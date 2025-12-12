@@ -1,25 +1,27 @@
 import os
-import uuid
 import shutil
-import pandas as pd
 import logging
 import asyncio
 from typing import List
-from fastapi import FastAPI, UploadFile, File, Form, BackgroundTasks, Request
+from fastapi import FastAPI, UploadFile, File, Form
 from fastapi.responses import JSONResponse, FileResponse, StreamingResponse
 from fastapi.staticfiles import StaticFiles
 from fastapi.middleware.cors import CORSMiddleware
+import anyio
+import pandas as pd
 from app.core.formatter import DataFormatter
 from app.core.engine import DocumentEngine
 from app.utils import sanitize_filename, extract_zip, start_scheduler
 
 
 # Setup
-logging.basicConfig(level=logging.INFO)
+logging.basicConfig(
+    level=logging.INFO, format="%(asctime)s [%(levelname)s] %(message)s"
+)
 logger = logging.getLogger("DocGenius")
-app = FastAPI(title="DocGenius API")
+app = FastAPI(title="DocGenius API", version="1.0")
 
-# CORS
+# Middleware
 app.add_middleware(
     CORSMiddleware,
     allow_origins=["*"],
@@ -29,7 +31,7 @@ app.add_middleware(
 
 # Constants
 BASE_DIR = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
-TEMP_DIR = "/data/temp"  # Mapped in Docker
+TEMP_DIR = os.getenv("TEMP_DIR", "/data/temp")
 STATIC_DIR = os.path.join(BASE_DIR, "static")
 
 # Start Scheduler
@@ -38,13 +40,19 @@ start_scheduler(TEMP_DIR)
 # Mount Static for Frontend
 app.mount("/static", StaticFiles(directory=STATIC_DIR), name="static")
 
+
+# --- Real-time Logging (SSE) ---
+
+
 # Global Event Queue for SSE
 # In prod, change this for Redis Pub/Sub
 log_queues = {}
 
 
 async def log_generator(session_id: str):
-    """Generator for Server-Sent Events."""
+    """
+    Async generator for Server-Sent Events (SSE).
+    """
     queue = asyncio.Queue()
     log_queues[session_id] = queue
     try:
@@ -56,12 +64,17 @@ async def log_generator(session_id: str):
     except asyncio.CancelledError:
         pass
     finally:
-        del log_queues[session_id]
+        if session_id in log_queues:
+            del log_queues[session_id]
 
 
-def send_log(session_id: str, message: str):
+def send_log(session_id: str, message: str) -> None:
+    """Push a log message to the specific session queue."""
     if session_id in log_queues:
         log_queues[session_id].put_nowait(message)
+
+
+# --- Routes ---
 
 
 @app.get("/")
@@ -92,20 +105,18 @@ async def preview_data(file_excel: UploadFile = File(...)):
 
         # Create Protocol Map
         formatter = DataFormatter()
-        protocol_map = []
-        for i, p_str in enumerate(protocols_raw):
-            protocol_map.append(formatter.parse_protocol(p_str))
+        protocol_map = [formatter.parse_protocol(p) for p in protocols_raw]
 
         # Format Preview Data
         preview_data = []
-        for idx, row in data_rows.iterrows():
+        for _, row in data_rows.iterrows():
             row_dict = {}
             for col_idx, cell_val in enumerate(row):
                 var_name = headers[col_idx]
                 proto = protocol_map[col_idx]
                 formatted_val = formatter.format_value(cell_val, proto)
 
-                # Simplify object for JSON (handle image dicts)
+                # Simplify image objects for JSON preview
                 if (
                     isinstance(formatted_val, dict)
                     and formatted_val.get("type") == "image"
@@ -120,7 +131,7 @@ async def preview_data(file_excel: UploadFile = File(...)):
         )
 
     except Exception as e:
-        logger.error(f"Preview Error: {e}")
+        logger.error(f"Preview failed: {e}")
         return JSONResponse({"status": "error", "message": str(e)}, status_code=500)
 
 
@@ -129,113 +140,132 @@ async def process_batch(
     session_id: str = Form(...),
     filename_col: str = Form(...),
     output_pdf: bool = Form(False),
+    group_by_folders: bool = Form(True),
     file_excel: UploadFile = File(...),
-    file_template: UploadFile = File(...),
+    files_templates: List[UploadFile] = File(...),
     file_assets: UploadFile = File(None),
 ):
-    # Setup Session Paths
+    """
+    Main batch processing endpoint. Handles file naming conventions,
+    folder structuring (grouped vs flat), and Excel reporting.
+    """
+    # 1. Setup Environment
     session_path = os.path.join(TEMP_DIR, session_id)
     assets_path = os.path.join(session_path, "assets")
-    output_path = os.path.join(session_path, "output")
-    os.makedirs(assets_path, exist_ok=True)
-    os.makedirs(output_path, exist_ok=True)
+    output_base_path = os.path.join(session_path, "output")
+    templates_storage_path = os.path.join(session_path, "templates")
+
+    for p in [assets_path, output_base_path, templates_storage_path]:
+        os.makedirs(p, exist_ok=True)
 
     try:
-        send_log(session_id, "Initializing session...")
+        send_log(session_id, "🟢 Initializing session environment...")
 
-        # 1. Save Files
+        # 2. Save Inputs (Async I/O)
         excel_path = os.path.join(session_path, "data.xlsx")
-        template_path = os.path.join(session_path, file_template.filename)
+        async with await anyio.open_file(excel_path, "wb") as f:
+            await f.write(await file_excel.read())
 
-        async with await anyio.open_file(excel_path, "wb") as f:  # async save
-            content = await file_excel.read()
-            await f.write(content)
+        # Save ALL Templates
+        saved_template_paths = []
+        for tmpl in files_templates:
+            t_path = os.path.join(templates_storage_path, tmpl.filename)
+            async with await anyio.open_file(t_path, "wb") as f:
+                await f.write(await tmpl.read())
+            saved_template_paths.append(t_path)
+            send_log(session_id, f"   ↳ Loaded template: {tmpl.filename}")
 
-        async with await anyio.open_file(template_path, "wb") as f:
-            content = await file_template.read()
-            await f.write(content)
-
+        # Handle Assets
         if file_assets:
             zip_path = os.path.join(session_path, "assets.zip")
             async with await anyio.open_file(zip_path, "wb") as f:
-                content = await file_assets.read()
-                await f.write(content)
+                await f.write(await file_assets.read())
             extract_zip(zip_path, assets_path)
-            send_log(session_id, "Assets extracted.")
+            send_log(session_id, "📦 Assets library extracted.")
 
-        # 2. Init Engine
+        # 3. Initialize Engine & Protocol
         engine = DocumentEngine(session_path)
         formatter = DataFormatter()
 
-        # 3. Read Data
+        # Read Excel using pandas
         df = pd.read_excel(excel_path, header=None)
         headers = df.iloc[0].tolist()
-        protocols_raw = df.iloc[1].tolist()
+        protocol_map = [formatter.parse_protocol(p) for p in df.iloc[1].tolist()]
 
-        # Build Protocol Map
-        protocol_map = [formatter.parse_protocol(p) for p in protocols_raw]
-
-        # 4. Iterate
         total_rows = len(df) - 2
-        success_count = 0
+        send_log(session_id, f"🚀 Starting batch processing for {total_rows} rows.")
+
+        # 4. Processing Loop
         report = []
 
-        send_log(session_id, f"Starting processing of {total_rows} rows...")
-
         for idx, row in df.iloc[2:].iterrows():
-            row_num = idx + 1  # Excel row number equivalent
+            row_num = idx + 1
             try:
                 # Build Context
                 context = {}
-                file_name_base = "doc"
+                row_identifier = f"Row_{row_num}"
 
+                # Extract Data
                 for col_idx, cell_val in enumerate(row):
                     var_name = headers[col_idx]
-                    proto = protocol_map[col_idx]
-                    val = formatter.format_value(cell_val, proto)
+                    val = formatter.format_value(cell_val, protocol_map[col_idx])
                     context[var_name] = val
 
                     if var_name == filename_col:
-                        file_name_base = sanitize_filename(str(val))
+                        # Sanitize the specific identifier (e.g. "JOHN DOE")
+                        row_identifier = sanitize_filename(str(val))
 
-                # Determine Output Format
-                ext = os.path.splitext(template_path)[1].lower()
-                doc_name = f"{file_name_base}{ext}"
-                doc_output = os.path.join(output_path, doc_name)
+                # Determine Output Directory for this Row
+                if group_by_folders:
+                    # Option A: Create specific folder (e.g., Output/JOHN DOE/)
+                    target_dir = os.path.join(output_base_path, row_identifier)
+                else:
+                    # Option B: Flat structure (e.g., Output/)
+                    target_dir = output_base_path
 
-                # Render
-                if ext == ".docx":
-                    await engine.process_docx(
-                        template_path, doc_output, context, assets_path
-                    )
-                elif ext == ".pptx":
-                    await engine.process_pptx(template_path, doc_output, context)
+                os.makedirs(target_dir, exist_ok=True)
 
-                # PDF Conversion
-                if output_pdf:
-                    send_log(session_id, f"Converting Row {row_num} to PDF...")
-                    await engine.convert_to_pdf(doc_output, output_path)
+                # Iterate through EACH template for this row
+                for tmpl_path in saved_template_paths:
+                    # 1. Get original template name (e.g., "Contract")
+                    tmpl_filename = os.path.basename(tmpl_path)
+                    tmpl_name_base, tmpl_ext = os.path.splitext(tmpl_filename)
 
+                    # 2. Construct Filename: "Contract - JOHN DOE.docx"
+                    final_filename = f"{tmpl_name_base} - {row_identifier}{tmpl_ext}"
+                    doc_output_path = os.path.join(target_dir, final_filename)
+
+                    # 3. Render
+                    if tmpl_ext.lower() == ".docx":
+                        await engine.process_docx(
+                            tmpl_path, doc_output_path, context, assets_path
+                        )
+                    elif tmpl_ext.lower() == ".pptx":
+                        await engine.process_pptx(tmpl_path, doc_output_path, context)
+
+                    # 4. Convert to PDF if requested
+                    if output_pdf:
+                        await engine.convert_to_pdf(doc_output_path, target_dir)
+
+                send_log(session_id, f"✅ {row_identifier} processed.")
                 report.append(
-                    {"Row": row_num, "File": file_name_base, "Status": "Success"}
+                    {"Row": row_num, "Identifier": row_identifier, "Status": "Success"}
                 )
-                success_count += 1
-                send_log(session_id, f"Row {row_num} completed.")
 
             except Exception as e:
                 logger.error(f"Row {row_num} failed: {e}")
+                send_log(session_id, f"❌ Row {row_num} FAILED: {str(e)}")
                 report.append(
-                    {"Row": row_num, "File": "N/A", "Status": f"Error: {str(e)}"}
+                    {"Row": row_num, "Identifier": "N/A", "Status": f"Error: {str(e)}"}
                 )
-                send_log(session_id, f"Row {row_num} FAILED.")
 
-        # 5. Generate Report & Zip
-        pd.DataFrame(report).to_csv(
-            os.path.join(output_path, "job_report.csv"), index=False
-        )
+        # 5. Finalize - Generate Excel Report
+        report_path = os.path.join(output_base_path, "job_report.xlsx")
+        pd.DataFrame(report).to_excel(report_path, index=False)
 
-        zip_output = os.path.join(session_path, "result.zip")
-        shutil.make_archive(zip_output.replace(".zip", ""), "zip", output_path)
+        # Zip the entire 'output' folder
+        zip_output_path = os.path.join(session_path, "DocGenius_Batch_Result")
+        shutil.make_archive(zip_output_path, "zip", output_base_path)
 
         send_log(session_id, "PROCESS_COMPLETE")
 
@@ -244,19 +274,16 @@ async def process_batch(
         )
 
     except Exception as e:
-        logger.error(f"Batch Error: {e}")
+        logger.error(f"Critical Batch Error: {e}")
         send_log(session_id, f"PROCESS_ERROR: {str(e)}")
         return JSONResponse({"status": "error", "message": str(e)}, status_code=500)
 
 
 @app.get("/api/download/{session_id}")
 def download_result(session_id: str):
-    file_path = os.path.join(TEMP_DIR, session_id, "result.zip")
+    file_path = os.path.join(TEMP_DIR, session_id, "DocGenius_Batch_Result.zip")
     if os.path.exists(file_path):
         return FileResponse(file_path, filename="DocGenius_Output.zip")
     return JSONResponse(
         {"status": "error", "message": "File not found"}, status_code=404
     )
-
-
-import anyio  # Helper for async file I/O
