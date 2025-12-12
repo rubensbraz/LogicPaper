@@ -3,7 +3,8 @@ import logging
 import os
 import shutil
 import subprocess
-from typing import Any, Dict, List
+import zipfile
+from typing import Any, Dict, List, Optional
 
 from docx.shared import Cm
 from docxtpl import DocxTemplate, InlineImage
@@ -41,6 +42,32 @@ class DocumentEngine:
             logger.error(f"Error loading image: {e}")
             return "[IMAGE ERROR]"
 
+    def _remove_office_thumbnail(self, file_path: str) -> None:
+        """
+        Removes the 'docProps/thumbnail.jpeg' from the Office file (ZIP structure).
+        This fixes the 'White Thumbnail' issue by forcing the OS to use the default icon.
+        """
+        try:
+            temp_path = f"{file_path}.tmp"
+
+            # Open original as read, temp as write
+            with zipfile.ZipFile(file_path, "r") as zin:
+                with zipfile.ZipFile(temp_path, "w") as zout:
+                    # Iterate over all files in the archive
+                    for item in zin.infolist():
+                        # Copy everything EXCEPT the thumbnail
+                        if "thumbnail" not in item.filename.lower():
+                            buffer = zin.read(item.filename)
+                            zout.writestr(item, buffer)
+
+            # Replace original with cleaned version
+            os.remove(file_path)
+            os.rename(temp_path, file_path)
+
+        except Exception as e:
+            # Non-critical error, just log and continue
+            logger.warning(f"Could not strip thumbnail from {file_path}: {e}")
+
     async def process_docx(
         self,
         template_path: str,
@@ -69,6 +96,7 @@ class DocumentEngine:
 
             tpl.render(final_context)
             tpl.save(output_path)
+            self._remove_office_thumbnail(output_path)
             return True
         except Exception as e:
             logger.error(f"DOCX Render Error: {e}")
@@ -119,6 +147,7 @@ class DocumentEngine:
                                         pass
 
             prs.save(output_path)
+            self._remove_office_thumbnail(output_path)
             return True
         except Exception as e:
             logger.error(f"PPTX Render Error: {e}")

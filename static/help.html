@@ -1,0 +1,82 @@
+<!DOCTYPE html>
+<html lang="en">
+
+    <head>
+        <meta charset="UTF-8">
+        <meta name="viewport" content="width=device-width, initial-scale=1.0">
+        <title>DocGenius | Documentation</title>
+        <link rel="icon" href="data:image/svg+xml,<svg xmlns=%22http://www.w3.org/2000/svg%22 viewBox=%220 0 100 100%22><text y=%22.9em%22 font-size=%2290%22>📘</text></svg>">
+        <script src="https://cdn.tailwindcss.com"></script>
+        <link href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;700&family=Inter:wght@300;400;600;800&display=swap" rel="stylesheet">
+        <link rel="stylesheet" href="/static/css/style.css">
+        <script src="/static/js/config.js"></script>
+    </head>
+
+    <body class="min-h-screen p-4 md:p-8 flex flex-col items-center">
+        <div id="navbar-mount" class="w-full flex justify-center"></div>
+        <main class="w-full max-w-7xl">
+            <div class="glass-panel rounded-2xl p-8 shadow-2xl animate-in fade-in zoom-in duration-300">
+                <h2 class="text-2xl font-bold text-blue-400 mb-6 border-b border-white/10 pb-4">📘 Documentation & Guide</h2>
+                <div class="grid grid-cols-1 md:grid-cols-2 gap-10 text-sm text-gray-300 leading-relaxed">
+                    <div class="space-y-4">
+                        <h3 class="text-white font-bold text-lg flex items-center gap-2">
+                            <span class="bg-green-500/20 text-green-400 w-6 h-6 flex items-center justify-center rounded text-xs">1</span> The Excel Schema
+                        </h3>
+                        <p>DocGenius requires a strict 3-row header format in your <code>.xlsx</code> file.</p>
+                        <div class="bg-black/40 p-4 rounded-lg font-mono text-xs border border-white/5 shadow-inner">
+                            <div class="text-gray-500 mb-1 opacity-50">// Row 1: Variable Names (Must match template tags)</div>
+                            <div class="text-white font-bold">client_name | contract_val | sign_date</div>
+                            <div class="my-2 border-b border-white/10"></div>
+                            <div class="text-gray-500 mb-1 opacity-50">// Row 2: Formatter Protocol</div>
+                            <div class="text-blue-300">string;upper | currency;USD | date;long</div>
+                            <div class="my-2 border-b border-white/10"></div>
+                            <div class="text-gray-500 mb-1 opacity-50">// Row 3+: The Data</div>
+                            <div class="text-green-300">John Doe | 1500.50 | 2024-01-01</div>
+                        </div>
+                        <div class="bg-blue-900/10 border-l-2 border-blue-500 p-3 text-xs text-blue-200">
+                            <strong>Supported Protocols:</strong>
+                            <ul class="list-disc pl-4 mt-1 space-y-1">
+                                <li><code>string;upper</code>, <code>string;title</code></li>
+                                <li><code>currency;BRL</code>, <code>currency;USD</code>, <code>currency;EUR</code></li>
+                                <li><code>date;long</code> (e.g., 12th January), <code>date;iso</code></li>
+                                <li><code>mask;###.###.###-##</code> (Any pattern using #)</li>
+                                <li><code>image;5;3</code> (Width;Height in cm)</li>
+                            </ul>
+                        </div>
+                    </div>
+                    <div class="space-y-4">
+                        <h3 class="text-white font-bold text-lg flex items-center gap-2">
+                            <span class="bg-purple-500/20 text-purple-400 w-6 h-6 flex items-center justify-center rounded text-xs">2</span> Templates & Logic
+                        </h3>
+                        <p>Use <strong>Jinja2</strong> syntax inside your Word or PowerPoint documents. The system replaces these tags with formatted Excel data.</p>
+                        <div class="bg-black/40 p-4 rounded-lg border border-white/5 shadow-inner">
+                            <div class="font-bold text-white mb-2">Basic Replacement:</div>
+                            <code class="bg-blue-900/30 text-blue-300 px-2 py-1 rounded text-xs">{{ client_name }}</code>
+                            <div class="font-bold text-white mt-4 mb-2">Logic (Word Only):</div>
+                            <div class="font-mono text-xs text-purple-300"> {% if contract_val > 10000 %}<br> &nbsp;&nbsp;<strong>High Value Client</strong><br> {% endif %} </div>
+                        </div>
+                        <h3 class="text-white font-bold text-lg flex items-center gap-2 mt-6">
+                            <span class="bg-yellow-500/20 text-yellow-400 w-6 h-6 flex items-center justify-center rounded text-xs">3</span> Image Handling
+                        </h3>
+                        <div class="p-3 bg-black/20 rounded border border-white/5 text-xs">
+                            <p class="mb-2">To insert dynamic images:</p>
+                            <ol class="list-decimal pl-4 space-y-1 text-gray-400">
+                                <li>Set Excel Row 2 to <code>image;W;H</code>.</li>
+                                <li>Put the filename in the Excel cell (e.g., <code>photo.png</code>).</li>
+                                <li>Create a ZIP file containing <code>photo.png</code>.</li>
+                                <li>Upload the ZIP in the "Assets Library" slot.</li>
+                            </ol>
+                        </div>
+                    </div>
+                </div>
+                <div class="mt-8 flex justify-center">
+                    <a href="/" class="px-6 py-3 bg-gray-800 hover:bg-gray-700 rounded-full text-sm font-bold text-white transition flex items-center gap-2">
+                        <span>← Back to Dashboard</span>
+                    </a>
+                </div>
+            </div>
+        </main>
+        <script src="/static/js/navbar.js"></script>
+    </body>
+
+</html>
