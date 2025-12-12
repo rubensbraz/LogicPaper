@@ -11,3 +11,4 @@ Jinja2
 APScheduler
 babel
 Pillow
+num2words

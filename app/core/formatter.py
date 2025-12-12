@@ -1,165 +1,109 @@
 import logging
-from datetime import datetime
-from typing import Any, Dict, List, Optional
+from typing import Any, Dict, List
 
-import babel.dates
-import babel.numbers
+from app.core.strategies.base import BaseStrategy
+from app.core.strategies.boolean_std import BooleanStrategy
+from app.core.strategies.date_std import DateStrategy
+from app.core.strategies.image_std import ImageStrategy
+from app.core.strategies.logic_std import LogicStrategy
+from app.core.strategies.mask_std import MaskStrategy
+from app.core.strategies.number_std import NumberStrategy
+from app.core.strategies.string_std import StringStrategy
 
 
 # Configure Logging
 logger = logging.getLogger(__name__)
 
 
+class DefaultStrategy(BaseStrategy):
+    """Fallback strategy that performs no operation."""
+
+    def process(self, value: Any, ops: List[str]) -> Any:
+        return value
+
+
 class DataFormatter:
     """
-    Handles data transformation based on the 'Formatter Protocol' defined
-    in the second row of the Excel file.
+    The Central Registry that parses the protocol string and dispatches
+    execution to the correct Strategy.
     """
 
     def __init__(self, locale: str = "pt_BR"):
         self.locale = locale
 
-    def parse_protocol(self, protocol_string: str) -> Dict[str, Any]:
+        # Registry of Strategies
+        self.strategies: Dict[str, BaseStrategy] = {
+            # Text & Content
+            "string": StringStrategy(),
+            # Numbers & Finance
+            "int": NumberStrategy(locale),
+            "float": NumberStrategy(locale),
+            "currency": NumberStrategy(locale),
+            "percent": NumberStrategy(locale),
+            # Dates
+            "date": DateStrategy(locale),
+            "time": DateStrategy(locale),
+            # Logic & Boolean
+            "bool": BooleanStrategy(),
+            "logic": LogicStrategy(),
+            "default": LogicStrategy(),  # Alias for convenience
+            # Privacy & Security
+            "mask": MaskStrategy(),
+            # Rich Media
+            "image": ImageStrategy(),
+        }
+        self.default_strategy = DefaultStrategy()
+
+    def parse_protocol_string(self, protocol_string: str) -> Dict[str, Any]:
         """
-        Parses a protocol string like 'currency;BRL' or 'date;%d/%m/%Y'.
+        Parses a semi-colon separated string into a Type and a List of Operations.
 
-        Args:
-            protocol_string (str): The raw string from Excel Row 2.
-
-        Returns:
-            Dict: A dictionary containing 'type', 'format', and 'options'.
+        Example: "string;upper;prefix;Mr."
+        Result: {"type": "string", "ops": ["upper", "prefix", "Mr."]}
         """
         if not protocol_string or str(protocol_string).strip() == "":
-            return {"type": "string", "format": None}
+            return {"type": "default", "ops": []}
 
+        # 1. Split by semicolon
         parts = str(protocol_string).split(";")
-        data_type = parts[0].lower().strip()
-        fmt = parts[1].strip() if len(parts) > 1 else None
-        options = parts[2].strip() if len(parts) > 2 else None
 
-        return {"type": data_type, "format": fmt, "options": options}
+        # 2. Clean whitespace
+        parts = [p.strip() for p in parts if p.strip()]
+
+        if not parts:
+            return {"type": "default", "ops": []}
+
+        # 3. Extract Head (Type) and Tail (Operations)
+        data_type = parts[0].lower()
+        ops = parts[1:]
+
+        return {"type": data_type, "ops": ops}
+
+    def parse_protocol(self, protocol_string: str) -> Dict[str, Any]:
+        """Legacy wrapper for compatibility."""
+        return self.parse_protocol_string(protocol_string)
 
     def format_value(self, value: Any, protocol: Dict[str, Any]) -> Any:
         """
-        Applies the formatting rule to a single value.
+        Applies the formatting rule to a single value using the Strategy Pattern.
         """
-        if value is None:
+        dtype = protocol.get("type", "default")
+        ops = protocol.get("ops", [])
+
+        # Special handling for Logic Strategy (needs to run even if value is None)
+        # Other strategies might bail early if value is None
+        if value is None and dtype not in ("logic", "default"):
             return ""
 
-        dtype = protocol.get("type", "string")
-        fmt = protocol.get("format")
-
         try:
-            # --- String Handling ---
-            if dtype == "string":
-                text = str(value)
-                if fmt == "upper":
-                    return text.upper()
-                if fmt == "lower":
-                    return text.lower()
-                if fmt == "title":
-                    return text.title()
-                return text
+            # 1. Select Strategy
+            strategy = self.strategies.get(dtype)
 
-            # --- Integer Handling ---
-            elif dtype == "int":
-                try:
-                    num = int(float(value))  # Handle 10.0 -> 10
-                    if fmt:
-                        # Handles padding like '04d' -> 0001
-                        return format(num, fmt)
-                    return num
-                except ValueError:
-                    return value
+            if strategy:
+                return strategy.process(value, ops)
 
-            # --- Float Handling ---
-            elif dtype == "float":
-                try:
-                    num = float(value)
-                    if fmt:
-                        if fmt == ".":
-                            return f"{num:.2f}".replace(",", ".")
-                        if fmt == ",":
-                            return f"{num:.2f}".replace(".", ",")
-                        # Assume fmt is precision integer (e.g. '2')
-                        try:
-                            precision = int(fmt)
-                            return round(num, precision)
-                        except:
-                            pass
-                    return num
-                except ValueError:
-                    return value
-
-            # --- Currency Handling ---
-            elif dtype == "currency":
-                try:
-                    num = float(value)
-                    currency_code = fmt if fmt else "BRL"
-                    return babel.numbers.format_currency(
-                        num, currency_code, locale=self.locale
-                    )
-                except Exception as e:
-                    logger.error(f"Currency error: {e}")
-                    return value
-
-            # --- Date Handling ---
-            elif dtype == "date":
-                # Ensure value is a datetime object
-                dt_val = value
-                if not isinstance(value, datetime):
-                    # Try minimal parsing if it's a string, or fail gracefully
-                    return str(value)
-
-                if fmt == "iso":
-                    return dt_val.isoformat()
-                elif fmt == "long":
-                    return babel.dates.format_date(
-                        dt_val, format="long", locale=self.locale
-                    )
-                elif fmt:
-                    # Python strftime format
-                    return dt_val.strftime(fmt)
-                return dt_val.strftime("%d/%m/%Y")
-
-            # --- Mask Handling (Generic) ---
-            elif dtype == "mask":
-                # Implementation of mask: ###.###.###-##
-                if not fmt:
-                    return str(value)
-
-                raw_val = str(value)
-                # Remove non-alphanumeric chars from value just in case
-                clean_val = "".join(filter(str.isalnum, raw_val))
-
-                masked_result = ""
-                val_idx = 0
-
-                for char in fmt:
-                    if char == "#":
-                        if val_idx < len(clean_val):
-                            masked_result += clean_val[val_idx]
-                            val_idx += 1
-                        else:
-                            break
-                    else:
-                        masked_result += char
-
-                return masked_result
-
-            # --- Image Handling ---
-            elif dtype == "image":
-                # For images, we just return the filename and the dimensions metadata
-                # The Engine will handle the actual insertion.
-                return {
-                    "type": "image",
-                    "filename": str(value),
-                    "width": fmt,  # e.g., 5
-                    "height": protocol.get("options"),  # e.g., 3
-                }
-
-            else:
-                return str(value)
+            # 2. Fallback
+            return str(value)
 
         except Exception as e:
             logger.error(f"Formatting failed for {value} with {protocol}: {e}")

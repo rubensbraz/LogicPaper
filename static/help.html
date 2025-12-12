@@ -10,69 +10,500 @@
         <link href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;700&family=Inter:wght@300;400;600;800&display=swap" rel="stylesheet">
         <link rel="stylesheet" href="/static/css/style.css">
         <script src="/static/js/config.js"></script>
+        <style>
+            /* Custom Table Styles for Documentation */
+            .doc-table {
+                width: 100%;
+                border-collapse: separate;
+                border-spacing: 0;
+            }
+
+            .doc-table th {
+                text-align: left;
+                padding: 12px;
+                border-bottom: 1px solid rgba(255, 255, 255, 0.1);
+                color: #94a3b8;
+                font-size: 0.75rem;
+                text-transform: uppercase;
+                letter-spacing: 0.05em;
+            }
+
+            .doc-table td {
+                padding: 12px;
+                border-bottom: 1px solid rgba(255, 255, 255, 0.05);
+                font-size: 0.85rem;
+                color: #cbd5e1;
+                font-family: 'Inter', sans-serif;
+            }
+
+            .doc-table tr:last-child td {
+                border-bottom: none;
+            }
+
+            .doc-table tr:hover td {
+                background: rgba(255, 255, 255, 0.02);
+            }
+
+            .code-pill {
+                background: rgba(59, 130, 246, 0.15);
+                color: #93c5fd;
+                padding: 4px 8px;
+                rounded: 6px;
+                font-family: 'JetBrains Mono', monospace;
+                font-size: 0.75rem;
+                border: 1px solid rgba(59, 130, 246, 0.2);
+                white-space: nowrap;
+            }
+
+            .example-pill {
+                background: rgba(16, 185, 129, 0.1);
+                color: #6ee7b7;
+                padding: 4px 8px;
+                rounded: 6px;
+                font-family: 'JetBrains Mono', monospace;
+                font-size: 0.75rem;
+                white-space: nowrap;
+            }
+
+            .desc-text {
+                color: #94a3b8;
+                font-size: 0.75rem;
+            }
+        </style>
     </head>
 
-    <body class="min-h-screen p-4 md:p-8 flex flex-col items-center">
+    <body class="min-h-screen p-4 md:p-8 flex flex-col items-center bg-[#0B0C15]">
         <div id="navbar-mount" class="w-full flex justify-center"></div>
-        <main class="w-full max-w-7xl">
-            <div class="glass-panel rounded-2xl p-8 shadow-2xl animate-in fade-in zoom-in duration-300">
-                <h2 class="text-2xl font-bold text-blue-400 mb-6 border-b border-white/10 pb-4">📘 Documentation & Guide</h2>
-                <div class="grid grid-cols-1 md:grid-cols-2 gap-10 text-sm text-gray-300 leading-relaxed">
-                    <div class="space-y-4">
-                        <h3 class="text-white font-bold text-lg flex items-center gap-2">
-                            <span class="bg-green-500/20 text-green-400 w-6 h-6 flex items-center justify-center rounded text-xs">1</span> The Excel Schema
-                        </h3>
-                        <p>DocGenius requires a strict 3-row header format in your <code>.xlsx</code> file.</p>
-                        <div class="bg-black/40 p-4 rounded-lg font-mono text-xs border border-white/5 shadow-inner">
-                            <div class="text-gray-500 mb-1 opacity-50">// Row 1: Variable Names (Must match template tags)</div>
-                            <div class="text-white font-bold">client_name | contract_val | sign_date</div>
-                            <div class="my-2 border-b border-white/10"></div>
-                            <div class="text-gray-500 mb-1 opacity-50">// Row 2: Formatter Protocol</div>
-                            <div class="text-blue-300">string;upper | currency;USD | date;long</div>
-                            <div class="my-2 border-b border-white/10"></div>
-                            <div class="text-gray-500 mb-1 opacity-50">// Row 3+: The Data</div>
-                            <div class="text-green-300">John Doe | 1500.50 | 2024-01-01</div>
-                        </div>
-                        <div class="bg-blue-900/10 border-l-2 border-blue-500 p-3 text-xs text-blue-200">
-                            <strong>Supported Protocols:</strong>
-                            <ul class="list-disc pl-4 mt-1 space-y-1">
-                                <li><code>string;upper</code>, <code>string;title</code></li>
-                                <li><code>currency;BRL</code>, <code>currency;USD</code>, <code>currency;EUR</code></li>
-                                <li><code>date;long</code> (e.g., 12th January), <code>date;iso</code></li>
-                                <li><code>mask;###.###.###-##</code> (Any pattern using #)</li>
-                                <li><code>image;5;3</code> (Width;Height in cm)</li>
-                            </ul>
-                        </div>
+        <main class="w-full max-w-7xl animate-in fade-in zoom-in duration-300">
+            <div class="glass-panel rounded-2xl p-8 shadow-2xl mb-8">
+                <div class="flex flex-col md:flex-row justify-between items-start md:items-center gap-4">
+                    <div>
+                        <h2 class="text-3xl font-bold text-blue-400">Reference Manual</h2>
+                        <p class="text-gray-400 mt-2 text-sm max-w-2xl"> Complete guide to the DocGenius Formatter Protocol. Use these codes in <strong>Row 2</strong> of your Excel file to transform data. </p>
                     </div>
-                    <div class="space-y-4">
-                        <h3 class="text-white font-bold text-lg flex items-center gap-2">
-                            <span class="bg-purple-500/20 text-purple-400 w-6 h-6 flex items-center justify-center rounded text-xs">2</span> Templates & Logic
-                        </h3>
-                        <p>Use <strong>Jinja2</strong> syntax inside your Word or PowerPoint documents. The system replaces these tags with formatted Excel data.</p>
-                        <div class="bg-black/40 p-4 rounded-lg border border-white/5 shadow-inner">
-                            <div class="font-bold text-white mb-2">Basic Replacement:</div>
-                            <code class="bg-blue-900/30 text-blue-300 px-2 py-1 rounded text-xs">{{ client_name }}</code>
-                            <div class="font-bold text-white mt-4 mb-2">Logic (Word Only):</div>
-                            <div class="font-mono text-xs text-purple-300"> {% if contract_val > 10000 %}<br> &nbsp;&nbsp;<strong>High Value Client</strong><br> {% endif %} </div>
-                        </div>
-                        <h3 class="text-white font-bold text-lg flex items-center gap-2 mt-6">
-                            <span class="bg-yellow-500/20 text-yellow-400 w-6 h-6 flex items-center justify-center rounded text-xs">3</span> Image Handling
-                        </h3>
-                        <div class="p-3 bg-black/20 rounded border border-white/5 text-xs">
-                            <p class="mb-2">To insert dynamic images:</p>
-                            <ol class="list-decimal pl-4 space-y-1 text-gray-400">
-                                <li>Set Excel Row 2 to <code>image;W;H</code>.</li>
-                                <li>Put the filename in the Excel cell (e.g., <code>photo.png</code>).</li>
-                                <li>Create a ZIP file containing <code>photo.png</code>.</li>
-                                <li>Upload the ZIP in the "Assets Library" slot.</li>
-                            </ol>
-                        </div>
+                    <div class="flex gap-3">
+                        <a href="/" class="px-5 py-2.5 bg-white/5 hover:bg-white/10 border border-white/10 rounded-lg text-sm font-medium transition flex items-center gap-2">
+                            <span>← Back to Dashboard</span>
+                        </a>
                     </div>
                 </div>
-                <div class="mt-8 flex justify-center">
-                    <a href="/" class="px-6 py-3 bg-gray-800 hover:bg-gray-700 rounded-full text-sm font-bold text-white transition flex items-center gap-2">
-                        <span>← Back to Dashboard</span>
-                    </a>
+            </div>
+            <div class="grid grid-cols-1 lg:grid-cols-12 gap-8">
+                <div class="lg:col-span-3">
+                    <nav class="glass-panel rounded-xl p-4 sticky top-8 space-y-1 max-h-[80vh] overflow-y-auto custom-scrollbar">
+                        <div class="text-xs font-bold text-gray-500 uppercase tracking-widest px-3 mb-3 mt-1">Directory</div>
+                        <a href="#section-schema" class="block px-3 py-2 text-sm text-gray-300 hover:text-white hover:bg-white/5 rounded-lg transition">1. Excel Schema</a>
+                        <div class="my-2 border-b border-white/5"></div>
+                        <a href="#section-strings" class="block px-3 py-2 text-sm text-gray-300 hover:text-white hover:bg-white/5 rounded-lg transition">2. Text Manipulation</a>
+                        <a href="#section-numbers" class="block px-3 py-2 text-sm text-gray-300 hover:text-white hover:bg-white/5 rounded-lg transition">3. Numbers & Currency</a>
+                        <a href="#section-dates" class="block px-3 py-2 text-sm text-gray-300 hover:text-white hover:bg-white/5 rounded-lg transition">4. Dates & Arithmetic</a>
+                        <a href="#section-logic" class="block px-3 py-2 text-sm text-gray-300 hover:text-white hover:bg-white/5 rounded-lg transition">5. Logic & Defaults</a>
+                        <a href="#section-privacy" class="block px-3 py-2 text-sm text-gray-300 hover:text-white hover:bg-white/5 rounded-lg transition">6. Privacy & Masking</a>
+                        <a href="#section-images" class="block px-3 py-2 text-sm text-gray-300 hover:text-white hover:bg-white/5 rounded-lg transition">7. Dynamic Images</a>
+                    </nav>
+                </div>
+                <div class="lg:col-span-9 space-y-12 pb-20">
+                    <section id="section-schema" class="scroll-mt-24">
+                        <h3 class="text-xl font-bold text-white mb-6 border-l-4 border-blue-500 pl-4">01. The Excel Schema</h3>
+                        <div class="glass-panel rounded-xl p-6">
+                            <p class="text-sm text-gray-400 mb-4">DocGenius ignores all rows except the header structure defined below.</p>
+                            <div class="bg-black/40 rounded-xl border border-white/5 overflow-hidden">
+                                <div class="grid grid-cols-12 text-xs font-mono border-b border-white/10 bg-white/5">
+                                    <div class="col-span-1 p-3 text-gray-500 border-r border-white/10">Row</div>
+                                    <div class="col-span-11 p-3 text-gray-300">Description</div>
+                                </div>
+                                <div class="grid grid-cols-12 text-xs font-mono border-b border-white/5">
+                                    <div class="col-span-1 p-3 text-gray-500 border-r border-white/5 bg-white/[0.02]">1</div>
+                                    <div class="col-span-11 p-3"><span class="text-white font-bold">Variable Name</span> <span class="text-gray-500">// Matches template tags (e.g. {{ client }})</span></div>
+                                </div>
+                                <div class="grid grid-cols-12 text-xs font-mono border-b border-white/5 bg-blue-500/10">
+                                    <div class="col-span-1 p-3 text-gray-500 border-r border-white/5 bg-white/[0.02]">2</div>
+                                    <div class="col-span-11 p-3"><span class="text-blue-400 font-bold">Protocol</span> <span class="text-gray-500">// Formatting rules (e.g. string;upper)</span></div>
+                                </div>
+                                <div class="grid grid-cols-12 text-xs font-mono">
+                                    <div class="col-span-1 p-3 text-gray-500 border-r border-white/5 bg-white/[0.02]">3+</div>
+                                    <div class="col-span-11 p-3 text-gray-400">Data Rows...</div>
+                                </div>
+                            </div>
+                        </div>
+                    </section>
+                    <section id="section-strings" class="scroll-mt-24">
+                        <h3 class="text-xl font-bold text-white mb-6 border-l-4 border-purple-500 pl-4">02. Text Manipulation</h3>
+                        <div class="glass-panel rounded-xl overflow-hidden">
+                            <table class="doc-table">
+                                <thead>
+                                    <tr>
+                                        <th width="40%">Protocol</th>
+                                        <th width="20%">Input</th>
+                                        <th width="20%">Output</th>
+                                        <th width="20%">Description</th>
+                                    </tr>
+                                </thead>
+                                <tbody>
+                                    <tr>
+                                        <td><span class="code-pill">string;upper</span></td>
+                                        <td>John</td>
+                                        <td><span class="example-pill">JOHN</span></td>
+                                        <td>Uppercase</td>
+                                    </tr>
+                                    <tr>
+                                        <td><span class="code-pill">string;lower</span></td>
+                                        <td>John</td>
+                                        <td><span class="example-pill">john</span></td>
+                                        <td>Lowercase</td>
+                                    </tr>
+                                    <tr>
+                                        <td><span class="code-pill">string;title</span></td>
+                                        <td>the doc</td>
+                                        <td><span class="example-pill">The Doc</span></td>
+                                        <td>Title Case</td>
+                                    </tr>
+                                    <tr>
+                                        <td><span class="code-pill">string;capitalize</span></td>
+                                        <td>john doe</td>
+                                        <td><span class="example-pill">John doe</span></td>
+                                        <td>First Letter</td>
+                                    </tr>
+                                    <tr>
+                                        <td><span class="code-pill">string;swapcase</span></td>
+                                        <td>DocGen</td>
+                                        <td><span class="example-pill">dOCgEN</span></td>
+                                        <td>Invert Case</td>
+                                    </tr>
+                                    <tr>
+                                        <td><span class="code-pill">string;snake</span></td>
+                                        <td>My File</td>
+                                        <td><span class="example-pill">my_file</span></td>
+                                        <td>Snake Case</td>
+                                    </tr>
+                                    <tr>
+                                        <td><span class="code-pill">string;kebab</span></td>
+                                        <td>My File</td>
+                                        <td><span class="example-pill">my-file</span></td>
+                                        <td>Kebab Case</td>
+                                    </tr>
+                                    <tr>
+                                        <td><span class="code-pill">string;slug</span></td>
+                                        <td>Doc & Gen!</td>
+                                        <td><span class="example-pill">doc-gen</span></td>
+                                        <td>URL Slug</td>
+                                    </tr>
+                                    <tr>
+                                        <td><span class="code-pill">string;trim</span></td>
+                                        <td>" data "</td>
+                                        <td><span class="example-pill">"data"</span></td>
+                                        <td>Remove whitespace</td>
+                                    </tr>
+                                    <tr>
+                                        <td><span class="code-pill">string;reverse</span></td>
+                                        <td>ABC</td>
+                                        <td><span class="example-pill">CBA</span></td>
+                                        <td>Reverse Text</td>
+                                    </tr>
+                                    <tr>
+                                        <td><span class="code-pill">prefix;"Dr. "</span></td>
+                                        <td>House</td>
+                                        <td><span class="example-pill">Dr. House</span></td>
+                                        <td>Add Start</td>
+                                    </tr>
+                                    <tr>
+                                        <td><span class="code-pill">suffix;" (CEO)"</span></td>
+                                        <td>John</td>
+                                        <td><span class="example-pill">John (CEO)</span></td>
+                                        <td>Add End</td>
+                                    </tr>
+                                    <tr>
+                                        <td><span class="code-pill">truncate;5</span></td>
+                                        <td>Document</td>
+                                        <td><span class="example-pill">Docum...</span></td>
+                                        <td>Cut text</td>
+                                    </tr>
+                                </tbody>
+                            </table>
+                        </div>
+                    </section>
+                    <section id="section-numbers" class="scroll-mt-24">
+                        <h3 class="text-xl font-bold text-white mb-6 border-l-4 border-green-500 pl-4">03. Numbers & Finance</h3>
+                        <div class="glass-panel rounded-xl overflow-hidden">
+                            <table class="doc-table">
+                                <thead>
+                                    <tr>
+                                        <th width="40%">Protocol</th>
+                                        <th width="20%">Input</th>
+                                        <th width="20%">Output</th>
+                                        <th width="20%">Description</th>
+                                    </tr>
+                                </thead>
+                                <tbody>
+                                    <tr>
+                                        <td><span class="code-pill">int</span></td>
+                                        <td>10.5</td>
+                                        <td><span class="example-pill">10</span></td>
+                                        <td>Integer</td>
+                                    </tr>
+                                    <tr>
+                                        <td><span class="code-pill">int;pad;04d</span></td>
+                                        <td>42</td>
+                                        <td><span class="example-pill">0042</span></td>
+                                        <td>Zero Padding</td>
+                                    </tr>
+                                    <tr>
+                                        <td><span class="code-pill">float;2</span></td>
+                                        <td>1500.5</td>
+                                        <td><span class="example-pill">1500.50</span></td>
+                                        <td>Precision</td>
+                                    </tr>
+                                    <tr>
+                                        <td><span class="code-pill">float;round;0</span></td>
+                                        <td>15.8</td>
+                                        <td><span class="example-pill">16</span></td>
+                                        <td>Rounding</td>
+                                    </tr>
+                                    <tr>
+                                        <td><span class="code-pill">separator;.,</span></td>
+                                        <td>1234.5</td>
+                                        <td><span class="example-pill">1.234,50</span></td>
+                                        <td>EU/BR Standard</td>
+                                    </tr>
+                                    <tr>
+                                        <td><span class="code-pill">separator;,.</span></td>
+                                        <td>1234.5</td>
+                                        <td><span class="example-pill">1,234.50</span></td>
+                                        <td>US Standard</td>
+                                    </tr>
+                                    <tr>
+                                        <td><span class="code-pill">currency;USD</span></td>
+                                        <td>1000</td>
+                                        <td><span class="example-pill">$1,000.00</span></td>
+                                        <td>US Dollar</td>
+                                    </tr>
+                                    <tr>
+                                        <td><span class="code-pill">currency;BRL</span></td>
+                                        <td>1000</td>
+                                        <td><span class="example-pill">R$ 1.000,00</span></td>
+                                        <td>Reais</td>
+                                    </tr>
+                                    <tr>
+                                        <td><span class="code-pill">currency;EUR</span></td>
+                                        <td>1000</td>
+                                        <td><span class="example-pill">€1,000.00</span></td>
+                                        <td>Euros</td>
+                                    </tr>
+                                    <tr>
+                                        <td><span class="code-pill">percent</span></td>
+                                        <td>0.5</td>
+                                        <td><span class="example-pill">50%</span></td>
+                                        <td>Percentage</td>
+                                    </tr>
+                                    <tr>
+                                        <td><span class="code-pill">scientific</span></td>
+                                        <td>10000</td>
+                                        <td><span class="example-pill">1E+04</span></td>
+                                        <td>Scientific Not.</td>
+                                    </tr>
+                                    <tr>
+                                        <td><span class="code-pill">humanize</span></td>
+                                        <td>1500000</td>
+                                        <td><span class="example-pill">1.5M</span></td>
+                                        <td>Short Scale</td>
+                                    </tr>
+                                    <tr>
+                                        <td><span class="code-pill">ordinal</span></td>
+                                        <td>1</td>
+                                        <td><span class="example-pill">1st</span></td>
+                                        <td>Rank</td>
+                                    </tr>
+                                    <tr>
+                                        <td><span class="code-pill">spell_out;en</span></td>
+                                        <td>10</td>
+                                        <td><span class="example-pill">ten</span></td>
+                                        <td>Text (EN)</td>
+                                    </tr>
+                                    <tr>
+                                        <td><span class="code-pill">spell_out;pt</span></td>
+                                        <td>10</td>
+                                        <td><span class="example-pill">dez</span></td>
+                                        <td>Text (PT)</td>
+                                    </tr>
+                                </tbody>
+                            </table>
+                        </div>
+                    </section>
+                    <section id="section-dates" class="scroll-mt-24">
+                        <h3 class="text-xl font-bold text-white mb-6 border-l-4 border-orange-500 pl-4">04. Dates & Arithmetic</h3>
+                        <div class="glass-panel rounded-xl overflow-hidden">
+                            <table class="doc-table">
+                                <thead>
+                                    <tr>
+                                        <th width="40%">Protocol</th>
+                                        <th width="20%">Input (2025-12-25)</th>
+                                        <th width="20%">Output</th>
+                                        <th width="20%">Description</th>
+                                    </tr>
+                                </thead>
+                                <tbody>
+                                    <tr>
+                                        <td><span class="code-pill">date;iso</span></td>
+                                        <td>2025-12-25</td>
+                                        <td><span class="example-pill">2025-12-25</span></td>
+                                        <td>ISO 8601</td>
+                                    </tr>
+                                    <tr>
+                                        <td><span class="code-pill">date;long</span></td>
+                                        <td>2025-12-25</td>
+                                        <td><span class="example-pill">25 de dezembro de 2025</span></td>
+                                        <td>Localized Long</td>
+                                    </tr>
+                                    <tr>
+                                        <td><span class="code-pill">date;short</span></td>
+                                        <td>2025-12-25</td>
+                                        <td><span class="example-pill">25/12/2025</span></td>
+                                        <td>Localized Short</td>
+                                    </tr>
+                                    <tr>
+                                        <td><span class="code-pill">date;fmt;"%d/%m"</span></td>
+                                        <td>2025-12-25</td>
+                                        <td><span class="example-pill">25/12</span></td>
+                                        <td>Custom Pattern</td>
+                                    </tr>
+                                    <tr>
+                                        <td><span class="code-pill">date;year</span></td>
+                                        <td>2025-12-25</td>
+                                        <td><span class="example-pill">2025</span></td>
+                                        <td>Year Only</td>
+                                    </tr>
+                                    <tr>
+                                        <td><span class="code-pill">date;month_name</span></td>
+                                        <td>2025-12-25</td>
+                                        <td><span class="example-pill">Dezembro</span></td>
+                                        <td>Month Name</td>
+                                    </tr>
+                                    <tr>
+                                        <td><span class="code-pill">date;add_days;5</span></td>
+                                        <td>2025-12-25</td>
+                                        <td><span class="example-pill">2025-12-30</span></td>
+                                        <td>Add Days</td>
+                                    </tr>
+                                    <tr>
+                                        <td><span class="code-pill">date;add_years;1</span></td>
+                                        <td>2025-12-25</td>
+                                        <td><span class="example-pill">2026-12-25</span></td>
+                                        <td>Add Years</td>
+                                    </tr>
+                                </tbody>
+                            </table>
+                        </div>
+                    </section>
+                    <section id="section-logic" class="scroll-mt-24">
+                        <h3 class="text-xl font-bold text-white mb-6 border-l-4 border-red-500 pl-4">05. Logic & Defaults</h3>
+                        <div class="glass-panel rounded-xl overflow-hidden">
+                            <table class="doc-table">
+                                <thead>
+                                    <tr>
+                                        <th width="40%">Protocol</th>
+                                        <th width="20%">Input</th>
+                                        <th width="20%">Output</th>
+                                        <th width="20%">Description</th>
+                                    </tr>
+                                </thead>
+                                <tbody>
+                                    <tr>
+                                        <td><span class="code-pill">default;"N/A"</span></td>
+                                        <td><i>(empty)</i></td>
+                                        <td><span class="example-pill">N/A</span></td>
+                                        <td>Fallback</td>
+                                    </tr>
+                                    <tr>
+                                        <td><span class="code-pill">bool;Yes;No</span></td>
+                                        <td>TRUE</td>
+                                        <td><span class="example-pill">Yes</span></td>
+                                        <td>Map Boolean</td>
+                                    </tr>
+                                    <tr>
+                                        <td><span class="code-pill">bool;Sim;Não</span></td>
+                                        <td>FALSE</td>
+                                        <td><span class="example-pill">Não</span></td>
+                                        <td>Map Boolean (PT)</td>
+                                    </tr>
+                                    <tr>
+                                        <td><span class="code-pill">bool;check</span></td>
+                                        <td>TRUE</td>
+                                        <td><span class="example-pill">☑</span></td>
+                                        <td>Checkbox</td>
+                                    </tr>
+                                    <tr>
+                                        <td><span class="code-pill">bool;on_off</span></td>
+                                        <td>1</td>
+                                        <td><span class="example-pill">On</span></td>
+                                        <td>On/Off Switch</td>
+                                    </tr>
+                                </tbody>
+                            </table>
+                        </div>
+                    </section>
+                    <section id="section-privacy" class="scroll-mt-24">
+                        <h3 class="text-xl font-bold text-white mb-6 border-l-4 border-gray-500 pl-4">06. Privacy & Masking</h3>
+                        <div class="glass-panel rounded-xl overflow-hidden">
+                            <table class="doc-table">
+                                <thead>
+                                    <tr>
+                                        <th width="40%">Protocol</th>
+                                        <th width="20%">Input</th>
+                                        <th width="20%">Output</th>
+                                        <th width="20%">Compliance</th>
+                                    </tr>
+                                </thead>
+                                <tbody>
+                                    <tr>
+                                        <td><span class="code-pill">mask;email</span></td>
+                                        <td>john@acme.com</td>
+                                        <td><span class="example-pill">j***@acme.com</span></td>
+                                        <td>GDPR/LGPD</td>
+                                    </tr>
+                                    <tr>
+                                        <td><span class="code-pill">mask;name</span></td>
+                                        <td>John Doe</td>
+                                        <td><span class="example-pill">J*** D**</span></td>
+                                        <td>Anonymization</td>
+                                    </tr>
+                                    <tr>
+                                        <td><span class="code-pill">mask;credit_card</span></td>
+                                        <td>1234567812345678</td>
+                                        <td><span class="example-pill">**** **** **** 5678</span></td>
+                                        <td>PCI DSS</td>
+                                    </tr>
+                                    <tr>
+                                        <td><span class="code-pill">mask;###.###.###-##</span></td>
+                                        <td>12345678900</td>
+                                        <td><span class="example-pill">123.456.789-00</span></td>
+                                        <td>Generic Pattern</td>
+                                    </tr>
+                                </tbody>
+                            </table>
+                        </div>
+                    </section>
+                    <section id="section-images" class="scroll-mt-24">
+                        <h3 class="text-xl font-bold text-white mb-6 border-l-4 border-yellow-500 pl-4">07. Dynamic Images</h3>
+                        <p class="text-sm text-gray-400 mb-6">Inject images directly into Word documents using the `InlineImage` engine.</p>
+                        <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+                            <div class="bg-black/40 p-5 rounded-xl border border-white/5">
+                                <h4 class="text-xs font-bold text-gray-500 uppercase mb-3">Step 1: Protocol</h4>
+                                <div class="text-sm text-white mb-2">Use the <span class="code-pill">image</span> strategy.</div>
+                                <code class="block bg-black/60 p-3 rounded text-blue-300 text-xs mb-3 font-mono">image;[Width];[Height]</code>
+                                <div class="text-xs text-gray-500">
+                                    <strong>Example:</strong> <code>image;5;3</code><br> (Width=5cm, Height=3cm)<br> Use <code>auto</code> to keep aspect ratio.
+                                </div>
+                            </div>
+                            <div class="bg-black/40 p-5 rounded-xl border border-white/5">
+                                <h4 class="text-xs font-bold text-gray-500 uppercase mb-3">Step 2: Data</h4>
+                                <div class="text-sm text-white mb-2">Cell content must match the filename.</div>
+                                <code class="block bg-black/60 p-3 rounded text-green-300 text-xs mb-3 font-mono">signature_john.png</code>
+                                <div class="text-xs text-gray-500">
+                                    <strong>Requirement:</strong> This file must exist inside the uploaded <code>assets.zip</code> file.
+                                </div>
+                            </div>
+                        </div>
+                    </section>
                 </div>
             </div>
         </main>
