@@ -1,0 +1,182 @@
+<!DOCTYPE html>
+<html lang="en">
+
+    <head>
+        <meta charset="UTF-8">
+        <meta name="viewport" content="width=device-width, initial-scale=1.0">
+        <title>DocGenius | Auto-Docs</title>
+        <link rel="icon" href="data:image/svg+xml,<svg xmlns=%22http://www.w3.org/2000/svg%22 viewBox=%220 0 100 100%22><text y=%22.9em%22 font-size=%2290%22>📄</text></svg>">
+        <script src="https://cdn.tailwindcss.com"></script>
+        <script src="https://cdn.jsdelivr.net/npm/sweetalert2@11"></script>
+        <style>
+            .glass {
+                background: rgba(255, 255, 255, 0.05);
+                backdrop-filter: blur(10px);
+                border: 1px solid rgba(255, 255, 255, 0.1);
+            }
+
+            body {
+                background-color: #0f172a;
+                color: #e2e8f0;
+                font-family: sans-serif;
+            }
+        </style>
+    </head>
+
+    <body class="min-h-screen flex items-center justify-center p-4">
+        <div class="glass rounded-2xl p-8 w-full max-w-4xl shadow-2xl">
+            <h1 class="text-3xl font-bold mb-2 text-blue-400">DocGenius <span class="text-xs text-gray-500">v1.0</span></h1>
+            <p class="text-gray-400 mb-6">Secure, Containerized Document Generation System</p>
+            <div id="step-1" class="space-y-4">
+                <h2 class="text-xl font-semibold border-b border-gray-700 pb-2">1. Upload Assets</h2>
+                <div class="grid grid-cols-1 md:grid-cols-3 gap-4">
+                    <div class="border-2 border-dashed border-gray-600 rounded-lg p-6 text-center hover:border-blue-500 transition cursor-pointer" onclick="document.getElementById('fileExcel').click()">
+                        <div class="text-2xl mb-2">📊</div>
+                        <div class="text-sm font-medium">Data Source (Excel)</div>
+                        <input type="file" id="fileExcel" class="hidden" accept=".xlsx" onchange="updateLabel(this)">
+                        <span id="lblExcel" class="text-xs text-gray-500 block mt-1">Select .xlsx</span>
+                    </div>
+                    <div class="border-2 border-dashed border-gray-600 rounded-lg p-6 text-center hover:border-blue-500 transition cursor-pointer" onclick="document.getElementById('fileTemplate').click()">
+                        <div class="text-2xl mb-2">📄</div>
+                        <div class="text-sm font-medium">Template</div>
+                        <input type="file" id="fileTemplate" class="hidden" accept=".docx,.pptx" onchange="updateLabel(this)">
+                        <span id="lblTemplate" class="text-xs text-gray-500 block mt-1">.docx or .pptx</span>
+                    </div>
+                    <div class="border-2 border-dashed border-gray-600 rounded-lg p-6 text-center hover:border-blue-500 transition cursor-pointer" onclick="document.getElementById('fileAssets').click()">
+                        <div class="text-2xl mb-2">🖼️</div>
+                        <div class="text-sm font-medium">Images (Optional)</div>
+                        <input type="file" id="fileAssets" class="hidden" accept=".zip" onchange="updateLabel(this)">
+                        <span id="lblAssets" class="text-xs text-gray-500 block mt-1">.zip only</span>
+                    </div>
+                </div>
+                <button onclick="previewData()" class="w-full bg-blue-600 hover:bg-blue-500 text-white font-bold py-2 px-4 rounded mt-4 transition"> Analyze & Preview Data </button>
+            </div>
+            <div id="step-2" class="hidden mt-8 space-y-4">
+                <h2 class="text-xl font-semibold border-b border-gray-700 pb-2">2. Configuration</h2>
+                <div class="bg-gray-900 rounded p-4 text-xs font-mono overflow-x-auto h-40 border border-gray-700">
+                    <pre id="jsonPreview" class="text-green-400">Waiting for data...</pre>
+                </div>
+                <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+                    <div>
+                        <label class="block text-sm font-medium mb-1">Filename Column</label>
+                        <select id="colSelect" class="w-full bg-gray-800 border border-gray-700 rounded p-2 text-white">
+                            <option>Select a column...</option>
+                        </select>
+                    </div>
+                    <div class="flex items-center space-x-4 pt-6">
+                        <label class="flex items-center cursor-pointer">
+                            <input type="checkbox" id="checkPDF" class="sr-only peer">
+                            <div class="w-11 h-6 bg-gray-700 peer-focus:outline-none rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-green-600 relative"></div>
+                            <span class="ml-3 text-sm font-medium">Convert to PDF</span>
+                        </label>
+                    </div>
+                </div>
+                <button onclick="startProcessing()" class="w-full bg-green-600 hover:bg-green-500 text-white font-bold py-3 px-4 rounded mt-4 transition shadow-lg shadow-green-900/50"> 🚀 Launch Production Batch </button>
+            </div>
+            <div id="terminal" class="hidden mt-8">
+                <div class="bg-black rounded-t-lg p-2 border-b border-gray-800 flex justify-between">
+                    <span class="text-xs text-gray-400">Server Logs</span>
+                    <span class="text-xs text-green-500 animate-pulse">● Live</span>
+                </div>
+                <div id="logContent" class="bg-gray-950 p-4 h-48 overflow-y-auto font-mono text-xs text-gray-300 rounded-b-lg shadow-inner">
+                </div>
+                <div id="downloadArea" class="hidden mt-4 text-center">
+                    <a id="downloadLink" href="#" class="inline-block bg-white text-black font-bold py-2 px-6 rounded-full hover:bg-gray-200 transition"> 📥 Download ZIP </a>
+                </div>
+            </div>
+        </div>
+        <script>
+            let sessionId = crypto.randomUUID();
+            let headers = [];
+
+            function updateLabel(input) {
+                if (input.files && input.files[0]) {
+                    document.getElementById('lbl' + input.id.replace('file', '')).innerText = input.files[0].name;
+                    document.getElementById('lbl' + input.id.replace('file', '')).classList.add('text-green-400');
+                }
+            }
+
+            async function previewData() {
+                const fileExcel = document.getElementById('fileExcel').files[0];
+                if (!fileExcel) return Swal.fire('Error', 'Please upload an Excel file', 'error');
+
+                const formData = new FormData();
+                formData.append('file_excel', fileExcel);
+
+                try {
+                    const res = await fetch('/api/preview', { method: 'POST', body: formData });
+                    const data = await res.json();
+
+                    if (data.status === 'success') {
+                        document.getElementById('step-2').classList.remove('hidden');
+                        document.getElementById('jsonPreview').innerText = JSON.stringify(data.preview, null, 2);
+
+                        // Populate Select
+                        headers = data.headers;
+                        const sel = document.getElementById('colSelect');
+                        sel.innerHTML = '';
+                        headers.forEach(h => {
+                            let opt = document.createElement('option');
+                            opt.value = h;
+                            opt.innerText = h;
+                            sel.appendChild(opt);
+                        });
+                    } else {
+                        throw new Error(data.message);
+                    }
+                } catch (e) {
+                    Swal.fire('Preview Failed', e.message, 'error');
+                }
+            }
+
+            function startProcessing() {
+                const fileExcel = document.getElementById('fileExcel').files[0];
+                const fileTemplate = document.getElementById('fileTemplate').files[0];
+                const fileAssets = document.getElementById('fileAssets').files[0];
+                const colName = document.getElementById('colSelect').value;
+                const toPdf = document.getElementById('checkPDF').checked;
+
+                if (!fileTemplate) return Swal.fire('Error', 'Please upload a template', 'error');
+
+                // Setup SSE
+                const evtSource = new EventSource(`/stream-logs/${sessionId}`);
+                const logDiv = document.getElementById('logContent');
+                document.getElementById('terminal').classList.remove('hidden');
+
+                evtSource.onmessage = function (event) {
+                    const newLog = document.createElement('div');
+                    newLog.innerText = `> ${event.data}`;
+                    logDiv.appendChild(newLog);
+                    logDiv.scrollTop = logDiv.scrollHeight;
+
+                    if (event.data.includes("PROCESS_COMPLETE")) {
+                        evtSource.close();
+                        Swal.fire('Success!', 'Batch processing finished.', 'success');
+                    } else if (event.data.includes("PROCESS_ERROR")) {
+                        evtSource.close();
+                        Swal.fire('Error', 'Processing stopped due to error.', 'error');
+                    }
+                };
+
+                // Submit Batch
+                const formData = new FormData();
+                formData.append('session_id', sessionId);
+                formData.append('filename_col', colName);
+                formData.append('output_pdf', toPdf);
+                formData.append('file_excel', fileExcel);
+                formData.append('file_template', fileTemplate);
+                if (fileAssets) formData.append('file_assets', fileAssets);
+
+                fetch('/api/process', { method: 'POST', body: formData })
+                    .then(res => res.json())
+                    .then(data => {
+                        if (data.status === 'success') {
+                            document.getElementById('downloadArea').classList.remove('hidden');
+                            document.getElementById('downloadLink').href = data.download_url;
+                        }
+                    });
+            }
+        </script>
+    </body>
+
+</html>

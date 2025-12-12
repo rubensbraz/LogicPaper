@@ -1,0 +1,13 @@
+fastapi
+uvicorn[standard]
+python-multipart
+aiofiles
+pandas
+openpyxl
+docxtpl
+python-docx
+python-pptx
+Jinja2
+APScheduler
+babel
+Pillow

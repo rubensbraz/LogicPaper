@@ -1,0 +1,60 @@
+services:
+  # ==========================================
+  # DocGenius Core Service
+  # Hosts FastAPI Backend & LibreOffice Engine
+  # ==========================================
+  docgenius-app:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    image: docgenius:v1
+    container_name: docgenius
+
+    # Network Configuration
+    # Maps localhost:8000 to container:8000
+    ports:
+      - "8000:8000"
+
+    # Volume Mapping (Persistence & Hot-Reloading)
+    volumes:
+      # 1. Data Persistence:
+      # Maps local './data' to container '/data'
+      # Allows viewing generated ZIPs/PDFs from the host machine
+      - ./data:/data
+
+      # 2. Code Hot-Reloading (Development):
+      # Maps local source code to container paths
+      # Changes in Python or HTML reflect immediately without rebuilding
+      - ./app:/app/app
+      - ./static:/app/static
+
+    # Environment Variables
+    environment:
+      # Force stdout/stderr to be unbuffered (real-time logs)
+      - PYTHONUNBUFFERED=1
+      # Prevent Python from generating .pyc files
+      - PYTHONDONTWRITEBYTECODE=1
+      # Internal absolute path for temporary file processing
+      - TEMP_DIR=/data/temp
+      # Set explicit Timezone to prevent tzlocal warnings
+      - TZ=America/Sao_Paulo
+
+    # Execution Command
+    # Uses Uvicorn with --reload for development agility
+    # In a pure production environment, remove '--reload'
+    command: uvicorn app.main:app --host 0.0.0.0 --port 8000 --reload
+
+    # Restart Policy
+    # Automatically restarts the container if it crashes (unless stopped manually)
+    restart: unless-stopped
+
+    # Resource Limits (Stability Guardrails)
+    # LibreOffice conversion is CPU/RAM intensive
+    # These limits prevent the container from crashing the host system
+    deploy:
+      resources:
+        limits:
+          cpus: '2.0'       # Cap at 2 CPU cores
+          memory: 2G        # Cap at 2GB RAM
+        reservations:
+          memory: 512M      # Reserve minimal 512MB RAM
