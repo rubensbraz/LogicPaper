@@ -2,6 +2,7 @@ import asyncio
 import logging
 import os
 import shutil
+import uuid
 from datetime import datetime
 from typing import Any, Dict, List, Optional
 
@@ -19,6 +20,7 @@ from openpyxl.worksheet.table import Table, TableStyleInfo
 from app.core.engine import DocumentEngine
 from app.core.formatter import DataFormatter
 from app.utils import extract_zip, sanitize_filename, start_scheduler
+from app.core.validator import TemplateValidator
 
 
 # Setup
@@ -336,6 +338,58 @@ async def preview_data(file_excel: UploadFile = File(...)):
     except Exception as e:
         logger.error(f"Preview failed: {e}")
         return JSONResponse({"status": "error", "message": str(e)}, status_code=500)
+
+
+@app.post("/api/validate")
+async def validate_compatibility(
+    file_excel: UploadFile = File(...),
+    files_templates: List[UploadFile] = File(...),
+):
+    """
+    Pre-flight Check: Validates that all Jinja2 tags in the uploaded templates
+    exist as headers in the uploaded Excel file.
+    """
+    # 1. Setup Temp Session
+    session_id = f"val_{uuid.uuid4().hex[:8]}"
+    session_path = os.path.join(TEMP_DIR, session_id)
+    os.makedirs(session_path, exist_ok=True)
+
+    try:
+        # 2. Save Excel
+        excel_path = os.path.join(session_path, file_excel.filename)
+        async with await anyio.open_file(excel_path, "wb") as f:
+            await f.write(await file_excel.read())
+
+        # 3. Save Templates
+        templates_map = {}
+        for tmpl in files_templates:
+            t_path = os.path.join(session_path, tmpl.filename)
+            async with await anyio.open_file(t_path, "wb") as f:
+                await f.write(await tmpl.read())
+            templates_map[tmpl.filename] = t_path
+
+        # 4. Extract Headers from Excel
+        # Minimal read just for headers
+        df = pd.read_excel(excel_path, header=None, nrows=1)
+        if df.empty:
+            raise ValueError("Excel file is empty.")
+        headers = df.iloc[0].tolist()
+        # Convert to string just in case to ensure matching works
+        headers = [str(h) for h in headers]
+
+        # 5. Run Validation
+        validator = TemplateValidator()
+        result = validator.compare(headers, templates_map)
+
+        return JSONResponse({"status": "success", "report": result})
+
+    except Exception as e:
+        logger.error(f"Validation Error: {e}")
+        return JSONResponse({"status": "error", "message": str(e)}, status_code=500)
+    finally:
+        # Cleanup immediately
+        if os.path.exists(session_path):
+            shutil.rmtree(session_path)
 
 
 @app.post("/api/sample")

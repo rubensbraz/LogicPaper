@@ -33,7 +33,8 @@ const CONFIG = {
     endpoints: {
         preview: '/api/preview',
         process: '/api/process',
-        sample: '/api/sample'
+        sample: '/api/sample',
+        validate: '/api/validate'
     },
     dom: {
         navbarMount: 'navbar-mount',

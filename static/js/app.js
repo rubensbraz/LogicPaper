@@ -85,11 +85,10 @@ function initializeDragDrop(ids) {
 
 /**
  * Updates the UI labels when files are selected.
- * Triggers state reset and automatic analysis for Excel files.
+ * Triggers state reset but DOES NOT auto-analyze.
  * @param {HTMLInputElement} input - The file input element.
  */
 function updateUI(input) {
-    // ID Convention: fileExcel -> lblExcel
     const labelId = input.id.replace('file', 'lbl');
     const label = document.getElementById(labelId);
 
@@ -104,44 +103,77 @@ function updateUI(input) {
         label.classList.add('text-blue-400', 'font-bold');
         label.classList.remove('text-gray-500');
 
-        // Determine type for state reset
-        let type = 'other';
-
-        // Auto-trigger analysis if it is the Excel file
-        if (input.id === 'fileExcel') {
-            type = 'excel';
-            resetStateOnInput(type);
-            previewData(); // Auto-execute analysis
-        } else {
-            resetStateOnInput(type);
-        }
+        // Reset state (hide results, lock config) to force re-analysis
+        const type = input.id.includes('Excel') ? 'excel' : 'other';
+        resetStateOnInput(type);
     }
 }
 
 // --- API Actions ---
 
 /**
- * Analyzes the Excel file and populates the configuration panel.
+ * MASTER FUNCTION: Orchestrates the Analysis and Validation workflow.
+ * 1. Checks inputs.
+ * 2. Runs Data Preview (Backend Analysis).
+ * 3. Runs Template Validation (Backend Comparison).
+ * 4. Unlocks Configuration if successful.
  */
-async function previewData() {
+async function performAnalysisSequence() {
     const fileExcel = document.getElementById('fileExcel').files[0];
-    if (!fileExcel) return Swal.fire({ icon: 'error', title: 'Missing Input', text: 'Please upload an Excel file first.', background: '#1e293b', color: '#fff' });
+    const fileTemplates = document.getElementById('fileTemplates').files;
 
+    // 1. Basic Input Validation
+    if (!fileExcel) return Swal.fire({ icon: 'warning', title: 'Missing Input', text: 'Please upload an Excel file.', background: '#1e293b', color: '#fff' });
+    if (fileTemplates.length === 0) return Swal.fire({ icon: 'warning', title: 'Missing Input', text: 'Please upload Templates.', background: '#1e293b', color: '#fff' });
+
+    // 2. UI Loading State
+    const btn = document.getElementById('btnValidate');
+    const originalText = btn.innerHTML;
+    btn.innerHTML = `<span class="animate-pulse">Analyzing & Validating...</span>`;
+    btn.disabled = true;
+
+    try {
+        // 3. Step 1: Preview Data (Excel Analysis)
+        // We await the result. If false, we stop.
+        const previewSuccess = await previewData(fileExcel);
+        if (!previewSuccess) throw new Error("Data Analysis failed. Check Excel format.");
+
+        // 4. Step 2: Validate Templates (Compatibility Check)
+        const validationSuccess = await validateTemplates(fileExcel, fileTemplates);
+
+        // 5. Unlock Configuration Panel only if everything passed
+        if (validationSuccess) {
+            document.getElementById('configPanel').classList.remove('opacity-50', 'pointer-events-none');
+            // Log success to terminal
+            logToTerminal("✅ Analysis Complete. Configuration Unlocked.", "success");
+        }
+
+    } catch (e) {
+        // Silent catch (errors handled in sub-functions), but ensure button resets
+        console.error(e);
+    } finally {
+        btn.innerHTML = originalText;
+        btn.disabled = false;
+    }
+}
+/**
+ * Analyzes the Excel file and populates the JSON preview.
+ * @param {File} fileExcel - The Excel file object.
+ * @returns {Promise<boolean>} True if successful.
+ */
+async function previewData(fileExcel) {
     const formData = new FormData();
     formData.append('file_excel', fileExcel);
 
-    const prevEl = document.getElementById('jsonPreview');
-    prevEl.innerText = "Scanning file structure...";
+    const prevEl = document.getElementById(CONFIG.dom.jsonPreview);
+    prevEl.innerText = "Step 1: Reading Excel Structure...";
     prevEl.className = "absolute inset-0 p-4 text-xs font-mono text-blue-400 overflow-auto scrollbar-thin animate-pulse";
 
     try {
-        const res = await fetch('/api/preview', { method: 'POST', body: formData });
+        const res = await fetch(CONFIG.endpoints.preview, { method: 'POST', body: formData });
         const data = await res.json();
 
         if (data.status === 'success') {
-            // Unlock Config
-            document.getElementById('configPanel').classList.remove('opacity-50', 'pointer-events-none');
-
             // Render JSON
             prevEl.className = "absolute inset-0 p-4 text-xs font-mono text-green-400 overflow-auto scrollbar-thin";
             prevEl.innerText = JSON.stringify(data.preview, null, 2);
@@ -155,14 +187,137 @@ async function previewData() {
                 opt.innerText = h;
                 sel.appendChild(opt);
             });
+            return true;
         } else {
             throw new Error(data.message);
         }
     } catch (e) {
-        Swal.fire({ icon: 'error', title: 'Analysis Failed', text: e.message, background: '#1e293b', color: '#fff' });
+        Swal.fire({ icon: 'error', title: 'Data Analysis Failed', text: e.message, background: '#1e293b', color: '#fff' });
         prevEl.innerText = "Error: " + e.message;
         prevEl.className = "absolute inset-0 p-4 text-xs font-mono text-red-400 overflow-auto scrollbar-thin";
+        return false;
     }
+}
+
+/**
+ * Validates that template variables match Excel headers.
+ * @param {File} fileExcel - The Excel file.
+ * @param {FileList} fileTemplates - The list of templates.
+ * @returns {Promise<boolean>} True if valid (or warning shown).
+ */
+async function validateTemplates(fileExcel, fileTemplates) {
+    const formData = new FormData();
+    formData.append('file_excel', fileExcel);
+    for (let i = 0; i < fileTemplates.length; i++) {
+        formData.append('files_templates', fileTemplates[i]);
+    }
+
+    try {
+        const res = await fetch(CONFIG.endpoints.validate, { method: 'POST', body: formData });
+        const data = await res.json();
+
+        if (data.status === 'success') {
+            renderValidationReport(data.report);
+            // We return true even if there are warnings, to allow the user to proceed if they choose.
+            // Strict mode would return data.report.overall_valid
+            return true;
+        } else {
+            throw new Error(data.message);
+        }
+    } catch (e) {
+        Swal.fire({ icon: 'error', title: 'Validation Failed', text: e.message, background: '#1e293b', color: '#fff' });
+        return false;
+    }
+}
+
+/**
+ * Renders the validation results modal.
+ * @param {Object} report - The validation report object from the backend.
+ */
+function renderValidationReport(report) {
+    const valid = report.overall_valid;
+
+    // 1. Build the Header / Status Banner
+    let html = `
+    <div class="flex flex-col gap-6 text-left">
+        <div class="p-4 rounded-xl border ${valid ? 'bg-green-500/10 border-green-500/50' : 'bg-red-500/10 border-red-500/50'} flex items-center gap-4">
+            <div class="w-12 h-12 flex items-center justify-center rounded-full shrink-0 ${valid ? 'bg-green-500/20 text-green-400' : 'bg-red-500/20 text-red-400'}">
+                <span class="text-2xl leading-none">${valid ? '✔' : '⚠'}</span>
+            </div>
+            <div>
+                <h3 class="text-lg font-bold text-white">${valid ? 'Compatibility Confirmed' : 'Issues Detected'}</h3>
+                <p class="text-sm ${valid ? 'text-green-300' : 'text-red-300'}">
+                    ${valid ? 'All templates match the Excel schema.' : 'Some templates contain variables missing from your Excel file.'}
+                </p>
+            </div>
+        </div>
+
+        <div class="max-h-[400px] overflow-y-auto pr-2 space-y-3 custom-scrollbar">
+    `;
+
+    // 2. Build Cards for each Template
+    report.details.forEach(item => {
+        const isOk = item.status === 'OK';
+        const borderColor = isOk ? 'border-l-green-500' : 'border-l-red-500';
+        const icon = isOk ? '📄' : '📑';
+
+        html += `
+        <div class="bg-black/40 rounded-lg border border-white/5 border-l-4 ${borderColor} p-4 transition hover:bg-black/60">
+            <div class="flex justify-between items-start mb-2">
+                <div class="flex items-center gap-2">
+                    <span class="text-xl">${icon}</span>
+                    <span class="font-semibold text-gray-200 text-sm">${item.template}</span>
+                </div>
+                <span class="px-2 py-1 rounded text-[10px] font-bold uppercase tracking-wider ${isOk ? 'bg-green-500/20 text-green-400' : 'bg-red-500/20 text-red-400'}">
+                    ${item.status}
+                </span>
+            </div>
+        `;
+
+        // 3. Render Missing Variables as "Code Chips"
+        if (item.missing_vars.length > 0) {
+            html += `
+            <div class="mt-3 bg-red-900/10 rounded p-3 border border-red-500/10">
+                <p class="text-sm text-red-300 mb-2 font-semibold flex items-center gap-1">
+                    <span>❌</span> Missing Variables (in Excel):
+                </p>
+                <div class="flex flex-wrap gap-2">`;
+
+            item.missing_vars.forEach(v => {
+                html += `<span class="font-mono text-sm bg-red-500/20 text-red-200 px-2 py-1 rounded border border-red-500/30">{{ ${v} }}</span>`;
+            });
+
+            html += `</div></div>`;
+        } else {
+            html += `<div class="mt-1 text-sm text-gray-500 flex items-center gap-1">
+                <span class="text-green-500">●</span> ${item.matched_vars.length} variables matched successfully.
+             </div>`;
+        }
+
+        html += `</div>`; // End Card
+    });
+
+    html += `</div></div>`; // End Scroll Container & Wrapper
+
+    // 4. Launch Stylish Modal
+    Swal.fire({
+        title: '<span class="text-xl font-bold text-gray-100">Validation Report</span>',
+        html: html,
+        background: '#0f172a', // Matches body bg
+        color: '#e2e8f0',
+        showCloseButton: true,
+        focusConfirm: false,
+        confirmButtonText: valid ? 'Proceed' : 'Understood',
+        confirmButtonColor: valid ? '#10b981' : '#3b82f6',
+        customClass: {
+            popup: 'glass-panel border border-white/10 shadow-2xl',
+            title: 'text-left border-b border-white/10 pb-4',
+            htmlContainer: '!m-0 !pt-4 !text-left', // Reset SweetAlert defaults
+            confirmButton: 'px-6 py-3 rounded-xl text-sm font-bold shadow-lg w-full mt-4'
+        },
+        width: '650px',
+        padding: '2rem'
+    });
 }
 
 /**
