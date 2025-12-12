@@ -158,9 +158,14 @@
                                 <div class="w-11 h-6 bg-gray-700 peer-focus:outline-none peer-focus:ring-2 peer-focus:ring-blue-800 rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-purple-600"></div>
                             </label>
                         </div>
-                        <button onclick="startProcessing()" class="w-full py-4 bg-gradient-to-r from-blue-600 to-purple-600 hover:from-blue-500 hover:to-purple-500 rounded-xl font-bold shadow-lg shadow-blue-900/40 transform hover:scale-[1.02] transition-all flex items-center justify-center gap-2">
-                            <span>🚀 Start Processing</span>
-                        </button>
+                        <div class="grid grid-cols-2 gap-4 mt-6">
+                            <button onclick="generateSample()" id="btnSample" class="py-4 bg-gray-800 hover:bg-gray-700 border border-gray-600 rounded-xl font-bold text-blue-400 transition flex items-center justify-center gap-2 group">
+                                <span>🧪 Test (First Row)</span>
+                            </button>
+                            <button onclick="startProcessing()" class="py-4 bg-gradient-to-r from-blue-600 to-purple-600 hover:from-blue-500 hover:to-purple-500 rounded-xl font-bold text-white shadow-lg shadow-blue-900/40 transform hover:scale-[1.02] transition-all flex items-center justify-center gap-2">
+                                <span>🚀 Start Processing</span>
+                            </button>
+                        </div>
                     </div>
                 </div>
             </div>
@@ -293,6 +298,66 @@
                 } catch (e) {
                     Swal.fire({ icon: 'error', title: 'Analysis Failed', text: e.message, background: '#1e293b', color: '#fff' });
                     document.getElementById('jsonPreview').innerText = "Error: " + e.message;
+                }
+            }
+
+            async function generateSample() {
+                const fileExcel = document.getElementById('fileExcel').files[0];
+                const fileTemplates = document.getElementById('fileTemplates').files;
+                const fileAssets = document.getElementById('fileAssets').files[0];
+                const colName = document.getElementById('colSelect').value;
+                const toPdf = document.getElementById('checkPDF').checked;
+
+                if (fileTemplates.length === 0) return Swal.fire({ icon: 'warning', title: 'No Templates', text: 'Please select templates.', background: '#1e293b', color: '#fff' });
+                if (!colName) return Swal.fire({ icon: 'warning', title: 'Configuration Missing', text: 'Please select a column.', background: '#1e293b', color: '#fff' });
+
+                // UI Loading State
+                const btn = document.getElementById('btnSample');
+                const originalText = btn.innerHTML;
+                btn.innerHTML = `<span class="animate-pulse">⏳ Generating...</span>`;
+                btn.disabled = true;
+
+                const formData = new FormData();
+                formData.append('session_id', sessionId);
+                formData.append('filename_col', colName);
+                formData.append('output_pdf', toPdf);
+                formData.append('file_excel', fileExcel);
+
+                for (let i = 0; i < fileTemplates.length; i++) {
+                    formData.append('files_templates', fileTemplates[i]);
+                }
+                if (fileAssets) formData.append('file_assets', fileAssets);
+
+                try {
+                    const response = await fetch('/api/sample', { method: 'POST', body: formData });
+
+                    if (response.ok) {
+                        // Handle File Download from Blob
+                        const blob = await response.blob();
+                        const url = window.URL.createObjectURL(blob);
+                        const a = document.createElement('a');
+                        a.href = url;
+                        a.download = "DocGenius_Sample.zip";
+                        document.body.appendChild(a);
+                        a.click();
+                        a.remove();
+
+                        Swal.fire({
+                            icon: 'success',
+                            title: 'Sample Generated',
+                            text: 'Check your downloads folder.',
+                            background: '#1e293b', color: '#fff',
+                            timer: 2000, showConfirmButton: false
+                        });
+                    } else {
+                        const errData = await response.json();
+                        throw new Error(errData.message || "Unknown error");
+                    }
+                } catch (e) {
+                    Swal.fire({ icon: 'error', title: 'Sample Failed', text: e.message, background: '#1e293b', color: '#fff' });
+                } finally {
+                    btn.innerHTML = originalText;
+                    btn.disabled = false;
                 }
             }
 

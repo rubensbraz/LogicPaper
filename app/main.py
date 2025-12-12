@@ -130,7 +130,12 @@ def generate_styled_report(
         top=Side(style="thin"),
         bottom=Side(style="thin"),
     )
-    wrap_align = Alignment(vertical="top", wrap_text=True)
+    # Standard Alignment (Wrap + Vertical Center)
+    standard_align = Alignment(vertical="center", wrap_text=True)
+    # Right Alignment for Column C
+    right_align = Alignment(horizontal="right", vertical="center", wrap_text=True)
+    # Top Alignment for Lists
+    top_align = Alignment(vertical="top", wrap_text=True)
 
     # ==========================
     # SHEET 1: DASHBOARD
@@ -159,7 +164,10 @@ def generate_styled_report(
 
         cell_label.font = label_font
         cell_label.border = thin_border
+        cell_label.alignment = standard_align
+
         cell_value.border = thin_border
+        cell_value.alignment = right_align
 
         # Apply alternating color to even rows (relative to the list)
         if i % 2 == 1:
@@ -187,12 +195,12 @@ def generate_styled_report(
 
         cell_label.font = label_font
         cell_label.border = thin_border
-        cell_label.alignment = Alignment(vertical="top")
+        cell_label.alignment = top_align
 
         cell_value.border = thin_border
-        cell_value.alignment = wrap_align
+        cell_value.alignment = right_align
 
-        # Apply alternating color
+        # Apply alternating color to even rows (relative to the list)
         if i % 2 == 1:
             cell_label.fill = even_fill
             cell_value.fill = even_fill
@@ -200,7 +208,7 @@ def generate_styled_report(
         row_idx += 1
 
     ws_dash.column_dimensions["B"].width = 25
-    ws_dash.column_dimensions["C"].width = 50
+    ws_dash.column_dimensions["C"].width = 35
 
     # ==========================
     # SHEET 2: DETAILED LOG
@@ -221,7 +229,9 @@ def generate_styled_report(
             cell = ws_log.cell(row=1, column=col_num, value=column_title)
             cell.font = header_font
             cell.fill = header_fill
-            cell.alignment = Alignment(horizontal="center")
+            cell.alignment = Alignment(
+                horizontal="center", vertical="center", wrap_text=True
+            )
 
         # Data
         for r_idx, row in enumerate(
@@ -230,7 +240,7 @@ def generate_styled_report(
             for c_idx, value in enumerate(row, 1):
                 cell = ws_log.cell(row=r_idx, column=c_idx, value=value)
                 cell.border = thin_border
-                cell.alignment = Alignment(vertical="center")
+                cell.alignment = standard_align
 
                 # Status Coloring (Column 4)
                 if c_idx == 4:
@@ -246,7 +256,7 @@ def generate_styled_report(
                     cell.font = error_font
 
         # Column Widths
-        ws_log.column_dimensions["A"].width = 8  # Row
+        ws_log.column_dimensions["A"].width = 10  # Row
         ws_log.column_dimensions["B"].width = 25  # Identifier
         ws_log.column_dimensions["C"].width = 50  # Output File
         ws_log.column_dimensions["D"].width = 15  # Status
@@ -600,6 +610,232 @@ async def process_batch(
     except Exception as e:
         logger.error(f"Critical Batch Error: {e}")
         send_log(session_id, f"PROCESS_ERROR: {str(e)}")
+        return JSONResponse({"status": "error", "message": str(e)}, status_code=500)
+
+
+@app.post("/api/sample")
+async def generate_sample(
+    session_id: str = Form(...),
+    filename_col: str = Form(...),
+    output_pdf: bool = Form(False),
+    file_excel: UploadFile = File(...),
+    files_templates: List[UploadFile] = File(...),
+    file_assets: UploadFile = File(None),
+):
+    """
+    Dry Run Endpoint: Processes ONLY the first data row from the Excel file.
+    Returns a ZIP file containing the generated documents for that specific row
+    for immediate user verification.
+    """
+    start_time = datetime.now()
+
+    # 1. Setup Temporary Session
+    sample_session_id = f"{session_id}_sample"
+    session_path = os.path.join(TEMP_DIR, sample_session_id)
+
+    dir_inputs = os.path.join(session_path, "inputs")
+    dir_output = os.path.join(session_path, "output")
+    dir_assets_internal = os.path.join(session_path, ".temp_assets")
+
+    for p in [dir_inputs, dir_output, dir_assets_internal]:
+        os.makedirs(p, exist_ok=True)
+
+    try:
+        # 2. Save Inputs
+        # Save Excel
+        excel_path = os.path.join(dir_inputs, file_excel.filename)
+        async with await anyio.open_file(excel_path, "wb") as f:
+            await f.write(await file_excel.read())
+
+        # Save Templates
+        saved_template_paths = []
+        template_names = []
+        for tmpl in files_templates:
+            t_path = os.path.join(dir_inputs, tmpl.filename)
+            async with await anyio.open_file(t_path, "wb") as f:
+                await f.write(await tmpl.read())
+            saved_template_paths.append(t_path)
+            template_names.append(tmpl.filename)
+
+        # Handle Assets
+        assets_filename = "None"
+        if file_assets:
+            assets_filename = file_assets.filename
+            zip_input_path = os.path.join(dir_inputs, file_assets.filename)
+            async with await anyio.open_file(zip_input_path, "wb") as f:
+                await f.write(await file_assets.read())
+            extract_zip(zip_input_path, dir_assets_internal)
+
+        # Manifest for Report
+        input_manifest = {
+            "excel": file_excel.filename,
+            "templates": template_names,
+            "assets": assets_filename,
+        }
+
+        # 3. Initialize Engine & Parse Data
+        engine = DocumentEngine(session_path)
+        formatter = DataFormatter()
+
+        df = pd.read_excel(excel_path, header=None)
+
+        if len(df) < 3:
+            raise ValueError(
+                "Excel file must contain at least Header, Protocol, and one Data Row."
+            )
+
+        headers = df.iloc[0].tolist()
+        protocol_map = [formatter.parse_protocol(p) for p in df.iloc[1].tolist()]
+
+        # TARGET: Only the first data row (Excel Row 3)
+        target_row = df.iloc[2]
+
+        # 4. Process Single Row
+        report = []
+        files_generated_count = 0
+        row_success = False
+
+        context = {}
+        row_identifier = "SAMPLE"
+
+        # Parse Context
+        try:
+            for col_idx, cell_val in enumerate(target_row):
+                var_name = headers[col_idx]
+                val = formatter.format_value(cell_val, protocol_map[col_idx])
+                context[var_name] = val
+                if var_name == filename_col:
+                    row_identifier = sanitize_filename(str(val))
+
+            # Validate Assets
+            for key, val in context.items():
+                if isinstance(val, dict) and val.get("type") == "image":
+                    img_filename = val.get("filename")
+                    if not file_assets:
+                        raise FileNotFoundError(
+                            f"Variable '{key}' requires image '{img_filename}', but no Assets Zip uploaded."
+                        )
+
+                    img_path = os.path.join(dir_assets_internal, img_filename)
+                    if not os.path.exists(img_path):
+                        raise FileNotFoundError(
+                            f"Image '{img_filename}' (for '{key}') not found in Assets Zip."
+                        )
+
+        except Exception as e:
+            report.append(
+                {
+                    "Row": 1,
+                    "Identifier": "SAMPLE",
+                    "Output File": "N/A",
+                    "Status": "Error",
+                    "Error Details": f"Data/Validation Error: {str(e)}",
+                }
+            )
+
+        # Generate Files (if no parsing error)
+        if not report:
+            for tmpl_path in saved_template_paths:
+                tmpl_filename = os.path.basename(tmpl_path)
+                tmpl_name_base, tmpl_ext = os.path.splitext(tmpl_filename)
+
+                final_filename = (
+                    f"{tmpl_name_base} - {row_identifier} (SAMPLE){tmpl_ext}"
+                )
+                doc_output_path = os.path.join(dir_output, final_filename)
+
+                try:
+                    if tmpl_ext.lower() == ".docx":
+                        await engine.process_docx(
+                            tmpl_path, doc_output_path, context, dir_assets_internal
+                        )
+                    elif tmpl_ext.lower() == ".pptx":
+                        await engine.process_pptx(tmpl_path, doc_output_path, context)
+
+                    report.append(
+                        {
+                            "Row": 1,
+                            "Identifier": row_identifier,
+                            "Output File": final_filename,
+                            "Status": "Success",
+                            "Error Details": "",
+                        }
+                    )
+                    files_generated_count += 1
+                    row_success = True
+
+                except Exception as e:
+                    report.append(
+                        {
+                            "Row": 1,
+                            "Identifier": row_identifier,
+                            "Output File": final_filename,
+                            "Status": "Error",
+                            "Error Details": str(e),
+                        }
+                    )
+
+                # PDF Conversion
+                if output_pdf and os.path.exists(doc_output_path):
+                    pdf_filename = f"{tmpl_name_base} - {row_identifier} (SAMPLE).pdf"
+                    try:
+                        await engine.convert_to_pdf(doc_output_path, dir_output)
+                        report.append(
+                            {
+                                "Row": 1,
+                                "Identifier": row_identifier,
+                                "Output File": pdf_filename,
+                                "Status": "Success",
+                                "Error Details": "",
+                            }
+                        )
+                        files_generated_count += 1
+                    except Exception as e:
+                        report.append(
+                            {
+                                "Row": 1,
+                                "Identifier": row_identifier,
+                                "Output File": pdf_filename,
+                                "Status": "Error",
+                                "Error Details": f"PDF Error: {str(e)}",
+                            }
+                        )
+
+        # 5. Generate Report & Zip
+        end_time = datetime.now()
+        duration = end_time - start_time
+
+        metadata = {
+            "session_id": "SAMPLE_RUN",
+            "start_time": start_time,
+            "duration": duration,
+            "total_rows": 1,
+            "total_files": files_generated_count,
+            "success_rate": 100 if row_success else 0,
+        }
+
+        # Generate Styled Report inside Output Folder
+        report_path = os.path.join(dir_output, "sample_report.xlsx")
+        generate_styled_report(report_path, report, metadata, input_manifest)
+
+        # Clean assets
+        if os.path.exists(dir_assets_internal):
+            shutil.rmtree(dir_assets_internal)
+
+        # Zip Output
+        zip_base_name = os.path.join(TEMP_DIR, f"{session_id}_sample_result")
+        shutil.make_archive(base_name=zip_base_name, format="zip", root_dir=dir_output)
+
+        zip_file_path = f"{zip_base_name}.zip"
+        timestamp = end_time.strftime("%Y-%m-%d_%H-%M")
+        download_filename = f"DocGenius_Sample_{row_identifier}_{timestamp}.zip"
+
+        return FileResponse(
+            path=zip_file_path, filename=download_filename, media_type="application/zip"
+        )
+
+    except Exception as e:
+        logger.error(f"Sample Generation Error: {e}")
         return JSONResponse({"status": "error", "message": str(e)}, status_code=500)
 
 
