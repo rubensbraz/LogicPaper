@@ -90,7 +90,6 @@ def generate_styled_report(
 ) -> None:
     """
     Generates a high-fidelity, styled Excel report with two sheets.
-    Updated to support granular, file-level logging.
 
     Args:
         path (str): Output path for the .xlsx file.
@@ -103,6 +102,7 @@ def generate_styled_report(
     # --- Styles ---
     navy_blue = "1F4E78"
     white = "FFFFFF"
+    light_gray = "F2F2F2"  # Color for alternating rows
 
     header_font = Font(name="Calibri", size=12, bold=True, color=white)
     title_font = Font(name="Calibri", size=18, bold=True, color=navy_blue)
@@ -111,6 +111,9 @@ def generate_styled_report(
 
     header_fill = PatternFill(
         start_color=navy_blue, end_color=navy_blue, fill_type="solid"
+    )
+    even_fill = PatternFill(
+        start_color=light_gray, end_color=light_gray, fill_type="solid"
     )
     success_fill = PatternFill(
         start_color="C6EFCE", end_color="C6EFCE", fill_type="solid"
@@ -150,12 +153,19 @@ def generate_styled_report(
     ]
 
     row_idx = 4
-    for label, value in metrics:
+    for i, (label, value) in enumerate(metrics):
         cell_label = ws_dash.cell(row=row_idx, column=2, value=label)
         cell_value = ws_dash.cell(row=row_idx, column=3, value=value)
+
         cell_label.font = label_font
         cell_label.border = thin_border
         cell_value.border = thin_border
+
+        # Apply alternating color to even rows (relative to the list)
+        if i % 2 == 1:
+            cell_label.fill = even_fill
+            cell_value.fill = even_fill
+
         row_idx += 1
 
     # Input Manifest
@@ -171,14 +181,22 @@ def generate_styled_report(
         ("Templates Used", "\n".join(input_manifest.get("templates", []))),
     ]
 
-    for label, value in inputs:
+    for i, (label, value) in enumerate(inputs):
         cell_label = ws_dash.cell(row=row_idx, column=2, value=label)
         cell_value = ws_dash.cell(row=row_idx, column=3, value=value)
+
         cell_label.font = label_font
         cell_label.border = thin_border
         cell_label.alignment = Alignment(vertical="top")
+
         cell_value.border = thin_border
         cell_value.alignment = wrap_align
+
+        # Apply alternating color
+        if i % 2 == 1:
+            cell_label.fill = even_fill
+            cell_value.fill = even_fill
+
         row_idx += 1
 
     ws_dash.column_dimensions["B"].width = 25
@@ -249,6 +267,66 @@ def generate_styled_report(
     wb.save(path)
 
 
+# --- Routes ---
+
+
+@app.get("/")
+async def read_root():
+    return FileResponse(os.path.join(STATIC_DIR, "index.html"))
+
+
+@app.get("/stream-logs/{session_id}")
+async def stream_logs(session_id: str):
+    return StreamingResponse(log_generator(session_id), media_type="text/event-stream")
+
+
+@app.post("/api/preview")
+async def preview_data(file_excel: UploadFile = File(...)):
+    """
+    Parses the Excel file and returns the headers, protocol, and first 5 formatted rows.
+    """
+    try:
+        # Load Excel
+        df = pd.read_excel(file_excel.file, header=None)
+
+        # Row 1: Variables (Headers)
+        headers = df.iloc[0].tolist()
+        # Row 2: Protocol
+        protocols_raw = df.iloc[1].tolist()
+        # Row 3+: Data
+        data_rows = df.iloc[2:].head(5)  # Preview only 5
+
+        # Create Protocol Map
+        formatter = DataFormatter()
+        protocol_map = [formatter.parse_protocol(p) for p in protocols_raw]
+
+        # Format Preview Data
+        preview_data = []
+        for _, row in data_rows.iterrows():
+            row_dict = {}
+            for col_idx, cell_val in enumerate(row):
+                var_name = headers[col_idx]
+                proto = protocol_map[col_idx]
+                formatted_val = formatter.format_value(cell_val, proto)
+
+                # Simplify image objects for JSON preview
+                if (
+                    isinstance(formatted_val, dict)
+                    and formatted_val.get("type") == "image"
+                ):
+                    row_dict[var_name] = f"[Image: {formatted_val['filename']}]"
+                else:
+                    row_dict[var_name] = formatted_val
+            preview_data.append(row_dict)
+
+        return JSONResponse(
+            {"status": "success", "headers": headers, "preview": preview_data}
+        )
+    except Exception as e:
+        logger.error(f"Preview failed: {e}")
+        return JSONResponse({"status": "error", "message": str(e)}, status_code=500)
+
+
 @app.post("/api/process")
 async def process_batch(
     session_id: str = Form(...),
@@ -261,7 +339,8 @@ async def process_batch(
 ):
     """
     Main batch processing endpoint.
-    Refactored to handle granular file logging and clean asset management.
+    Refactored to handle granular file logging, clean asset management,
+    and strict validation for missing images.
     """
     start_time = datetime.now()
 
@@ -273,7 +352,6 @@ async def process_batch(
     dir_outputs = os.path.join(session_path, "2 Generated documents")
 
     # Internal folder for asset extraction (will be DELETED before zipping)
-    # Using a dot prefix to denote internal use, though strict path deletion is what matters
     dir_assets_internal = os.path.join(session_path, ".temp_assets")
 
     for p in [dir_inputs, dir_outputs, dir_assets_internal]:
@@ -351,16 +429,36 @@ async def process_batch(
                     context[var_name] = val
                     if var_name == filename_col:
                         row_identifier = sanitize_filename(str(val))
+
+                # --- VALIDATE ASSETS ---
+                # Check if any image is required but missing
+                for key, val in context.items():
+                    if isinstance(val, dict) and val.get("type") == "image":
+                        img_filename = val.get("filename")
+
+                        # Case 1: No Assets Zip provided at all
+                        if not file_assets:
+                            raise FileNotFoundError(
+                                f"Variable '{key}' requires image '{img_filename}', but no Assets Zip was uploaded."
+                            )
+
+                        # Case 2: File missing inside the provided Zip
+                        img_path = os.path.join(dir_assets_internal, img_filename)
+                        if not os.path.exists(img_path):
+                            raise FileNotFoundError(
+                                f"Image '{img_filename}' (for '{key}') not found in uploaded Assets Zip."
+                            )
+
             except Exception as e:
-                # If context parsing fails, log a generic error for the row
-                logger.error(f"Row {row_num} parsing error: {e}")
+                # If context parsing or validation fails, log a generic error for the row
+                logger.error(f"Row {row_num} data/validation error: {e}")
                 report.append(
                     {
                         "Row": row_num,
                         "Identifier": "N/A",
                         "Output File": "N/A",
                         "Status": "Error",
-                        "Error Details": f"Data Parsing Error: {str(e)}",
+                        "Error Details": str(e),
                     }
                 )
                 continue
@@ -462,7 +560,6 @@ async def process_batch(
             send_log(session_id, f"✅ {row_identifier} processed.")
 
         # 5. Cleanup Internal Assets
-        # This prevents the weird folder from appearing in the output zip
         if os.path.exists(dir_assets_internal):
             shutil.rmtree(dir_assets_internal)
             send_log(session_id, "🧹 Cleaning up temporary files...")
@@ -482,267 +579,12 @@ async def process_batch(
             ),
         }
 
-        report_path = os.path.join(session_path, "job_report.xlsx")
-        generate_styled_report(report_path, report, metadata, input_manifest)
-
-        # 7. Zip Result
-        zip_base_name = os.path.join(TEMP_DIR, f"{session_id}_result")
-        shutil.make_archive(
-            base_name=zip_base_name, format="zip", root_dir=session_path
-        )
-
-        send_log(session_id, "PROCESS_COMPLETE")
-
-        return JSONResponse(
-            {"status": "success", "download_url": f"/api/download/{session_id}"}
-        )
-
-    except Exception as e:
-        logger.error(f"Critical Batch Error: {e}")
-        send_log(session_id, f"PROCESS_ERROR: {str(e)}")
-        return JSONResponse({"status": "error", "message": str(e)}, status_code=500)
-
-
-# --- Routes ---
-
-
-@app.get("/")
-async def read_root():
-    return FileResponse(os.path.join(STATIC_DIR, "index.html"))
-
-
-@app.get("/stream-logs/{session_id}")
-async def stream_logs(session_id: str):
-    return StreamingResponse(log_generator(session_id), media_type="text/event-stream")
-
-
-@app.post("/api/preview")
-async def preview_data(file_excel: UploadFile = File(...)):
-    """
-    Parses the Excel file and returns the headers, protocol, and first 5 formatted rows.
-    """
-    try:
-        # Load Excel
-        df = pd.read_excel(file_excel.file, header=None)
-
-        # Row 1: Variables (Headers)
-        headers = df.iloc[0].tolist()
-        # Row 2: Protocol
-        protocols_raw = df.iloc[1].tolist()
-        # Row 3+: Data
-        data_rows = df.iloc[2:].head(5)  # Preview only 5
-
-        # Create Protocol Map
-        formatter = DataFormatter()
-        protocol_map = [formatter.parse_protocol(p) for p in protocols_raw]
-
-        # Format Preview Data
-        preview_data = []
-        for _, row in data_rows.iterrows():
-            row_dict = {}
-            for col_idx, cell_val in enumerate(row):
-                var_name = headers[col_idx]
-                proto = protocol_map[col_idx]
-                formatted_val = formatter.format_value(cell_val, proto)
-
-                # Simplify image objects for JSON preview
-                if (
-                    isinstance(formatted_val, dict)
-                    and formatted_val.get("type") == "image"
-                ):
-                    row_dict[var_name] = f"[Image: {formatted_val['filename']}]"
-                else:
-                    row_dict[var_name] = formatted_val
-            preview_data.append(row_dict)
-
-        return JSONResponse(
-            {"status": "success", "headers": headers, "preview": preview_data}
-        )
-    except Exception as e:
-        logger.error(f"Preview failed: {e}")
-        return JSONResponse({"status": "error", "message": str(e)}, status_code=500)
-
-
-@app.post("/api/process")
-async def process_batch(
-    session_id: str = Form(...),
-    filename_col: str = Form(...),
-    output_pdf: bool = Form(False),
-    group_by_folders: bool = Form(True),
-    file_excel: UploadFile = File(...),
-    files_templates: List[UploadFile] = File(...),
-    file_assets: UploadFile = File(None),
-):
-    """
-    Main batch processing endpoint. Handles file naming conventions,
-    folder structuring (grouped vs flat), and Excel reporting.
-    """
-    start_time = datetime.now()
-
-    # 1. Setup Directory Structure
-    session_path = os.path.join(TEMP_DIR, session_id)
-
-    # Define High-Level Folders
-    dir_inputs = os.path.join(session_path, "1 Input documents")
-    dir_outputs = os.path.join(session_path, "2 Generated documents")
-
-    # Define Sub-folders within Inputs
-    dir_input_assets = os.path.join(dir_inputs, "assets")
-
-    for p in [dir_inputs, dir_outputs, dir_input_assets]:
-        os.makedirs(p, exist_ok=True)
-
-    try:
-        send_log(session_id, "🟢 Initializing session structure...")
-
-        # 2. Save Inputs (Async I/O)
-        # Save Excel
-        excel_path = os.path.join(dir_inputs, file_excel.filename)
-        async with await anyio.open_file(excel_path, "wb") as f:
-            await f.write(await file_excel.read())
-
-        # Save Templates
-        saved_template_paths = []
-        template_names = []
-        for tmpl in files_templates:
-            t_path = os.path.join(dir_inputs, tmpl.filename)
-            async with await anyio.open_file(t_path, "wb") as f:
-                await f.write(await tmpl.read())
-            saved_template_paths.append(t_path)
-            template_names.append(tmpl.filename)
-            send_log(session_id, f"   ↳ Loaded template: {tmpl.filename}")
-
-        # Handle Assets
-        assets_filename = "None"
-        if file_assets:
-            assets_filename = file_assets.filename
-            zip_path = os.path.join(dir_inputs, file_assets.filename)
-            async with await anyio.open_file(zip_path, "wb") as f:
-                await f.write(await file_assets.read())
-            extract_zip(zip_path, dir_input_assets)
-            send_log(session_id, "📦 Assets library extracted.")
-
-        # Create Manifest for Report
-        input_manifest = {
-            "excel": file_excel.filename,
-            "templates": template_names,
-            "assets": assets_filename,
-        }
-
-        # 3. Initialize Engine & Protocol
-        engine = DocumentEngine(session_path)
-        formatter = DataFormatter()
-
-        df = pd.read_excel(excel_path, header=None)
-        headers = df.iloc[0].tolist()
-        protocol_map = [formatter.parse_protocol(p) for p in df.iloc[1].tolist()]
-
-        total_rows = len(df) - 2
-        send_log(session_id, f"🚀 Starting batch processing for {total_rows} rows.")
-
-        # 4. Processing Loop
-        report = []
-        total_files_generated_count = 0
-        success_count = 0
-
-        for idx, row in df.iloc[2:].iterrows():
-            row_num = idx + 1
-            row_generated_files = []  # Track filenames for this row
-
-            try:
-                # Build Context
-                context = {}
-                row_identifier = f"Row_{row_num}"
-
-                # Extract Data
-                for col_idx, cell_val in enumerate(row):
-                    var_name = headers[col_idx]
-                    val = formatter.format_value(cell_val, protocol_map[col_idx])
-                    context[var_name] = val
-                    if var_name == filename_col:
-                        row_identifier = sanitize_filename(str(val))
-
-                # Determine Output Directory (Inside '2 Generated documents')
-                if group_by_folders:
-                    target_dir = os.path.join(dir_outputs, row_identifier)
-                else:
-                    target_dir = dir_outputs
-
-                os.makedirs(target_dir, exist_ok=True)
-
-                # Iterate Templates
-                for tmpl_path in saved_template_paths:
-                    tmpl_filename = os.path.basename(tmpl_path)
-                    tmpl_name_base, tmpl_ext = os.path.splitext(tmpl_filename)
-
-                    final_filename = f"{tmpl_name_base} - {row_identifier}{tmpl_ext}"
-                    doc_output_path = os.path.join(target_dir, final_filename)
-
-                    # Render DOCX/PPTX
-                    if tmpl_ext.lower() == ".docx":
-                        await engine.process_docx(
-                            tmpl_path, doc_output_path, context, dir_input_assets
-                        )
-                    elif tmpl_ext.lower() == ".pptx":
-                        await engine.process_pptx(tmpl_path, doc_output_path, context)
-
-                    row_generated_files.append(final_filename)
-
-                    # Render PDF
-                    if output_pdf:
-                        await engine.convert_to_pdf(doc_output_path, target_dir)
-                        pdf_name = f"{os.path.splitext(final_filename)[0]}.pdf"
-                        row_generated_files.append(pdf_name)
-
-                send_log(session_id, f"✅ {row_identifier} processed.")
-
-                report.append(
-                    {
-                        "Row": row_num,
-                        "Identifier": row_identifier,
-                        "Status": "Success",
-                        "Output Files": "\n".join(row_generated_files),
-                        "Error Details": "",
-                    }
-                )
-                success_count += 1
-                total_files_generated_count += len(row_generated_files)
-
-            except Exception as e:
-                logger.error(f"Row {row_num} failed: {e}")
-                send_log(session_id, f"❌ Row {row_num} FAILED: {str(e)}")
-                report.append(
-                    {
-                        "Row": row_num,
-                        "Identifier": (
-                            row_identifier if "row_identifier" in locals() else "N/A"
-                        ),
-                        "Status": "Failed",
-                        "Output Files": "",
-                        "Error Details": str(e),
-                    }
-                )
-
-        # 5. Finalize - Generate Report in ROOT of Session
-        end_time = datetime.now()
-        duration = end_time - start_time
-
-        metadata = {
-            "session_id": session_id,
-            "start_time": start_time,
-            "duration": duration,
-            "total_rows": total_rows,
-            "total_files": total_files_generated_count,
-            "success_rate": (success_count / total_rows * 100) if total_rows > 0 else 0,
-        }
-
         # Save report at Session Root (outside input/output folders)
         report_path = os.path.join(session_path, "job_report.xlsx")
 
         generate_styled_report(report_path, report, metadata, input_manifest)
 
-        # 6. Create ZIP (Zipping the content of session_path)
-        # We save the ZIP file to TEMP_DIR (parent) to avoid recursive zipping
+        # 7. Zip Result
         zip_base_name = os.path.join(TEMP_DIR, f"{session_id}_result")
 
         shutil.make_archive(
