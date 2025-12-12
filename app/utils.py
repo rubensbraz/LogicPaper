@@ -1,8 +1,9 @@
+import logging
 import os
 import shutil
 import time
-import logging
 import zipfile
+
 from apscheduler.schedulers.background import BackgroundScheduler
 
 # Configure Logging

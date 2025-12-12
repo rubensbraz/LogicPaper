@@ -1,12 +1,14 @@
-import os
-import subprocess
-import shutil
-import logging
 import asyncio
-from typing import Dict, Any, List
+import logging
+import os
+import shutil
+import subprocess
+from typing import Any, Dict, List
+
+from docx.shared import Cm
 from docxtpl import DocxTemplate, InlineImage
 from pptx import Presentation
-from docx.shared import Cm
+
 from app.core.formatter import DataFormatter
 
 
