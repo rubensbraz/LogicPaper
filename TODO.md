@@ -17,9 +17,6 @@
 ## 2. 🧠 Backend Logic Enhancements (Priority: MEDIUM)
 *Improving the "Smart Engine".*
 
-- [ ] **Template Validator (Pre-flight Check):**
-    - Create a utility that scans the `.docx` template *upon upload* and returns a list of all detected `{{ jinja_tags }}`.
-    - Compare these tags against the Excel headers and warn the user: *"Warning: Template expects 'contract_date', but Excel is missing this column."*
 - [ ] **Legacy Format Support:**
     - Implement the logic to detect `.doc` files and auto-convert them to `.docx` using LibreOffice *before* the templating engine starts.
 - [ ] **Advanced Formatting:**

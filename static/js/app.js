@@ -15,6 +15,14 @@ document.addEventListener('DOMContentLoaded', () => {
 // --- State Management ---
 
 /**
+ * COMPLETELY resets the application state by reloading the page.
+ * This ensures a truly clean slate (memory, file inputs, global variables).
+ */
+function performFullReset() {
+    window.location.reload();
+}
+
+/**
  * Resets the UI state when inputs change.
  * Allows the user to start a fresh batch without page reload.
  * @param {string} type - The type of input changed ('excel', 'template', 'asset').
