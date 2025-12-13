@@ -1,17 +1,20 @@
+import asyncio
 import logging
 import os
 import shutil
 import zipfile
-from datetime import date
-from typing import Tuple
+from datetime import date, datetime, timedelta
+from typing import Any, Dict, List, Optional, Tuple, Union
 
 import xlsxwriter
 from docx import Document
+from docx.enum.text import WD_ALIGN_PARAGRAPH, WD_BREAK
 from docx.oxml import OxmlElement
 from docx.oxml.ns import qn
-from docx.shared import Pt
-from PIL import Image
+from docx.shared import Cm, Pt, RGBColor
+from PIL import Image, ImageDraw, ImageFont
 from pptx import Presentation
+from pptx.util import Inches, Pt as PptPt
 
 
 # --- Configuration ---
@@ -21,384 +24,688 @@ logging.basicConfig(
 logger = logging.getLogger(__name__)
 
 # --- Constants ---
-# Files will be generated in the same directory as this script
 BASE_DIR = os.path.dirname(os.path.abspath(__file__))
-# Temporary folder for generating raw images before zipping
 ASSETS_TEMP_DIR = os.path.join(BASE_DIR, ".temp_assets_gen")
 
-
-# --- Helper Functions ---
-
-
-def ensure_temp_directory() -> None:
-    """Creates the temporary assets directory."""
-    os.makedirs(ASSETS_TEMP_DIR, exist_ok=True)
+# Corporate Colors (RGB)
+COLOR_PRIMARY = (31, 78, 120)  # Navy Blue
+COLOR_SECONDARY = (231, 76, 60)  # Accent Red
+COLOR_TEXT = (51, 51, 51)  # Dark Gray
 
 
-def set_no_proof(run) -> None:
+class SeedGenerator:
     """
-    Marks a run as 'no proofing' to prevent Word from splitting tags during
-    spell check or grammar check. This is crucial for template stability.
-
-    Args:
-        run (Run): The docx Run object to modify.
+    Seed Generator.
+    Orchestrates the creation of robust mock data, documentation, assets, and
+    high-fidelity templates for system integration testing.
     """
-    rPr = run._element.get_or_add_rPr()
-    noProof = OxmlElement("w:noProof")
-    rPr.append(noProof)
 
+    def __init__(self):
+        """Initialize the generator configuration."""
+        self.excel_filename = "mock_data.xlsx"
+        self.assets_zip_name = "assets.zip"
 
-def create_dummy_image(filename: str, color: Tuple[int, int, int]) -> None:
-    """
-    Creates a simple colored square image for testing.
+        # Templates
+        self.tmpl_word_brief = "template_brief.docx"
+        self.tmpl_word_contract = "template_contract.docx"
+        self.tmpl_word_compat = "template_compatibility_word.docx"
 
-    Args:
-        filename (str): Output filename.
-        color (Tuple[int, int, int]): RGB color tuple.
-    """
-    try:
-        ensure_temp_directory()
-        img = Image.new("RGB", (200, 200), color)
-        path = os.path.join(ASSETS_TEMP_DIR, filename)
-        img.save(path)
-        logger.info(f"Generated temp image: {path}")
-    except Exception as e:
-        logger.error(f"Error generating image {filename}: {e}")
+        self.tmpl_ppt_pres = "template_presentation.pptx"
+        self.tmpl_ppt_compat = "template_compatibility_ppt.pptx"
 
+    # --- Helper Methods ---
 
-def create_assets_zip(zip_filename: str = "assets.zip") -> None:
-    """
-    Generates dummy images, compresses them into a ZIP file in the base dir,
-    and then deletes the source images.
+    def _ensure_temp_directory(self) -> None:
+        """Creates the temporary assets directory safely."""
+        os.makedirs(ASSETS_TEMP_DIR, exist_ok=True)
 
-    Args:
-        zip_filename (str): Name of the output zip file.
-    """
-    # 1. Create dummy images in the temp folder
-    create_dummy_image("photo_a.jpg", (52, 152, 219))  # Blue
-    create_dummy_image("photo_b.jpg", (231, 76, 60))  # Red
-    create_dummy_image("signature.png", (46, 204, 113))  # Green
+    def _set_no_proof(self, run: Any) -> None:
+        """
+        Marks a Word run as 'no proofing'.
+        Prevents Word spellcheck from breaking Jinja2 tags.
 
-    # 2. Zip them to the main directory
-    zip_path = os.path.join(BASE_DIR, zip_filename)
-    try:
-        with zipfile.ZipFile(zip_path, "w") as zipf:
-            for root, _, files in os.walk(ASSETS_TEMP_DIR):
-                for file in files:
-                    file_path = os.path.join(root, file)
-                    # Add file to zip with relative path (so they are at root of zip)
-                    zipf.write(file_path, os.path.relpath(file_path, ASSETS_TEMP_DIR))
-        logger.info(f"Assets ZIP created successfully: {zip_path}")
-    except Exception as e:
-        logger.error(f"Error creating assets ZIP: {e}")
-    finally:
-        # 3. Cleanup temp images immediately
-        if os.path.exists(ASSETS_TEMP_DIR):
-            shutil.rmtree(ASSETS_TEMP_DIR)
-            logger.info("Cleaned up temporary assets folder.")
+        Args:
+            run (Any): The docx Run object.
+        """
+        try:
+            rPr = run._element.get_or_add_rPr()
+            noProof = OxmlElement("w:noProof")
+            rPr.append(noProof)
+        except Exception as e:
+            logger.warning(f"Could not set noProof on run: {e}")
 
+    def _style_header_run(
+        self, run: Any, size: int = 14, color: Tuple[int, int, int] = COLOR_PRIMARY
+    ) -> None:
+        """Applies styling to a text run."""
+        run.bold = True
+        run.font.size = Pt(size)
+        run.font.color.rgb = RGBColor(*color)
+        run.font.name = "Calibri"
 
-# --- Main Generation Functions ---
+    # --- Asset Generation ---
 
+    async def generate_assets(self) -> None:
+        """
+        Generates diverse dummy images and compresses them into a ZIP file.
+        """
+        logger.info("🎨 Generating High-Res Assets...")
+        self._ensure_temp_directory()
 
-def create_excel_data(filename: str = "mock_data.xlsx") -> None:
-    """
-    Creates the Excel data source file with Header and Raw Data.
-    NO PROTOCOL ROW (Row 2 contains data).
-
-    Args:
-        filename (str): Output Excel filename.
-    """
-    filepath = os.path.join(BASE_DIR, filename)
-
-    try:
-        workbook = xlsxwriter.Workbook(filepath)
-        worksheet = workbook.add_worksheet("Data")
-
-        # 1. Define Headers (Variables)
-        header_row = [
-            "client_id",  # String/Number identifier
-            "client_name",  # String
-            "contract_date",  # Date object
-            "contract_value",  # Float (Currency)
-            "completion_rate",  # Float (Percentage)
-            "is_active",  # Boolean
-            "has_debt",  # Boolean
-            "status_code",  # Integer (for Logic mapping)
-            "client_photo",  # String (Filename in assets.zip)
-            "signature_img",  # String (Filename in assets.zip)
+        tasks = [
+            self._create_image(
+                "profile_CEO.jpg", (500, 500), (44, 62, 80), "CEO", (255, 255, 255)
+            ),
+            self._create_image(
+                "profile_CTO.jpg", (500, 500), (39, 174, 96), "CTO", (255, 255, 255)
+            ),
+            self._create_image(
+                "logo_acme.png", (800, 300), (255, 255, 255), "ACME CORP", (31, 78, 120)
+            ),
+            self._create_image(
+                "sig_valid.png",
+                (400, 150),
+                (255, 255, 255),
+                "Signed: J.Doe",
+                (0, 0, 128),
+            ),
+            self._create_image(
+                "chart_growth.jpg",
+                (800, 400),
+                (236, 240, 241),
+                "GROWTH CHART",
+                (127, 140, 141),
+            ),
         ]
 
-        # 2. Define Raw Data Rows
-        # Note: We use real types (date, bool, float) to test raw data handling
-        data_row_1 = [
-            "CL-12345",
-            "Acme Corporation International",
-            date(2023, 10, 25),
-            150000.50,
-            0.985,
-            True,
-            False,
-            10,  # e.g., 10 = Approved
-            "photo_a.jpg",
-            "signature.png",
-        ]
+        await asyncio.gather(*tasks)
+        await asyncio.to_thread(self._zip_assets)
 
-        data_row_2 = [
-            "CL-98765",
-            "Jane Doe Enterprises LLC",
-            date(2024, 1, 15),
-            2500.00,
-            0.45,
-            False,
-            True,
-            20,  # e.g., 20 = Pending
-            "photo_b.jpg",
-            "None",  # No signature
-        ]
+    async def _create_image(
+        self,
+        filename: str,
+        size: Tuple[int, int],
+        color: Tuple[int, int, int],
+        text: str,
+        text_color: Tuple[int, int, int],
+    ) -> None:
+        """Creates a single dummy image with text."""
 
-        # Add formats for better readability in Excel
-        bold = workbook.add_format({"bold": True})
-        date_fmt = workbook.add_format({"num_format": "yyyy-mm-dd"})
-        money_fmt = workbook.add_format({"num_format": "$#,##0.00"})
+        def _blocking_create():
+            try:
+                img = Image.new("RGB", size, color)
+                draw = ImageDraw.Draw(img)
+                # Border
+                draw.rectangle(
+                    [(0, 0), (size[0] - 1, size[1] - 1)], outline=text_color, width=5
+                )
+                # Text
+                try:
+                    font = ImageFont.truetype("arial.ttf", 40)
+                except IOError:
+                    font = ImageFont.load_default()
 
-        # Write Header
-        worksheet.write_row(0, 0, header_row, bold)
+                # Simple center logic
+                bbox = draw.textbbox((0, 0), text, font=font)
+                w, h = bbox[2] - bbox[0], bbox[3] - bbox[1]
+                draw.text(
+                    ((size[0] - w) / 2, (size[1] - h) / 2),
+                    text,
+                    fill=text_color,
+                    font=font,
+                )
 
-        # Write Data Row 1 (Excel Row 2)
-        worksheet.write(1, 0, data_row_1[0])
-        worksheet.write(1, 1, data_row_1[1])
-        worksheet.write(1, 2, data_row_1[2], date_fmt)
-        worksheet.write(1, 3, data_row_1[3], money_fmt)
-        worksheet.write(1, 4, data_row_1[4])
-        worksheet.write(1, 5, data_row_1[5])
-        worksheet.write(1, 6, data_row_1[6])
-        worksheet.write(1, 7, data_row_1[7])
-        worksheet.write(1, 8, data_row_1[8])
-        worksheet.write(1, 9, data_row_1[9])
+                path = os.path.join(ASSETS_TEMP_DIR, filename)
+                img.save(path)
+            except Exception as e:
+                logger.error(f"Error creating image {filename}: {e}")
 
-        # Write Data Row 2 (Excel Row 3)
-        worksheet.write(2, 0, data_row_2[0])
-        worksheet.write(2, 1, data_row_2[1])
-        worksheet.write(2, 2, data_row_2[2], date_fmt)
-        worksheet.write(2, 3, data_row_2[3], money_fmt)
-        worksheet.write(2, 4, data_row_2[4])
-        worksheet.write(2, 5, data_row_2[5])
-        worksheet.write(2, 6, data_row_2[6])
-        worksheet.write(2, 7, data_row_2[7])
-        worksheet.write(2, 8, data_row_2[8])
-        worksheet.write(2, 9, data_row_2[9])
+        await asyncio.to_thread(_blocking_create)
 
-        workbook.close()
-        logger.info(f"Excel data file created successfully: {filepath}")
-    except Exception as e:
-        logger.error(f"Error creating Excel file: {e}")
+    def _zip_assets(self) -> None:
+        """Compresses temp assets to ZIP and cleans up."""
+        zip_path = os.path.join(BASE_DIR, self.assets_zip_name)
+        try:
+            with zipfile.ZipFile(zip_path, "w") as zipf:
+                for root, _, files in os.walk(ASSETS_TEMP_DIR):
+                    for file in files:
+                        file_path = os.path.join(root, file)
+                        zipf.write(
+                            file_path, os.path.relpath(file_path, ASSETS_TEMP_DIR)
+                        )
+            logger.info(f"✅ Assets Library created: {zip_path}")
+        except Exception as e:
+            logger.error(f"Error zipping assets: {e}")
+        finally:
+            if os.path.exists(ASSETS_TEMP_DIR):
+                shutil.rmtree(ASSETS_TEMP_DIR)
 
+    # --- Excel Generation ---
 
-def create_word_templates() -> None:
-    """
-    Creates DOCX templates with formatting tags.
-    Applies 'no_proof' to all tags to ensure template integrity.
-    """
-    # --- Template 1: Contract (String, Date, Currency focus) ---
-    doc1 = Document()
-    doc1.add_heading("SERVICE AGREEMENT", 0)
+    async def generate_excel_data(self) -> None:
+        """Creates the Excel file with 5 robust rows."""
+        logger.info("📊 Generating Excel Data (5 Rows)...")
+        filepath = os.path.join(BASE_DIR, self.excel_filename)
+        await asyncio.to_thread(self._write_excel_file, filepath)
 
-    p = doc1.add_paragraph("This agreement is made between ")
+    def _write_excel_file(self, filepath: str) -> None:
+        try:
+            wb = xlsxwriter.Workbook(filepath)
 
-    # Tag: Client Name
-    run = p.add_run("{{ client_name | format_string('title', 'prefix', 'Client: ') }}")
-    run.bold = True
-    set_no_proof(run)
+            # Formats
+            fmt_head = wb.add_format(
+                {
+                    "bold": True,
+                    "font_color": "white",
+                    "bg_color": "#2C3E50",
+                    "border": 1,
+                }
+            )
+            fmt_date = wb.add_format({"num_format": "yyyy-mm-dd", "border": 1})
+            fmt_curr = wb.add_format({"num_format": "$#,##0.00", "border": 1})
+            fmt_text = wb.add_format({"border": 1, "text_wrap": True})
 
-    p.add_run(" and DocGenius Systems.")
+            ws = wb.add_worksheet("Data")
 
-    doc1.add_heading("1. Contract Details", level=1)
-    p = doc1.add_paragraph()
-    p.add_run("Contract ID: ").bold = True
+            headers = [
+                "id",
+                "company",
+                "ceo_name",
+                "founded_date",
+                "revenue_q4",
+                "growth_pct",
+                "is_public",
+                "compliance_check",
+                "risk_score",
+                "email_contact",
+                "card_token",
+                "logo_img",
+                "ceo_img",
+                "auth_sig",
+            ]
+            ws.write_row(0, 0, headers, fmt_head)
 
-    # Tag: Client ID
-    run = p.add_run("{{ client_id | format_string('upper') }}")
-    set_no_proof(run)
+            # 5 Robust Rows
+            data = [
+                # 1. Happy Path (Standard Enterprise)
+                [
+                    "CORP-001",
+                    "Acme Solutions Inc.",
+                    "John Sterling",
+                    date(1998, 5, 12),
+                    1500000.00,
+                    0.125,
+                    True,
+                    False,
+                    10,
+                    "contact@acme.com",
+                    "4532123456789012",
+                    "logo_acme.png",
+                    "profile_CEO.jpg",
+                    "sig_valid.png",
+                ],
+                # 2. International / Localization (European Context)
+                [
+                    "CORP-002",
+                    "Omega G.m.b.H",
+                    "Klaus Müller",
+                    date(2005, 11, 30),
+                    450500.50,
+                    0.052,
+                    False,
+                    True,
+                    20,
+                    "info@omega.de",
+                    "5500123456789012",
+                    "None",
+                    "profile_CTO.jpg",
+                    "sig_valid.png",
+                ],
+                # 3. High Risk / Negative Growth
+                [
+                    "CORP-003",
+                    "Cyberdyne Sys",
+                    "Sarah Connor",
+                    date(2024, 1, 1),
+                    -50000.00,
+                    -0.25,
+                    True,
+                    True,
+                    30,
+                    "alert@skynet.net",
+                    "371234567890123",
+                    "chart_growth.jpg",
+                    "None",
+                    "None",
+                ],
+                # 4. Nulls / Defaults Testing (Crucial for robustness)
+                [
+                    "CORP-004",
+                    "Stealth Startup",
+                    None,
+                    date(2025, 1, 1),
+                    0.00,
+                    0.0,
+                    False,
+                    False,
+                    99,
+                    None,
+                    "1234",
+                    "None",
+                    "None",
+                    "None",
+                ],
+                # 5. Edge Case (Long Strings & Precision)
+                [
+                    "CORP-005",
+                    "The Very Long Company Name Limited Partnership Global Edition",
+                    "Alexander Wolfeschlegelsteinhausenbergerdorff",
+                    date(1900, 1, 1),
+                    9999999.99,
+                    1.0,
+                    True,
+                    True,
+                    10,
+                    "ceo@verylongdomainnamecompany.com",
+                    "4111111111111111",
+                    "logo_acme.png",
+                    "profile_CEO.jpg",
+                    "sig_valid.png",
+                ],
+            ]
 
-    p.add_run("\nDate Signed: ").bold = True
+            for r, row in enumerate(data, 1):
+                for c, val in enumerate(row):
+                    if isinstance(val, date):
+                        ws.write(r, c, val, fmt_date)
+                    elif isinstance(val, float):
+                        ws.write(r, c, val, fmt_curr)
+                    else:
+                        ws.write(r, c, val, fmt_text)
 
-    # Tag: Date Long
-    run = p.add_run("{{ contract_date | format_date('long') }}")
-    set_no_proof(run)
+            # Autosize approximation
+            ws.set_column(0, 13, 20)
+            wb.close()
+            logger.info(f"✅ Excel Data created: {filepath}")
 
-    p.add_run("\n(Alternative Date Format for International filing: ")
+        except Exception as e:
+            logger.error(f"Excel generation failed: {e}")
+            raise e
 
-    # Tag: Date Extended
-    run = p.add_run("{{ contract_date | format_date('extended', 'es_ES') }}")
-    set_no_proof(run)
+    # --- Word Templates ---
 
-    p.add_run(")")
+    async def generate_word_templates(self) -> None:
+        """Orchestrates Word template creation."""
+        logger.info("📄 Generating 3 Word Templates...")
 
-    doc1.add_heading("2. Financial Terms", level=1)
-    p = doc1.add_paragraph("The total value of this contract is ")
+        await asyncio.gather(
+            asyncio.to_thread(
+                self._create_brief, os.path.join(BASE_DIR, self.tmpl_word_brief)
+            ),
+            asyncio.to_thread(
+                self._create_contract, os.path.join(BASE_DIR, self.tmpl_word_contract)
+            ),
+            asyncio.to_thread(
+                self._create_compatibility,
+                os.path.join(BASE_DIR, self.tmpl_word_compat),
+            ),
+        )
 
-    # Tag: Currency USD
-    run = p.add_run("{{ contract_value | format_currency('USD') }}")
-    run.bold = True
-    run.font.size = Pt(14)
-    set_no_proof(run)
+    def _create_brief(self, path: str) -> None:
+        """
+        Creates 'Brief': A professional summary document with layout tables.
+        """
+        doc = Document()
 
-    p.add_run(".")
+        # Header
+        h1 = doc.add_heading("EXECUTIVE BRIEFING", 0)
+        h1.alignment = WD_ALIGN_PARAGRAPH.CENTER
 
-    p = doc1.add_paragraph("Written amount: ")
+        # Profile Table (Layout)
+        table = doc.add_table(rows=1, cols=2)
+        table.autofit = False
+        table.allow_autofit = False
+        table.columns[0].width = Cm(4)
+        table.columns[1].width = Cm(12)
 
-    # Tag: Spell Out
-    run = p.add_run("{{ contract_value | format_number('spell_out', 'en') }}")
-    run.italic = True
-    set_no_proof(run)
+        # Left: Image
+        cell_img = table.cell(0, 0)
+        p = cell_img.paragraphs[0]
+        self._set_no_proof(p.add_run("{{ ceo_img | format_image('3.5', '3.5') }}"))
 
-    p.add_run(" dollars.")
+        # Right: Info
+        cell_info = table.cell(0, 1)
+        p = cell_info.paragraphs[0]
+        self._style_header_run(p.add_run("{{ company | format_string('upper') }}\n"))
+        p.add_run("CEO: ")
+        self._set_no_proof(
+            p.add_run("{{ ceo_name | format_logic('default', 'Confidential') }}")
+        )
+        p.add_run("\nEstablished: ")
+        self._set_no_proof(p.add_run("{{ founded_date | format_date('year') }}"))
 
-    doc1.add_heading("Signatures", level=1)
-    p = doc1.add_paragraph("Client Representative:\n\n")
+        doc.add_paragraph().add_run().add_break()
 
-    # Tag: Image
-    run = p.add_run("{{ signature_img | format_image('4', '2') }}")
-    set_no_proof(run)
+        # Financials
+        doc.add_heading("Financial Performance", level=1)
+        p = doc.add_paragraph("Fiscal Revenue: ")
+        run = p.add_run("{{ revenue_q4 | format_currency('USD') }}")
+        run.bold = True
+        self._set_no_proof(run)
 
-    doc1_path = os.path.join(BASE_DIR, "template_contract.docx")
-    doc1.save(doc1_path)
-    logger.info(f"Word template 1 created: {doc1_path}")
+        p = doc.add_paragraph("Growth Trajectory: ")
+        run = p.add_run("{{ growth_pct | format_number('percent', '2') }}")
+        self._set_no_proof(run)
 
-    # --- Template 2: Technical Report (Advanced features focus) ---
-    doc2 = Document()
-    doc2.add_heading("CLIENT TECHNICAL PROFILE Status Report", 0)
+        # Status Logic
+        doc.add_heading("Risk Assessment", level=1)
+        p = doc.add_paragraph("Current Status: ")
+        run = p.add_run(
+            "{{ risk_score | format_logic('10=Low Risk (Approved)', '20=Medium Risk (Review)', '30=High Risk (Audit)', 'default', 'Unknown') }}"
+        )
+        run.bold = True
+        run.font.color.rgb = RGBColor(200, 0, 0)
+        self._set_no_proof(run)
 
-    # Tag: Image (Photo)
-    p = doc2.add_paragraph()
-    p.alignment = 1  # Center
-    run = p.add_run("{{ client_photo | format_image('3', '3') }}")
-    set_no_proof(run)
+        doc.save(path)
 
-    doc2.add_heading("System Status & Metrics", level=1)
+    def _create_contract(self, path: str) -> None:
+        """
+        Creates 'Contract': Legal document style, heavy on text precision.
+        """
+        doc = Document()
+        doc.add_heading("SERVICE LEVEL AGREEMENT", 0)
 
-    # Tag: Checkbox
-    p = doc2.add_paragraph()
-    p.add_run("[ ")
-    run = p.add_run("{{ is_active | format_bool('check') }}")
-    set_no_proof(run)
-    p.add_run(" ] Account Active status verified.")
+        p = doc.add_paragraph("THIS AGREEMENT is dated ")
+        self._set_no_proof(p.add_run("{{ founded_date | format_date('long') }}"))
+        p.add_run(" and is made between:")
 
-    p = doc2.add_paragraph()
-    p.add_run("Current Debt Flag: ")
+        # Parties
+        doc.add_heading("1. The Parties", level=1)
+        p = doc.add_paragraph()
+        p.add_run("PROVIDER: DocGenius Systems Ltd.\n").bold = True
+        p.add_run("CLIENT: ")
+        run = p.add_run("{{ company | format_string('title') }}")
+        run.bold = True
+        self._set_no_proof(run)
+        p.add_run(" (ID: ")
+        self._set_no_proof(p.add_run("{{ id }}"))
+        p.add_run(")")
 
-    # Tag: Yes/No
-    run = p.add_run("{{ has_debt | format_bool('yesno') }}")
-    run.bold = True
-    set_no_proof(run)
+        # Terms
+        doc.add_heading("2. Consideration", level=1)
+        p = doc.add_paragraph("The Client agrees to pay the sum of ")
+        run = p.add_run("{{ revenue_q4 | format_currency('EUR') }}")
+        run.bold = True
+        self._set_no_proof(run)
+        p.add_run(" (")
+        run = p.add_run("{{ revenue_q4 | format_number('spell_out', 'en') }}")
+        run.italic = True
+        self._set_no_proof(run)
+        p.add_run(" Euros).")
 
-    doc2.add_heading("Performance Data", level=2)
-    table = doc2.add_table(rows=3, cols=2)
-    table.style = "Table Grid"
+        # Compliance (Boolean)
+        doc.add_heading("3. Compliance & Audit", level=1)
+        p = doc.add_paragraph()
+        p.add_run("[ ")
+        self._set_no_proof(p.add_run("{{ compliance_check | format_bool('check') }}"))
+        p.add_run(" ] Compliance Verified")
 
-    row0 = table.rows[0].cells
-    row0[0].text = "Metric"
-    row0[1].text = "Value / Formatting Demo"
+        p = doc.add_paragraph()
+        p.add_run("Publicly Traded: ")
+        self._set_no_proof(p.add_run("{{ is_public | format_bool('yesno') }}"))
 
-    row1 = table.rows[1].cells
-    row1[0].text = "Completion Rate"
+        # Signatures
+        doc.add_paragraph().add_run().add_break()
+        table = doc.add_table(rows=2, cols=2)
+        table.rows[0].cells[0].text = "Signed for DocGenius:"
+        table.rows[0].cells[1].text = "Signed for Client:"
 
-    # Tag: Percent
-    # Note: We must insert run into paragraph to set no_proof
-    p = row1[1].paragraphs[0]
-    run = p.add_run("{{ completion_rate | format_number('percent', '1') }}")
-    set_no_proof(run)
+        # Client Sig Image
+        cell = table.rows[1].cells[1]
+        p = cell.paragraphs[0]
+        self._set_no_proof(p.add_run("{{ auth_sig | format_image('4', '2') }}"))
 
-    row2 = table.rows[2].cells
-    row2[0].text = "Workflow Status Code"
+        doc.save(path)
 
-    # Tag: Logic Map
-    p = row2[1].paragraphs[0]
-    run = p.add_run(
-        "{{ status_code | format_logic('10=Approved Process', '20=Pending Review', '30=Rejected', 'Unknown Status') }}"
-    )
-    set_no_proof(run)
+    def _create_compatibility(self, path: str) -> None:
+        """
+        Creates 'Compatibility': The Ultimate Unit Test.
+        Tests EVERY single strategy method.
+        """
+        doc = Document()
+        doc.add_heading("SYSTEM COMPATIBILITY MATRIX", 0)
+        doc.add_paragraph("Automated Verification of all Jinja2 Filters.")
 
-    doc2.add_heading("Raw Data Dump (For Verification)", level=2)
-    p = doc2.add_paragraph("Raw Value: ")
-    run = p.add_run("{{ contract_value }}")
-    set_no_proof(run)
+        # Helper to make rows
+        def add_test_row(tbl, category, filter_name, syntax, result_tag):
+            cells = tbl.add_row().cells
+            cells[0].text = category
+            cells[1].text = filter_name
+            cells[2].text = syntax
+            p = cells[3].paragraphs[0]
+            r = p.add_run(result_tag)
+            r.font.color.rgb = RGBColor(0, 100, 0)  # Green for result
+            self._set_no_proof(r)
 
-    doc2_path = os.path.join(BASE_DIR, "template_brief.docx")
-    doc2.save(doc2_path)
-    logger.info(f"Word template 2 created: {doc2_path}")
+        table = doc.add_table(rows=1, cols=4)
+        table.style = "Table Grid"
+        hdrs = table.rows[0].cells
+        hdrs[0].text = "Category"
+        hdrs[1].text = "Filter"
+        hdrs[2].text = "Args"
+        hdrs[3].text = "Live Result"
 
+        # 1. Strings
+        add_test_row(
+            table, "String", "upper", "None", "{{ company | format_string('upper') }}"
+        )
+        add_test_row(
+            table, "String", "lower", "None", "{{ company | format_string('lower') }}"
+        )
+        add_test_row(
+            table, "String", "trim", "None", "{{ company | format_string('trim') }}"
+        )
+        add_test_row(
+            table,
+            "String",
+            "truncate",
+            "10",
+            "{{ company | format_string('truncate', '10') }}",
+        )
+        add_test_row(
+            table,
+            "String",
+            "prefix",
+            "ID: ",
+            "{{ id | format_string('prefix', 'ID: ') }}",
+        )
 
-def create_powerpoint_template(filename: str = "template_presentation.pptx") -> None:
-    """
-    Creates a PPTX template with formatting tags.
-    """
-    prs = Presentation()
+        # 2. Numbers
+        add_test_row(
+            table, "Number", "int", "None", "{{ revenue_q4 | format_number('int') }}"
+        )
+        add_test_row(
+            table,
+            "Number",
+            "float",
+            "2",
+            "{{ revenue_q4 | format_number('float', '2') }}",
+        )
+        add_test_row(
+            table,
+            "Number",
+            "percent",
+            "1",
+            "{{ growth_pct | format_number('percent', '1') }}",
+        )
+        add_test_row(
+            table,
+            "Number",
+            "spell_out",
+            "en",
+            "{{ risk_score | format_number('spell_out', 'en') }}",
+        )
 
-    # Slide 1: Title Slide (String and Date formatting)
-    slide_layout = prs.slide_layouts[0]  # Title Slide
-    slide = prs.slides.add_slide(slide_layout)
-    title = slide.shapes.title
-    subtitle = slide.placeholders[1]
+        # 3. Dates
+        add_test_row(
+            table, "Date", "iso", "None", "{{ founded_date | format_date('iso') }}"
+        )
+        add_test_row(
+            table, "Date", "long", "None", "{{ founded_date | format_date('long') }}"
+        )
+        add_test_row(
+            table, "Date", "year", "None", "{{ founded_date | format_date('year') }}"
+        )
+        add_test_row(
+            table,
+            "Date",
+            "add_days",
+            "30",
+            "{{ founded_date | format_date('add_days', '30') }}",
+        )
+        add_test_row(
+            table,
+            "Date",
+            "fmt",
+            "%d/%m/%Y",
+            "{{ founded_date | format_date('fmt', '%d/%m/%Y') }}",
+        )
 
-    # Multi-step string: Title case + Prefix
-    title.text = "Client Overview: {{ client_name | format_string('title') }}"
-    # Date: Medium format
-    subtitle.text = "Generated on: {{ contract_date | format_date('medium') }}"
+        # 4. Logic & Bool
+        add_test_row(
+            table,
+            "Logic",
+            "mapping",
+            "10=A, 20=B",
+            "{{ risk_score | format_logic('10=Approved', '20=Review', 'default', 'Critical') }}",
+        )
+        add_test_row(
+            table,
+            "Logic",
+            "default",
+            "N/A",
+            "{{ ceo_name | format_logic('default', 'VACANT POSITION') }}",
+        )
+        add_test_row(
+            table, "Bool", "yesno", "None", "{{ is_public | format_bool('yesno') }}"
+        )
+        add_test_row(
+            table,
+            "Bool",
+            "check",
+            "None",
+            "{{ compliance_check | format_bool('check') }}",
+        )
 
-    # Slide 2: Financial Highlights (Currency and Logic)
-    slide_layout = prs.slide_layouts[1]  # Title and Content
-    slide = prs.slides.add_slide(slide_layout)
-    title = slide.shapes.title
-    content = slide.placeholders[1]
+        # 5. Mask
+        add_test_row(
+            table, "Mask", "email", "None", "{{ email_contact | format_mask('email') }}"
+        )
+        add_test_row(
+            table,
+            "Mask",
+            "credit_card",
+            "None",
+            "{{ card_token | format_mask('credit_card') }}",
+        )
 
-    title.text = "Financial & Status Highlights"
-    tf = content.text_frame
-    tf.text = "Key Metrics:"
+        doc.save(path)
 
-    p = tf.add_paragraph()
-    # Currency: Brazilian Real
-    p.text = "Contract Value (BRL): {{ contract_value | format_currency('BRL') }}"
-    p.level = 1
+    # --- PowerPoint Templates ---
 
-    p = tf.add_paragraph()
-    # Logic mapping in PPTX
-    p.text = "Current Status: {{ status_code | format_logic('10=Green (Go)', '20=Yellow (Hold)', 'Red (Stop)') }}"
-    p.level = 1
+    async def generate_pptx_templates(self) -> None:
+        """Orchestrates PowerPoint template creation."""
+        logger.info("🖥️  Generating 2 PPTX Templates...")
 
-    # Slide 3: Boolean Demonstrations
-    slide_layout = prs.slide_layouts[1]
-    slide = prs.slides.add_slide(slide_layout)
-    title = slide.shapes.title
-    content = slide.placeholders[1]
+        await asyncio.gather(
+            asyncio.to_thread(
+                self._create_ppt_presentation,
+                os.path.join(BASE_DIR, self.tmpl_ppt_pres),
+            ),
+            asyncio.to_thread(
+                self._create_ppt_compatibility,
+                os.path.join(BASE_DIR, self.tmpl_ppt_compat),
+            ),
+        )
 
-    title.text = "Audit Checkpoints (Boolean Formats)"
-    tf = content.text_frame
+    def _create_ppt_presentation(self, path: str) -> None:
+        """Creates 'Presentation': Visual dashboard."""
+        prs = Presentation()
 
-    p = tf.add_paragraph()
-    # Boolean True/False string
-    p.text = "Is Active User? -> {{ is_active | format_bool('truefalse') }}"
+        # Slide 1: Title
+        slide = prs.slides.add_slide(prs.slide_layouts[0])
+        slide.shapes.title.text = "{{ company | format_string('upper') }}"
+        slide.placeholders[1].text = (
+            "Strategic Review | {{ founded_date | format_date('year') }}"
+        )
 
-    p = tf.add_paragraph()
-    # Boolean Checkbox visual
-    p.text = "Debt Clearance Checkbox: [ {{ has_debt | format_bool('checkbox') }} ]"
+        # Slide 2: Scorecard
+        slide = prs.slides.add_slide(prs.slide_layouts[1])
+        slide.shapes.title.text = "Financial Scorecard"
+        tf = slide.placeholders[1].text_frame
 
-    filepath = os.path.join(BASE_DIR, filename)
-    try:
-        prs.save(filepath)
-        logger.info(f"PowerPoint template created: {filepath}")
-    except Exception as e:
-        logger.error(f"Error creating PowerPoint template: {e}")
+        p = tf.add_paragraph()
+        p.text = "Q4 Revenue: {{ revenue_q4 | format_currency('USD') }}"
+        p.font.size = PptPt(24)
+
+        p = tf.add_paragraph()
+        p.text = "Growth: {{ growth_pct | format_number('percent', '2') }}"
+        p.font.size = PptPt(24)
+
+        # Logic Mapping for Color (Text-based simulation)
+        p = tf.add_paragraph()
+        p.text = "Risk Level: {{ risk_score | format_logic('10=LOW (Green)', '20=MED (Yellow)', '30=HIGH (Red)', 'default', 'UNRATED') }}"
+        p.font.bold = True
+
+        prs.save(path)
+
+    def _create_ppt_compatibility(self, path: str) -> None:
+        """Creates 'Compatibility': Visual unit test for PPTX."""
+        prs = Presentation()
+
+        # Slide 1: Logic & Strings
+        slide = prs.slides.add_slide(prs.slide_layouts[1])
+        slide.shapes.title.text = "Text & Logic Tests"
+        tf = slide.placeholders[1].text_frame
+
+        tf.text = "Company: {{ company | format_string('upper') }}"
+        p = tf.add_paragraph()
+        p.text = "Masked Email: {{ email_contact | format_mask('email') }}"
+        p = tf.add_paragraph()
+        p.text = "Masked Card: {{ card_token | format_mask('credit_card') }}"
+
+        # Slide 2: Booleans
+        slide = prs.slides.add_slide(prs.slide_layouts[1])
+        slide.shapes.title.text = "Boolean Visuals"
+        tf = slide.placeholders[1].text_frame
+
+        p = tf.add_paragraph()
+        p.text = "Is Public? {{ is_public | format_bool('truefalse') }}"
+        p = tf.add_paragraph()
+        p.text = "Compliance? [ {{ compliance_check | format_bool('check') }} ]"
+
+        prs.save(path)
+
+    # --- Main Execution ---
+
+    async def run(self) -> None:
+        """Executes the full generation pipeline."""
+        logger.info("🚀 Starting Seed Generation...")
+
+        # 1. Assets first (required by Excel)
+        await self.generate_assets()
+
+        # 2. Parallel Generation of Excel and Templates
+        await asyncio.gather(
+            self.generate_excel_data(),
+            self.generate_word_templates(),
+            self.generate_pptx_templates(),
+        )
+
+        logger.info("✨ Generation Complete. Files ready for testing.")
 
 
 if __name__ == "__main__":
-    logger.info("--- Generating Seed Data ---")
-    # 1. Create Assets Zip First (so Excel can reference images)
-    create_assets_zip()
-    # 2. Create Raw Excel Data
-    create_excel_data()
-    # 3. Create Templates
-    create_word_templates()
-    create_powerpoint_template()
-    logger.info(f"--- Seed Generation Complete. Files located in: {BASE_DIR} ---")
+    generator = SeedGenerator()
+    asyncio.run(generator.run())
