@@ -13,23 +13,25 @@ logger = logging.getLogger(__name__)
 
 class TemplateValidator:
     """
-    Analyzes template files to extract expected Jinja2 variables and
-    compares them against provided data headers.
+    Analyzes template files to extract expected Jinja2 variables.
+    Handle Jinja2 filters (pipes) correctly during extraction.
     """
 
     def extract_tags_from_docx(self, file_path: str) -> Set[str]:
         """
-        Extracts undeclared Jinja2 tags from a Word document.
+        Extracts variable names from a Word document, ignoring filters.
 
         Args:
             file_path (str): Path to the .docx file.
 
         Returns:
-            Set[str]: A set of variable names found in the template.
+            Set[str]: A set of raw variable names found in the template.
         """
         try:
             doc = DocxTemplate(file_path)
-            # docxtpl has a built-in method to find variables
+            # docxtpl returns undeclared variables.
+            # However, if extensive filters are used, standard extraction might be tricky.
+            # We rely on docxtpl's underlying jinja2 meta api which is generally robust.
             return doc.get_undeclared_template_variables()
         except Exception as e:
             logger.error(f"Failed to parse DOCX {file_path}: {e}")
@@ -38,7 +40,7 @@ class TemplateValidator:
     def extract_tags_from_pptx(self, file_path: str) -> Set[str]:
         """
         Extracts Jinja2 tags from a PowerPoint presentation using Regex.
-        Matches patterns like {{ variable_name }} or {{ object.attr }}.
+        Handles syntax like {{ variable | format_string('arg') }}.
 
         Args:
             file_path (str): Path to the .pptx file.
@@ -47,9 +49,12 @@ class TemplateValidator:
             Set[str]: A set of variable names found.
         """
         tags = set()
-        # Regex to capture content inside {{ }}.
-        # Matches {{ name }} but tries to ignore complex logic like {% if %}
-        tag_pattern = re.compile(r"\{\{\s*([a-zA-Z0-9_]+)\s*\}\}")
+        # Regex explanation:
+        # \{\{\s* : Match opening braces and whitespace
+        # ([a-zA-Z0-9_]+) : Capture the Variable Name (Group 1)
+        # (?:\|.*?)? : Non-capturing group for optional Pipe and following chars (filters)
+        # \s*\}\} : Match closing braces
+        tag_pattern = re.compile(r"\{\{\s*([a-zA-Z0-9_]+)(?:\|.*?)?\s*\}\}")
 
         try:
             prs = Presentation(file_path)
@@ -58,10 +63,10 @@ class TemplateValidator:
                     if not shape.has_text_frame:
                         continue
                     for paragraph in shape.text_frame.paragraphs:
-                        # Scan the full text of the paragraph (joins runs automatically)
                         text = paragraph.text
                         matches = tag_pattern.findall(text)
                         for match in matches:
+                            # Match is just the variable name due to Group 1
                             tags.add(match)
             return tags
         except Exception as e:
@@ -81,7 +86,6 @@ class TemplateValidator:
         Returns:
             Dict: Report containing missing variables per file.
         """
-        # Normalize headers (assuming strict matching based on project rules)
         available_vars = set(excel_headers)
         validation_report = []
         all_valid = True
@@ -95,7 +99,6 @@ class TemplateValidator:
             elif ext == ".pptx":
                 required_vars = self.extract_tags_from_pptx(path)
 
-            # Find mismatches: Variables in Template that are NOT in Excel
             missing_in_excel = required_vars - available_vars
 
             status = "OK"

@@ -18,7 +18,6 @@ from openpyxl.utils.dataframe import dataframe_to_rows
 from openpyxl.worksheet.table import Table, TableStyleInfo
 
 from app.core.engine import DocumentEngine
-from app.core.formatter import DataFormatter
 from app.utils import extract_zip, sanitize_filename, start_scheduler
 from app.core.validator import TemplateValidator
 
@@ -296,40 +295,27 @@ async def stream_logs(session_id: str):
 @app.post("/api/preview")
 async def preview_data(file_excel: UploadFile = File(...)):
     """
-    Parses the Excel file and returns the headers, protocol, and first 5 formatted rows.
+    Parses the Excel file and returns the headers and first 5 RAW rows.
     """
     try:
-        # Load Excel
-        df = pd.read_excel(file_excel.file, header=None)
+        # Load Excel, Header is Row 1 (index 0)
+        df = pd.read_excel(file_excel.file, header=0)
 
-        # Row 1: Variables (Headers)
-        headers = df.iloc[0].tolist()
-        # Row 2: Protocol
-        protocols_raw = df.iloc[1].tolist()
-        # Row 3+: Data
-        data_rows = df.iloc[2:].head(5)  # Preview only 5
+        # Row 1: Headers
+        headers = df.columns.tolist()
 
-        # Create Protocol Map
-        formatter = DataFormatter()
-        protocol_map = [formatter.parse_protocol(p) for p in protocols_raw]
+        # Data: Head 5
+        data_rows = df.head(5)
 
-        # Format Preview Data
+        # Format Preview Data (Raw)
         preview_data = []
         for _, row in data_rows.iterrows():
-            row_dict = {}
-            for col_idx, cell_val in enumerate(row):
-                var_name = headers[col_idx]
-                proto = protocol_map[col_idx]
-                formatted_val = formatter.format_value(cell_val, proto)
-
-                # Simplify image objects for JSON preview
-                if (
-                    isinstance(formatted_val, dict)
-                    and formatted_val.get("type") == "image"
-                ):
-                    row_dict[var_name] = f"[Image: {formatted_val['filename']}]"
-                else:
-                    row_dict[var_name] = formatted_val
+            # Convert to dict, handle NaNs
+            row_dict = row.where(pd.notnull(row), None).to_dict()
+            # Convert non-serializable types for JSON
+            for k, v in row_dict.items():
+                if isinstance(v, (datetime, pd.Timestamp)):
+                    row_dict[k] = str(v)
             preview_data.append(row_dict)
 
         return JSONResponse(
@@ -346,21 +332,19 @@ async def validate_compatibility(
     files_templates: List[UploadFile] = File(...),
 ):
     """
-    Pre-flight Check: Validates that all Jinja2 tags in the uploaded templates
-    exist as headers in the uploaded Excel file.
+    Validates that template tags exist in Excel headers.
     """
-    # 1. Setup Temp Session
     session_id = f"val_{uuid.uuid4().hex[:8]}"
     session_path = os.path.join(TEMP_DIR, session_id)
     os.makedirs(session_path, exist_ok=True)
 
     try:
-        # 2. Save Excel
+        # Save Excel
         excel_path = os.path.join(session_path, file_excel.filename)
         async with await anyio.open_file(excel_path, "wb") as f:
             await f.write(await file_excel.read())
 
-        # 3. Save Templates
+        # Save Templates
         templates_map = {}
         for tmpl in files_templates:
             t_path = os.path.join(session_path, tmpl.filename)
@@ -368,16 +352,12 @@ async def validate_compatibility(
                 await f.write(await tmpl.read())
             templates_map[tmpl.filename] = t_path
 
-        # 4. Extract Headers from Excel
-        # Minimal read just for headers
-        df = pd.read_excel(excel_path, header=None, nrows=1)
-        if df.empty:
-            raise ValueError("Excel file is empty.")
-        headers = df.iloc[0].tolist()
-        # Convert to string just in case to ensure matching works
+        # Read Headers
+        df = pd.read_excel(excel_path, header=0, nrows=0)
+        headers = df.columns.tolist()
         headers = [str(h) for h in headers]
 
-        # 5. Run Validation
+        # Validate
         validator = TemplateValidator()
         result = validator.compare(headers, templates_map)
 
@@ -387,7 +367,6 @@ async def validate_compatibility(
         logger.error(f"Validation Error: {e}")
         return JSONResponse({"status": "error", "message": str(e)}, status_code=500)
     finally:
-        # Cleanup immediately
         if os.path.exists(session_path):
             shutil.rmtree(session_path)
 
@@ -454,52 +433,40 @@ async def generate_sample(
 
         # 3. Initialize Engine & Parse Data
         engine = DocumentEngine(session_path)
-        formatter = DataFormatter()
 
-        df = pd.read_excel(excel_path, header=None)
+        # Read Excel: Row 1 is Header (header=0)
+        df = pd.read_excel(excel_path, header=0)
 
-        if len(df) < 3:
+        if df.empty:
             raise ValueError(
-                "Excel file must contain at least Header, Protocol, and one Data Row."
+                "Excel file must contain at least Header and one Data Row."
             )
 
-        headers = df.iloc[0].tolist()
-        protocol_map = [formatter.parse_protocol(p) for p in df.iloc[1].tolist()]
-
-        # TARGET: Only the first data row (Excel Row 3)
-        target_row = df.iloc[2]
+        # TARGET: Only the first data row (Index 0, which corresponds to Excel Row 2)
+        target_row = df.iloc[0]
 
         # 4. Process Single Row
         report = []
         files_generated_count = 0
         row_success = False
 
-        context = {}
         row_identifier = "SAMPLE"
 
-        # Parse Context
+        # Parse Context (Raw Data)
+        context = target_row.to_dict()
+
+        # Sanitize Context (Handle NaN and NaT)
+        cleaned_context = {}
         try:
-            for col_idx, cell_val in enumerate(target_row):
-                var_name = headers[col_idx]
-                val = formatter.format_value(cell_val, protocol_map[col_idx])
-                context[var_name] = val
-                if var_name == filename_col:
-                    row_identifier = sanitize_filename(str(val))
+            for k, v in context.items():
+                if pd.isna(v):
+                    cleaned_context[k] = None
+                else:
+                    cleaned_context[k] = v
 
-            # Validate Assets
-            for key, val in context.items():
-                if isinstance(val, dict) and val.get("type") == "image":
-                    img_filename = val.get("filename")
-                    if not file_assets:
-                        raise FileNotFoundError(
-                            f"Variable '{key}' requires image '{img_filename}', but no Assets Zip uploaded."
-                        )
-
-                    img_path = os.path.join(dir_assets_internal, img_filename)
-                    if not os.path.exists(img_path):
-                        raise FileNotFoundError(
-                            f"Image '{img_filename}' (for '{key}') not found in Assets Zip."
-                        )
+            # Determine Identifier
+            if filename_col in cleaned_context and cleaned_context[filename_col]:
+                row_identifier = sanitize_filename(str(cleaned_context[filename_col]))
 
         except Exception as e:
             report.append(
@@ -508,7 +475,7 @@ async def generate_sample(
                     "Identifier": "SAMPLE",
                     "Output File": "N/A",
                     "Status": "Error",
-                    "Error Details": f"Data/Validation Error: {str(e)}",
+                    "Error Details": f"Data Parsing Error: {str(e)}",
                 }
             )
 
@@ -526,10 +493,15 @@ async def generate_sample(
                 try:
                     if tmpl_ext.lower() == ".docx":
                         await engine.process_docx(
-                            tmpl_path, doc_output_path, context, dir_assets_internal
+                            tmpl_path,
+                            doc_output_path,
+                            cleaned_context,
+                            dir_assets_internal,
                         )
                     elif tmpl_ext.lower() == ".pptx":
-                        await engine.process_pptx(tmpl_path, doc_output_path, context)
+                        await engine.process_pptx(
+                            tmpl_path, doc_output_path, cleaned_context
+                        )
 
                     report.append(
                         {
@@ -630,19 +602,12 @@ async def process_batch(
 ):
     """
     Main batch processing endpoint.
-    Refactored to handle granular file logging, clean asset management,
-    and strict validation for missing images.
     """
     start_time = datetime.now()
-
-    # 1. Setup Session & Directories
     session_path = os.path.join(TEMP_DIR, session_id)
 
-    # Public folders (will be zipped)
     dir_inputs = os.path.join(session_path, "1 Input documents")
     dir_outputs = os.path.join(session_path, "2 Generated documents")
-
-    # Internal folder for asset extraction (will be DELETED before zipping)
     dir_assets_internal = os.path.join(session_path, ".temp_assets")
 
     for p in [dir_inputs, dir_outputs, dir_assets_internal]:
@@ -651,14 +616,11 @@ async def process_batch(
     try:
         send_log(session_id, "🟢 Initializing session structure...")
 
-        # 2. Save Inputs
-
-        # Save Excel
+        # 1. Save Inputs
         excel_path = os.path.join(dir_inputs, file_excel.filename)
         async with await anyio.open_file(excel_path, "wb") as f:
             await f.write(await file_excel.read())
 
-        # Save Templates
         saved_template_paths = []
         template_names = []
         for tmpl in files_templates:
@@ -669,90 +631,53 @@ async def process_batch(
             template_names.append(tmpl.filename)
             send_log(session_id, f"   ↳ Loaded template: {tmpl.filename}")
 
-        # Handle Assets (Save Zip to Inputs, Extract to Internal)
         assets_filename = "None"
         if file_assets:
             assets_filename = file_assets.filename
-
-            # Save original zip to Inputs folder for user reference
             zip_input_path = os.path.join(dir_inputs, file_assets.filename)
             async with await anyio.open_file(zip_input_path, "wb") as f:
                 await f.write(await file_assets.read())
-
-            # Extract to INTERNAL folder (hidden from final output)
             extract_zip(zip_input_path, dir_assets_internal)
             send_log(session_id, "📦 Assets library prepared.")
 
-        # Manifest
         input_manifest = {
             "excel": file_excel.filename,
             "templates": template_names,
             "assets": assets_filename,
         }
 
-        # 3. Initialize Engine
+        # 2. Load Data (Standard Header=0)
         engine = DocumentEngine(session_path)
-        formatter = DataFormatter()
 
-        df = pd.read_excel(excel_path, header=None)
-        headers = df.iloc[0].tolist()
-        protocol_map = [formatter.parse_protocol(p) for p in df.iloc[1].tolist()]
-
-        total_rows = len(df) - 2
+        # Read Excel using Pandas default (header is first row)
+        df = pd.read_excel(excel_path, header=0)
+        total_rows = len(df)
         send_log(session_id, f"🚀 Starting processing for {total_rows} rows.")
 
-        # 4. Processing Loop
         report = []
         total_files_generated_count = 0
-        success_rows_count = 0  # Count rows where at least one file worked
+        success_rows_count = 0
 
-        for idx, row in df.iloc[2:].iterrows():
-            row_num = idx + 1
+        # 3. Process Rows
+        for idx, row in df.iterrows():
+            row_num = idx + 2  # Excel Row 2 is data start
             row_success = False
 
-            # Parsing Context
-            context = {}
+            # Create Context (Raw Data)
+            context = row.to_dict()
+
+            # Handle NaN/Nat
+            cleaned_context = {}
+            for k, v in context.items():
+                if pd.isna(v):
+                    cleaned_context[k] = None
+                else:
+                    cleaned_context[k] = v
+
+            # Determine Identifier
             row_identifier = f"Row_{row_num}"
-            try:
-                for col_idx, cell_val in enumerate(row):
-                    var_name = headers[col_idx]
-                    val = formatter.format_value(cell_val, protocol_map[col_idx])
-                    context[var_name] = val
-                    if var_name == filename_col:
-                        row_identifier = sanitize_filename(str(val))
-
-                # --- VALIDATE ASSETS ---
-                # Check if any image is required but missing
-                for key, val in context.items():
-                    if isinstance(val, dict) and val.get("type") == "image":
-                        img_filename = val.get("filename")
-
-                        # Case 1: No Assets Zip provided at all
-                        if not file_assets:
-                            raise FileNotFoundError(
-                                f"Variable '{key}' requires image '{img_filename}', but no Assets Zip was uploaded."
-                            )
-
-                        # Case 2: File missing inside the provided Zip
-                        img_path = os.path.join(dir_assets_internal, img_filename)
-                        if not os.path.exists(img_path):
-                            raise FileNotFoundError(
-                                f"Image '{img_filename}' (for '{key}') not found in uploaded Assets Zip."
-                            )
-
-            except Exception as e:
-                # If context parsing or validation fails, log a generic error for the row
-                logger.error(f"Row {row_num} data/validation error: {e}")
-                report.append(
-                    {
-                        "Row": row_num,
-                        "Identifier": "N/A",
-                        "Output File": "N/A",
-                        "Status": "Error",
-                        "Error Details": str(e),
-                    }
-                )
-                continue
+            if filename_col in cleaned_context and cleaned_context[filename_col]:
+                row_identifier = sanitize_filename(str(cleaned_context[filename_col]))
 
             # Output Directory
             if group_by_folders:
@@ -765,20 +690,22 @@ async def process_batch(
             for tmpl_path in saved_template_paths:
                 tmpl_filename = os.path.basename(tmpl_path)
                 tmpl_name_base, tmpl_ext = os.path.splitext(tmpl_filename)
-
-                # --- PROCESS 1: DOCX/PPTX ---
                 final_filename = f"{tmpl_name_base} - {row_identifier}{tmpl_ext}"
                 doc_output_path = os.path.join(target_dir, final_filename)
 
                 try:
                     if tmpl_ext.lower() == ".docx":
                         await engine.process_docx(
-                            tmpl_path, doc_output_path, context, dir_assets_internal
+                            tmpl_path,
+                            doc_output_path,
+                            cleaned_context,
+                            dir_assets_internal,
                         )
                     elif tmpl_ext.lower() == ".pptx":
-                        await engine.process_pptx(tmpl_path, doc_output_path, context)
+                        await engine.process_pptx(
+                            tmpl_path, doc_output_path, cleaned_context
+                        )
 
-                    # Log Success for Document
                     report.append(
                         {
                             "Row": row_num,
@@ -792,7 +719,6 @@ async def process_batch(
                     row_success = True
 
                 except Exception as e:
-                    # Log Error for Document
                     report.append(
                         {
                             "Row": row_num,
@@ -804,45 +730,29 @@ async def process_batch(
                     )
                     logger.error(f"Error generating {final_filename}: {e}")
 
-                # --- PROCESS 2: PDF (Optional) ---
-                if output_pdf:
+                # PDF Conversion
+                if output_pdf and os.path.exists(doc_output_path):
                     pdf_filename = f"{tmpl_name_base} - {row_identifier}.pdf"
-
-                    # Only attempt PDF if DOCX succeeded
-                    if os.path.exists(doc_output_path):
-                        try:
-                            await engine.convert_to_pdf(doc_output_path, target_dir)
-
-                            report.append(
-                                {
-                                    "Row": row_num,
-                                    "Identifier": row_identifier,
-                                    "Output File": pdf_filename,
-                                    "Status": "Success",
-                                    "Error Details": "",
-                                }
-                            )
-                            total_files_generated_count += 1
-
-                        except Exception as e:
-                            report.append(
-                                {
-                                    "Row": row_num,
-                                    "Identifier": row_identifier,
-                                    "Output File": pdf_filename,
-                                    "Status": "Error",
-                                    "Error Details": f"PDF Conversion: {str(e)}",
-                                }
-                            )
-                    else:
-                        # If DOCX failed, imply PDF fail
+                    try:
+                        await engine.convert_to_pdf(doc_output_path, target_dir)
                         report.append(
                             {
                                 "Row": row_num,
                                 "Identifier": row_identifier,
                                 "Output File": pdf_filename,
-                                "Status": "Skipped",
-                                "Error Details": "Source document failed generation",
+                                "Status": "Success",
+                                "Error Details": "",
+                            }
+                        )
+                        total_files_generated_count += 1
+                    except Exception as e:
+                        report.append(
+                            {
+                                "Row": row_num,
+                                "Identifier": row_identifier,
+                                "Output File": pdf_filename,
+                                "Status": "Error",
+                                "Error Details": f"PDF Conversion: {str(e)}",
                             }
                         )
 
@@ -850,15 +760,13 @@ async def process_batch(
                 success_rows_count += 1
             send_log(session_id, f"✅ {row_identifier} processed.")
 
-        # 5. Cleanup Internal Assets
+        # Cleanup
         if os.path.exists(dir_assets_internal):
             shutil.rmtree(dir_assets_internal)
-            send_log(session_id, "🧹 Cleaning up temporary files...")
 
-        # 6. Finalize Report
+        # Stats
         end_time = datetime.now()
         duration = end_time - start_time
-
         metadata = {
             "session_id": session_id,
             "start_time": start_time,
@@ -870,20 +778,15 @@ async def process_batch(
             ),
         }
 
-        # Save report at Session Root (outside input/output folders)
         report_path = os.path.join(session_path, "job_report.xlsx")
-
         generate_styled_report(report_path, report, metadata, input_manifest)
 
-        # 7. Zip Result
         zip_base_name = os.path.join(TEMP_DIR, f"{session_id}_result")
-
         shutil.make_archive(
             base_name=zip_base_name, format="zip", root_dir=session_path
         )
 
         send_log(session_id, "PROCESS_COMPLETE")
-
         return JSONResponse(
             {"status": "success", "download_url": f"/api/download/{session_id}"}
         )

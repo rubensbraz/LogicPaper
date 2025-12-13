@@ -1,5 +1,5 @@
 import logging
-from typing import Any, Dict, List
+from typing import Any, Callable, Dict, List, Tuple
 
 from app.core.strategies.base import BaseStrategy
 from app.core.strategies.boolean_std import BooleanStrategy
@@ -15,96 +15,86 @@ from app.core.strategies.string_std import StringStrategy
 logger = logging.getLogger(__name__)
 
 
-class DefaultStrategy(BaseStrategy):
-    """Fallback strategy that performs no operation."""
-
-    def process(self, value: Any, ops: List[str]) -> Any:
-        return value
-
-
 class DataFormatter:
     """
-    The Central Registry that parses the protocol string and dispatches
-    execution to the correct Strategy.
+    Central Registry that acts as a bridge between Template Filters and Strategies.
+    Instead of parsing Excel protocols, it now exposes strategies as callable functions
+    that accept variable arguments for multi-step processing.
     """
 
     def __init__(self, locale: str = "pt_BR"):
+        """
+        Initialize the strategies with the given locale.
+
+        Args:
+            locale (str): Locale string (e.g., 'pt_BR', 'en_US').
+        """
         self.locale = locale
 
         # Registry of Strategies
         self.strategies: Dict[str, BaseStrategy] = {
-            # Text & Content
             "string": StringStrategy(),
-            # Numbers & Finance
-            "int": NumberStrategy(locale),
-            "float": NumberStrategy(locale),
-            "currency": NumberStrategy(locale),
-            "percent": NumberStrategy(locale),
-            # Dates
+            "number": NumberStrategy(locale),
             "date": DateStrategy(locale),
-            "time": DateStrategy(locale),
-            # Logic & Boolean
             "bool": BooleanStrategy(),
             "logic": LogicStrategy(),
-            "default": LogicStrategy(),  # Alias for convenience
-            # Privacy & Security
             "mask": MaskStrategy(),
-            # Rich Media
             "image": ImageStrategy(),
         }
-        self.default_strategy = DefaultStrategy()
 
-    def parse_protocol_string(self, protocol_string: str) -> Dict[str, Any]:
+    def _apply_strategy(self, strategy_name: str, value: Any, *args: str) -> Any:
         """
-        Parses a semi-colon separated string into a Type and a List of Operations.
+        Internal helper to execute a specific strategy with variable arguments.
 
-        Example: "string;upper;prefix;Mr."
-        Result: {"type": "string", "ops": ["upper", "prefix", "Mr."]}
+        Args:
+            strategy_name (str): The key of the strategy to use.
+            value (Any): The raw value to process.
+            *args (str): Variable list of operation tokens (e.g., 'upper', 'prefix', 'X').
+
+        Returns:
+            Any: The formatted result.
         """
-        if not protocol_string or str(protocol_string).strip() == "":
-            return {"type": "default", "ops": []}
+        strategy = self.strategies.get(strategy_name)
+        if not strategy:
+            logger.warning(
+                f"Strategy '{strategy_name}' not found. Returning raw value."
+            )
+            return value
 
-        # 1. Split by semicolon
-        parts = str(protocol_string).split(";")
+        # Convert args tuple to list for the Strategy 'process' contract
+        ops_list = list(args)
+        return strategy.process(value, ops_list)
 
-        # 2. Clean whitespace
-        parts = [p.strip() for p in parts if p.strip()]
-
-        if not parts:
-            return {"type": "default", "ops": []}
-
-        # 3. Extract Head (Type) and Tail (Operations)
-        data_type = parts[0].lower()
-        ops = parts[1:]
-
-        return {"type": data_type, "ops": ops}
-
-    def parse_protocol(self, protocol_string: str) -> Dict[str, Any]:
-        """Legacy wrapper for compatibility."""
-        return self.parse_protocol_string(protocol_string)
-
-    def format_value(self, value: Any, protocol: Dict[str, Any]) -> Any:
+    def get_jinja_filters(self) -> Dict[str, Callable]:
         """
-        Applies the formatting rule to a single value using the Strategy Pattern.
+        Returns a dictionary of filters ready to be registered in the Jinja2 environment.
+        This enables syntax like: {{ value | format_string('upper', 'trim') }}
+
+        Returns:
+            Dict[str, Callable]: Map of filter name -> wrapper function.
         """
-        dtype = protocol.get("type", "default")
-        ops = protocol.get("ops", [])
-
-        # Special handling for Logic Strategy (needs to run even if value is None)
-        # Other strategies might bail early if value is None
-        if value is None and dtype not in ("logic", "default"):
-            return ""
-
-        try:
-            # 1. Select Strategy
-            strategy = self.strategies.get(dtype)
-
-            if strategy:
-                return strategy.process(value, ops)
-
-            # 2. Fallback
-            return str(value)
-
-        except Exception as e:
-            logger.error(f"Formatting failed for {value} with {protocol}: {e}")
-            return str(value)
+        return {
+            "format_string": lambda val, *args: self._apply_strategy(
+                "string", val, *args
+            ),
+            "format_number": lambda val, *args: self._apply_strategy(
+                "number", val, *args
+            ),
+            # Aliases for convenience
+            "format_currency": lambda val, *args: self._apply_strategy(
+                "number", val, "currency", *args
+            ),
+            "format_int": lambda val, *args: self._apply_strategy(
+                "number", val, "int", *args
+            ),
+            "format_date": lambda val, *args: self._apply_strategy("date", val, *args),
+            "format_bool": lambda val, *args: self._apply_strategy("bool", val, *args),
+            "format_logic": lambda val, *args: self._apply_strategy(
+                "logic", val, *args
+            ),
+            "format_mask": lambda val, *args: self._apply_strategy("mask", val, *args),
+            # Image is handled specially in engine, but logic remains here for parsing dims
+            "parse_image_dims": lambda val, *args: self._apply_strategy(
+                "image", val, *args
+            ),
+        }
