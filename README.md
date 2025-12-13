@@ -1,41 +1,59 @@
-# DocGenius | Batch Document Engine
+# DocGenius | Document Generation Engine
 
 ![Build Status](https://img.shields.io/badge/build-passing-brightgreen?style=for-the-badge&logo=github)
 ![Python](https://img.shields.io/badge/Python-3.11-3776AB?style=for-the-badge&logo=python&logoColor=white)
 ![Docker](https://img.shields.io/badge/Docker-Enabled-2496ED?style=for-the-badge&logo=docker&logoColor=white)
-![License](https://img.shields.io/badge/License-Non--Commercial-red?style=for-the-badge)
+![License](https://img.shields.io/badge/License-CC%20BY--NC%204.0-lightgrey.svg?style=for-the-badge)
 
-> **The automation engine for transforming raw Excel data into high-fidelity Word, PowerPoint, and PDF documents.**
+> **Automate the creation of Word, PowerPoint, and PDF documents from Excel data.**
 
 ---
 
 ## 📖 Overview
 
-**DocGenius** is a robust, containerized application designed to solve the "Last Mile" problem of data processing: **Presentation**. It ingests structured data from Excel, applies complex business logic via custom Jinja2 strategies, and populates Microsoft Office templates to generate thousands of documents in seconds.
+**DocGenius** is a tool designed to automate document creation workflows. It takes structured data from Excel files and populates Microsoft Office templates (`.docx`, `.pptx`) using a custom Jinja2-based templating system.
 
-Built with **FastAPI** and **Docker**, it features a modern "Glassmorphism" UI for real-time batch monitoring and a headless LibreOffice engine for enterprise-grade PDF conversion.
+Developed with **FastAPI** and **Docker**, it provides a web-based dashboard for managing batch jobs and includes a headless LibreOffice integration for converting generated documents into PDF format. It is suitable for generating contracts, reports, certificates, and presentations at scale.
 
 ### 🌟 Key Features
 
-* **⚡ High-Performance Batching:** Process thousands of rows asynchronously.
-* **🎨 Template Agnostic:** Works natively with `.docx` (Word) and `.pptx` (PowerPoint).
-* **🧠 Logic Strategies:** Advanced filters for formatting dates, currency, masks (GDPR), and boolean logic directly inside templates.
-* **📷 Dynamic Assets:** Inject and resize images/signatures dynamically from a ZIP library.
-* **📄 Native PDF Conversion:** Integrated Headless LibreOffice for perfect file conversion.
-* **📡 Real-Time Telemetry:** Server-Sent Events (SSE) provide a live terminal-like experience in the browser.
-* **🛡️ Fail-Safe Iteration:** A single corrupted row never stops the batch. Errors are logged, and the engine moves on.
+* **Batch Processing:** Efficiently processes multiple rows of data from Excel files.
+* **Format Support:** Compatible with standard Word (`.docx`) and PowerPoint (`.pptx`) templates.
+* **Templating Logic:** Includes filters for text manipulation, date arithmetic, currency formatting, and conditional logic directly within the template.
+* **Asset Management:** Supports dynamic insertion and resizing of images (e.g., photos, signatures) from a ZIP archive.
+* **PDF Conversion:** Integrated LibreOffice for reliable conversion of Office files to PDF.
+* **Web Dashboard:** A clean user interface to upload files, monitor progress, and download results.
 
 ---
 
 ## 🖼️ System Preview
 
-### Dashboard
-
+### Dashboard Interface
 ![Dashboard Interface](docs/images/dashboard_preview.png)
+*Drag & Drop interface with real-time process logs.*
 
-### Documentation
-
+### Documentation & Help
 ![Documentation Interface](docs/images/documentation_preview.png)
+*Built-in guide for templating syntax.*
+
+---
+
+## 🔄 How It Works
+
+```mermaid
+graph LR
+    A[Excel Data] --> B(DocGenius Engine)
+    C[Word/PPT Templates] --> B
+    D[Assets ZIP] --> B
+    B --> E{Processing Core}
+    E --> F[Jinja2 Logic]
+    E --> G[Image Resizing]
+    E --> H[PDF Conversion]
+    F --> I[Final Documents]
+    G --> I
+    H --> I
+    I --> J[Downloadable ZIP]
+```
 
 ---
 
@@ -65,146 +83,114 @@ Built with **FastAPI** and **Docker**, it features a modern "Glassmorphism" UI f
 
 ---
 
-## 🛠️ Architecture & Project Structure
+## 🛠️ Project Structure
 
-The project follows a clean architecture pattern, separating core logic (strategies) from the API layer.
+The project separates the processing logic (backend) from the user interface (frontend).
 
 ```text
 DocGenius/
 ├── app/
 │   ├── core/
-│   │   ├── engine.py          # Core Document Processing Logic (Docx/Pptx/Pdf)
-│   │   ├── formatter.py       # Strategy Dispatcher
-│   │   ├── validator.py       # Template Compatibility Checker
-│   │   └── strategies/        # The Logic Brain
-│   │       ├── base.py        # Abstract Base Class
-│   │       ├── date_std.py    # Date Arithmetic & Formatting
-│   │       ├── logic_std.py   # Switch/Case & Fallback Logic
-│   │       ├── mask_std.py    # Privacy Masking (GDPR)
+│   │   ├── engine.py          # Document Processing (Docx/Pptx/Pdf)
+│   │   ├── formatter.py       # Filter Dispatcher
+│   │   ├── validator.py       # Template Checker
+│   │   └── strategies/        # Formatting Logic Modules
+│   │       ├── base.py
+│   │       ├── date_std.py    # Date Formatting
+│   │       ├── logic_std.py   # Conditional Logic
 │   │       └── ...
-│   ├── main.py                # FastAPI Entry Point & Routes
-│   └── utils.py               # File Handling & Scheduler
-├── static/                    # Frontend Assets (Glassmorphism UI)
-│   ├── css/
-│   ├── js/
-│   └── index.html
-├── data/                      # Persistence Volume (Docker)
-├── Dockerfile                 # Alpine-based Image with LibreOffice
-├── docker-compose.yml         # Orchestration
-└── requirements.txt           # Python Dependencies
+│   ├── main.py                # FastAPI Application
+│   └── utils.py               # Utilities
+├── static/                    # Frontend Assets (HTML/CSS/JS)
+├── data/                      # Docker Volume for Data
+├── Dockerfile                 # Image definition
+└── docker-compose.yml         # Container orchestration
 ```
 
 ---
 
-## 📘 Templating Guide (Strategies)
+## 📘 Templating Syntax
 
-DocGenius uses a powerful **Piping Syntax** (`|`) to transform data. Below is the simple reference for the available strategies.
+DocGenius uses the pipe character (`|`) to apply formatting filters to variables.
+*For a complete list of filters, refer to the "How to Use" section in the application.*
 
-For full Documentation, see: 
+### 1. Text Formatting
+```jinja2
+{{ client_name | format_string('upper') }}            -> "ACME CORP"
+{{ client_id | format_string('prefix', 'ID: ') }}     -> "ID: 12345"
+```
 
-### 1. String Manipulation
-Control text casing, trimming, and concatenation.
-| Filter | Usage | Description |
-| :--- | :--- | :--- |
-| `upper` | `{{ val \| format_string('upper') }}` | CONVERTS TO UPPERCASE |
-| `title` | `{{ val \| format_string('title') }}` | Title Case Format |
-| `prefix` | `{{ val \| format_string('prefix', 'ID: ') }}` | Adds text *before* value |
-| `truncate` | `{{ val \| format_string('truncate', '10') }}` | Cuts text to N chars |
+### 2. Numbers & Currency
+```jinja2
+{{ contract_value | format_currency('USD') }}         -> "$ 1,500.00"
+{{ tax_rate | format_number('percent', '2') }}        -> "12.50%"
+{{ total | format_number('spell_out', 'en') }}        -> "one thousand five hundred"
+```
 
-### 2. Number & Currency
-Financial formatting with localization support.
-| Filter | Usage | Description |
-| :--- | :--- | :--- |
-| `currency` | `{{ val \| format_currency('USD') }}` | $ 1,500.00 |
-| `percent` | `{{ val \| format_number('percent', '2') }}` | 0.5 -> 50.00% |
-| `spell_out`| `{{ val \| format_number('spell_out', 'en') }}`| 100 -> "one hundred" |
+### 3. Date Operations
+```jinja2
+{{ start_date | format_date('long') }}                -> "January 12, 2024"
+{{ start_date | format_date('add_days', '30') }}      -> "2024-02-11"
+```
 
-### 3. Date Logic
-Parses ISO dates and performs arithmetic without showing time (00:00:00).
-| Filter | Usage | Description |
-| :--- | :--- | :--- |
-| `long` | `{{ dt \| format_date('long') }}` | January 12, 2024 |
-| `add_days` | `{{ dt \| format_date('add_days', '30') }}` | Adds 30 days to date |
-| `year` | `{{ dt \| format_date('year') }}` | Extracts just the year |
-
-### 4. Complex Logic (Switch/Case)
-Handle complex mappings and fallbacks directly in the template.
+### 4. Conditional Logic
+Map status codes or values directly in the document:
 ```jinja2
 {{ status_code | format_logic(
-    '10=Approved', 
-    '20=Pending Review', 
-    '30=Rejected', 
-    'default', 'Unknown Status'
+    '10=Approved',
+    '20=Pending',
+    'default', 'Unknown'
 ) }}
 ```
 
-### 5. Privacy Masking (GDPR)
-Protect sensitive PII data in non-secure documents.
-| Filter | Usage | Output |
-| :--- | :--- | :--- |
-| `email` | `{{ mail \| format_mask('email') }}` | j***@domain.com |
-| `credit_card`| `{{ cc \| format_mask('credit_card') }}` | **** **** **** 1234 |
-
-### 6. Dynamic Images
-Inject images from the Assets ZIP, resizing them on the fly.
+### 5. Data Masking
 ```jinja2
-{{ photo_filename | format_image('width_cm', 'height_cm') }}
-Example: {{ client_photo | format_image('3', '4') }}
+{{ email | format_mask('email') }}                    -> "j***@domain.com"
+```
+
+### 6. Images
+```jinja2
+{{ photo_filename | format_image('3', '4') }}         -> (Resizes image to 3x4cm)
 ```
 
 ---
 
-## 🧪 Testing & Mock Data
+## 🧪 Testing
 
-The system includes a `generate_seeds.py` script to create mock data.
+A utility script is included to generate sample data for testing purposes.
 
-1.  **Generate Seeds:**
+1.  **Generate Sample Data (Inside Container):**
     ```bash
     docker exec -it docgenius python /data/mock_data/generate_seeds.py
     ```
-    *Creates: `mock_data.xlsx` (5 scenarios), `assets.zip`, and 5 high-fidelity Templates.*
+    *This creates a `mock_data.xlsx`, `assets.zip`, and sample templates in the data folder.*
 
-2.  **Run Sample:**
-    Upload these files to the Dashboard to test the "Happy Path", "Edge Cases", and "Error Handling".
-
----
-
-## ⚙️ Configuration (Environment)
-
-Configure the system via `docker-compose.yml`:
-
-```yaml
-environment:
-  - TZ=America/Sao_Paulo       # Timezone for logs
-```
+2.  **Run Test:**
+    Upload the generated files to the dashboard to verify the output.
 
 ---
 
-## ⚖️ License & Usage Terms (Non-Commercial)
+## ⚖️ License (CC BY-NC 4.0)
 
-**⚠️ IMPORTANT: READ CAREFULLY BEFORE USE**
+This project is licensed under the **Creative Commons Attribution-NonCommercial 4.0 International License**.
 
-This software is licensed under a custom **Non-Commercial, Attribution-Required License**.
+[![CC BY-NC 4.0](https://licensebuttons.net/l/by-nc/4.0/88x31.png)](http://creativecommons.org/licenses/by-nc/4.0/)
 
-### Permitted Uses:
-1.  **Personal Use:** You are free to use this software for personal projects, learning, or non-profit activities.
-2.  **Modification:** You may modify, adapt, and build upon this code for your own personal use.
+### You are free to:
+* **Share:** Copy and redistribute the material in any medium or format.
+* **Adapt:** Remix, transform, and build upon the material.
 
-### Restrictions:
-1.  **No Commercial Use:** You may **NOT** use this software, or any derivatives of it, for commercial purposes, including but not limited to: selling generated documents, using it as a backend for a paid SaaS, or integrating it into a proprietary commercial product.
-2.  **Redistribution:** If you redistribute this code (modified or unmodified), you **MUST** retain the original copyright notices and attribution to the original author. You cannot sublicense this code under different terms.
+### Under the following terms:
+1.  **Attribution:** You must give appropriate credit to **Rubens Braz**, provide a link to the license, and indicate if changes were made.
+2.  **NonCommercial:** You may **NOT** use the material for commercial purposes (selling the software, using it for paid services, or integrating it into commercial products).
 
-**By using this software, you agree to these terms.**
+*To view a copy of this license, visit [http://creativecommons.org/licenses/by-nc/4.0/](http://creativecommons.org/licenses/by-nc/4.0/)*
 
 ---
 
-## 👨‍💻 Author & Acknowledgments
+## 👨‍💻 Author
 
-**Created by Rubens Braz**
-
-* **Frontend:** HTML5, TailwindCSS, Vanilla JS (Glassmorphism Design).
-* **Backend:** FastAPI, Python 3.11.
-* **Engine:** LibreOffice (PDF), Python-docx, Python-pptx.
+**Rubens Braz**
 
 ---
 
