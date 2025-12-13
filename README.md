@@ -27,10 +27,15 @@ Built with **FastAPI** and **Docker**, it features a modern "Glassmorphism" UI f
 
 ---
 
-## 🖼️ Dashboard Preview
+## 🖼️ System Preview
+
+### Dashboard
 
 ![Dashboard Interface](docs/images/dashboard_preview.png)
-*(Screenshot of Glassmorphism UI here)*
+
+### Documentation
+
+![Documentation Interface](docs/images/documentation_preview.png)
 
 ---
 
@@ -105,7 +110,7 @@ Control text casing, trimming, and concatenation.
 | `truncate` | `{{ val \| format_string('truncate', '10') }}` | Cuts text to N chars |
 
 ### 2. Number & Currency
-Enterprise financial formatting with localization support.
+Financial formatting with localization support.
 | Filter | Usage | Description |
 | :--- | :--- | :--- |
 | `currency` | `{{ val \| format_currency('USD') }}` | $ 1,500.00 |
@@ -120,7 +125,7 @@ Parses ISO dates and performs arithmetic without showing time (00:00:00).
 | `add_days` | `{{ dt \| format_date('add_days', '30') }}` | Adds 30 days to date |
 | `year` | `{{ dt \| format_date('year') }}` | Extracts just the year |
 
-### 4. Enterprise Logic (Switch/Case)
+### 4. Complex Logic (Switch/Case)
 Handle complex mappings and fallbacks directly in the template.
 ```jinja2
 {{ status_code | format_logic(
