@@ -37,18 +37,18 @@ function resetStateOnInput(type) {
     // 2. Specific logic for Excel changes
     if (type === 'excel') {
         const previewEl = document.getElementById('jsonPreview');
-        previewEl.innerText = "Awaiting Excel file...";
+        previewEl.innerText = i18n.t('dashboard.config.placeholder_excel');
         previewEl.className = "absolute inset-0 p-4 text-xs font-mono text-green-400 overflow-auto scrollbar-thin";
 
         // Lock Config Panel until re-analysis
         document.getElementById('configPanel').classList.add('opacity-50', 'pointer-events-none');
-        document.getElementById('colSelect').innerHTML = '<option>Awaiting Excel file...</option>';
+        document.getElementById('colSelect').innerHTML = `<option>${i18n.t('dashboard.config.placeholder_excel')}</option>`;
     }
 
     // 3. Add visual separator in logs to indicate new context
     const term = document.getElementById('terminal');
-    if (term.innerText.trim() !== "System ready. Waiting for command...") {
-        logToTerminal('--- INPUTS CHANGED ---', 'info');
+    if (term.innerText.trim() !== i18n.t('dashboard.logs.ready')) {
+        logToTerminal(i18n.t('alerts.inputs_changed'), 'info');
     }
 }
 
@@ -104,7 +104,7 @@ function updateUI(input) {
         if (input.files.length === 1) {
             label.innerText = input.files[0].name;
         } else {
-            label.innerText = `${input.files.length} files selected`;
+            label.innerText = i18n.t('alerts.files_selected_plural', { count: input.files.length });
         }
 
         // Visual confirmation style
@@ -132,17 +132,8 @@ async function performAnalysisSequence() {
     if (CONFIG.env.isGithubPages) {
         Swal.fire({
             icon: 'info',
-            title: 'Static Demo Mode',
-            html: `
-                <div class="text-left text-sm">
-                    <p class="mb-2">Backend processing is <strong>unavailable</strong> in this live preview.</p>
-                    <p>To run the full document generation engine:</p>
-                    <ul class="list-disc pl-5 mt-1 text-gray-400">
-                        <li>Clone the repository</li>
-                        <li>Run via Docker Compose</li>
-                    </ul>
-                </div>
-             `,
+            title: i18n.t('alerts.static_mode.title'),
+            html: i18n.t('alerts.static_mode.html'),
             background: '#1e293b',
             color: '#fff',
             confirmButtonColor: '#3b82f6',
@@ -155,20 +146,20 @@ async function performAnalysisSequence() {
     const fileTemplates = document.getElementById('fileTemplates').files;
 
     // 1. Basic Input Validation
-    if (!fileExcel) return Swal.fire({ icon: 'warning', title: 'Missing Input', text: 'Please upload an Excel file.', background: '#1e293b', color: '#fff' });
-    if (fileTemplates.length === 0) return Swal.fire({ icon: 'warning', title: 'Missing Input', text: 'Please upload Templates.', background: '#1e293b', color: '#fff' });
+    if (!fileExcel) return Swal.fire({ icon: 'warning', title: i18n.t('alerts.missing_excel.title'), text: i18n.t('alerts.missing_excel.text'), background: '#1e293b', color: '#fff' });
+    if (fileTemplates.length === 0) return Swal.fire({ icon: 'warning', title: i18n.t('alerts.missing_excel.title'), text: i18n.t('alerts.missing_templates.text'), background: '#1e293b', color: '#fff' });
 
     // 2. UI Loading State
     const btn = document.getElementById('btnValidate');
     const originalText = btn.innerHTML;
-    btn.innerHTML = `<span class="animate-pulse">Analyzing & Validating...</span>`;
+    btn.innerHTML = `<span class="animate-pulse">${i18n.t('dashboard.ingestion.btn_validating')}</span>`;
     btn.disabled = true;
 
     try {
         // 3. Step 1: Preview Data (Excel Analysis)
         // We await the result. If false, we stop.
         const previewSuccess = await previewData(fileExcel);
-        if (!previewSuccess) throw new Error("Data Analysis failed. Check Excel format.");
+        if (!previewSuccess) throw new Error(i18n.t('alerts.analysis_failed'));
 
         // 4. Step 2: Validate Templates (Compatibility Check)
         const validationSuccess = await validateTemplates(fileExcel, fileTemplates);
@@ -177,7 +168,7 @@ async function performAnalysisSequence() {
         if (validationSuccess) {
             document.getElementById('configPanel').classList.remove('opacity-50', 'pointer-events-none');
             // Log success to terminal
-            logToTerminal("✅ Analysis Complete. Configuration Unlocked.", "success");
+            logToTerminal(i18n.t('alerts.validation_success'), "success");
         }
 
     } catch (e) {
@@ -198,7 +189,7 @@ async function previewData(fileExcel) {
     formData.append('file_excel', fileExcel);
 
     const prevEl = document.getElementById(CONFIG.dom.jsonPreview);
-    prevEl.innerText = "Step 1: Reading Excel Structure...";
+    prevEl.innerText = i18n.t('dashboard.preview.step1');
     prevEl.className = "absolute inset-0 p-4 text-xs font-mono text-blue-400 overflow-auto scrollbar-thin animate-pulse";
 
     try {
@@ -212,7 +203,7 @@ async function previewData(fileExcel) {
 
             // Populate Dropdown
             const sel = document.getElementById('colSelect');
-            sel.innerHTML = '<option value="">-- Select Identifier Column --</option>';
+            sel.innerHTML = `<option value="">${i18n.t('dashboard.config.opt_select_col')}</option>`;
             data.headers.forEach(h => {
                 let opt = document.createElement('option');
                 opt.value = h;
@@ -224,8 +215,8 @@ async function previewData(fileExcel) {
             throw new Error(data.message);
         }
     } catch (e) {
-        Swal.fire({ icon: 'error', title: 'Data Analysis Failed', text: e.message, background: '#1e293b', color: '#fff' });
-        prevEl.innerText = "Error: " + e.message;
+        Swal.fire({ icon: 'error', title: i18n.t('alerts.analysis_failed'), text: e.message, background: '#1e293b', color: '#fff' });
+        prevEl.innerText = i18n.t('dashboard.preview.error') + e.message;
         prevEl.className = "absolute inset-0 p-4 text-xs font-mono text-red-400 overflow-auto scrollbar-thin";
         return false;
     }
@@ -269,7 +260,11 @@ async function validateTemplates(fileExcel, fileTemplates) {
 function renderValidationReport(report) {
     const valid = report.overall_valid;
 
-    // 1. Build the Header / Status Banner
+    // Use i18n keys from 'alerts.validation_modal'
+    const titleText = valid ? i18n.t('alerts.validation_modal.title_ok') : i18n.t('alerts.validation_modal.title_fail');
+    const descText = valid ? i18n.t('alerts.validation_modal.desc_ok') : i18n.t('alerts.validation_modal.desc_fail');
+
+    // 1. Build Header
     let html = `
     <div class="flex flex-col gap-6 text-left">
         <div class="p-4 rounded-xl border ${valid ? 'bg-green-500/10 border-green-500/50' : 'bg-red-500/10 border-red-500/50'} flex items-center gap-4">
@@ -277,9 +272,9 @@ function renderValidationReport(report) {
                 <span class="text-2xl leading-none">${valid ? '✔' : '⚠'}</span>
             </div>
             <div>
-                <h3 class="text-lg font-bold text-white">${valid ? 'Compatibility Confirmed' : 'Issues Detected'}</h3>
+                <h3 class="text-lg font-bold text-white">${titleText}</h3>
                 <p class="text-sm ${valid ? 'text-green-300' : 'text-red-300'}">
-                    ${valid ? 'All templates match the Excel schema.' : 'Some templates contain variables missing from your Excel file.'}
+                    ${descText}
                 </p>
             </div>
         </div>
@@ -287,7 +282,7 @@ function renderValidationReport(report) {
         <div class="max-h-[400px] overflow-y-auto pr-2 space-y-3 custom-scrollbar">
     `;
 
-    // 2. Build Cards for each Template
+    // 2. Build Cards
     report.details.forEach(item => {
         const isOk = item.status === 'OK';
         const borderColor = isOk ? 'border-l-green-500' : 'border-l-red-500';
@@ -306,12 +301,12 @@ function renderValidationReport(report) {
             </div>
         `;
 
-        // 3. Render Missing Variables as "Code Chips"
+        // 3. Render Missing Variables
         if (item.missing_vars.length > 0) {
             html += `
             <div class="mt-3 bg-red-900/10 rounded p-3 border border-red-500/10">
                 <p class="text-sm text-red-300 mb-2 font-semibold flex items-center gap-1">
-                    <span>❌</span> Missing Variables (in Excel):
+                    <span>❌</span> ${i18n.t('alerts.validation_modal.missing_vars')}
                 </p>
                 <div class="flex flex-wrap gap-2">`;
 
@@ -321,30 +316,31 @@ function renderValidationReport(report) {
 
             html += `</div></div>`;
         } else {
+            // "variables matched successfully"
             html += `<div class="mt-1 text-sm text-gray-500 flex items-center gap-1">
-                <span class="text-green-500">●</span> ${item.matched_vars.length} variables matched successfully.
+                <span class="text-green-500">●</span> ${item.matched_vars.length} ${i18n.t('alerts.validation_modal.matched')}
              </div>`;
         }
 
-        html += `</div>`; // End Card
+        html += `</div>`;
     });
 
-    html += `</div></div>`; // End Scroll Container & Wrapper
+    html += `</div></div>`;
 
-    // 4. Launch Stylish Modal
+    // 4. Launch Modal
     Swal.fire({
-        title: '<span class="text-xl font-bold text-gray-100">Validation Report</span>',
+        title: `<span class="text-xl font-bold text-gray-100">${i18n.t('alerts.validation_modal.title')}</span>`,
         html: html,
-        background: '#0f172a', // Matches body bg
+        background: '#0f172a',
         color: '#e2e8f0',
         showCloseButton: true,
         focusConfirm: false,
-        confirmButtonText: valid ? 'Proceed' : 'Understood',
+        confirmButtonText: valid ? i18n.t('alerts.validation_modal.btn_proceed') : i18n.t('alerts.validation_modal.btn_close'),
         confirmButtonColor: valid ? '#10b981' : '#3b82f6',
         customClass: {
             popup: 'glass-panel border border-white/10 shadow-2xl',
             title: 'text-left border-b border-white/10 pb-4',
-            htmlContainer: '!m-0 !pt-4 !text-left', // Reset SweetAlert defaults
+            htmlContainer: '!m-0 !pt-4 !text-left',
             confirmButton: 'px-6 py-3 rounded-xl text-sm font-bold shadow-lg w-full mt-4'
         },
         width: '650px',
@@ -366,7 +362,7 @@ async function generateSample() {
     btnProcess.disabled = true;
     btnProcess.classList.add('opacity-50', 'cursor-not-allowed');
 
-    logToTerminal('--- STARTED: SAMPLE GENERATION ---', 'info');
+    logToTerminal(i18n.t('alerts.sample_start'), 'info');
 
     try {
         const formData = buildFormData(params);
@@ -376,16 +372,20 @@ async function generateSample() {
             downloadBlob(await response.blob(), "LogicPaper_Sample.zip");
             logToTerminal('✅ Sample generated successfully.', 'success');
             Swal.fire({
-                icon: 'success', title: 'Sample Ready',
-                text: 'Check your downloads folder.',
-                background: '#1e293b', color: '#fff', timer: 2000, showConfirmButton: false
+                icon: 'success',
+                title: i18n.t('alerts.sample_ready_title'),
+                text: i18n.t('alerts.sample_ready_text'),
+                background: '#1e293b',
+                color: '#fff',
+                timer: 2000,
+                showConfirmButton: false
             });
         } else {
             const err = await response.json();
             throw new Error(err.message || "Server Error");
         }
     } catch (e) {
-        logToTerminal(`❌ Sample Failed: ${e.message}`, 'error');
+        logToTerminal(i18n.t('alerts.sample_error', { error: e.message }), 'error');
         Swal.fire({ icon: 'error', title: 'Sample Failed', text: e.message, background: '#1e293b', color: '#fff' });
     } finally {
         // UI Unlocking
@@ -405,7 +405,7 @@ function startProcessing() {
 
     // Reset Terminal visually
     document.getElementById(CONFIG.dom.terminal).innerHTML = '';
-    logToTerminal('--- INITIALIZING BATCH ENGINE ---', 'info');
+    logToTerminal(i18n.t('alerts.batch_init'), 'info');
 
     // UI Locking
     toggleLoadingState(true, 'btnProcess');
@@ -466,11 +466,11 @@ function validateInputs() {
     const groupFolders = document.getElementById('checkFolders').checked;
 
     if (fileTemplates.length === 0) {
-        Swal.fire({ icon: 'warning', title: 'No Templates', text: 'Please select templates.', background: '#1e293b', color: '#fff' });
+        Swal.fire({ icon: 'warning', title: i18n.t('alerts.missing_templates.title'), text: i18n.t('alerts.missing_templates.text'), background: '#1e293b', color: '#fff' });
         return null;
     }
     if (!colName || colName === "") {
-        Swal.fire({ icon: 'warning', title: 'Configuration Missing', text: 'Please select a column.', background: '#1e293b', color: '#fff' });
+        Swal.fire({ icon: 'warning', title: i18n.t('alerts.missing_excel.title'), text: i18n.t('dashboard.ingestion.drop_excel.sub'), background: '#1e293b', color: '#fff' });
         return null;
     }
 
@@ -499,7 +499,7 @@ function toggleLoadingState(isLoading, btnId) {
     const btn = document.getElementById(btnId);
     if (isLoading) {
         btn.dataset.originalText = btn.innerHTML;
-        btn.innerHTML = `<span class="animate-pulse">⏳ Processing...</span>`;
+        btn.innerHTML = `<span class="animate-pulse">${i18n.t('dashboard.config.btn_processing')}</span>`;
         btn.disabled = true;
         document.querySelectorAll('input, select').forEach(i => i.disabled = true);
         document.querySelectorAll('.drop-zone').forEach(d => d.classList.add('disabled-zone'));
@@ -554,14 +554,14 @@ function finishBatch(success) {
         resultPanel.classList.add('animate-pulse');
         setTimeout(() => resultPanel.classList.remove('animate-pulse'), 500);
 
-        logToTerminal("🏁 Batch processing finished successfully.", 'success');
+        logToTerminal(i18n.t('alerts.batch_success'), 'success');
     } else {
         // On failure, re-enable the sample button so user can fix and retry
         const btnSample = document.getElementById('btnSample');
         btnSample.disabled = false;
         btnSample.classList.remove('opacity-50', 'cursor-not-allowed');
 
-        Swal.fire({ icon: 'error', title: 'Batch Failed', text: 'Check logs for details.', background: '#1e293b', color: '#fff' });
+        Swal.fire({ icon: 'error', title: i18n.t('alerts.batch_fail_title'), text: i18n.t('alerts.batch_fail_text'), background: '#1e293b', color: '#fff' });
     }
 
     sessionId = crypto.randomUUID();

@@ -11,6 +11,8 @@
         <script src="https://cdn.jsdelivr.net/npm/sweetalert2@11"></script>
         <link rel="stylesheet" href="css/style.css">
         <link rel="stylesheet" href="css/help.css">
+        <script src="js/locales.js"></script>
+        <script src="js/i18n.js"></script>
         <script src="js/config.js"></script>
     </head>
 
@@ -21,39 +23,39 @@
                 <div class="absolute top-0 right-0 w-64 h-64 bg-blue-500/10 rounded-full blur-3xl -translate-y-1/2 translate-x-1/2 group-hover:bg-blue-500/20 transition duration-1000"></div>
                 <div class="relative z-10 flex flex-col md:flex-row justify-between items-start md:items-center gap-6">
                     <div>
-                        <h2 class="text-3xl font-bold text-white tracking-tight">Template Engine Reference</h2>
-                        <p class="text-gray-400 mt-2 text-sm max-w-2xl leading-relaxed"> Comprehensive documentation for the LogicPaper formatting engine. Learn how to transform raw Excel data using <strong>Jinja2 Pipes</strong> directly inside your Word and PowerPoint templates. </p>
+                        <h2 class="text-3xl font-bold text-white tracking-tight" data-i18n="help.header.title">Template Engine Reference</h2>
+                        <p class="text-gray-400 mt-2 text-sm max-w-2xl leading-relaxed" data-i18n="help.header.desc"> Comprehensive documentation for the LogicPaper formatting engine. Learn how to transform raw Excel data using <strong>Jinja2 Pipes</strong> directly inside your Word and PowerPoint templates. </p>
                     </div>
                     <div>
                         <a href="/" class="px-6 py-3 bg-white/5 hover:bg-white/10 border border-white/10 hover:border-blue-500/50 rounded-xl text-sm font-bold text-white transition flex items-center gap-2 shadow-lg hover:shadow-blue-500/20">
                             <svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                                 <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M10 19l-7-7m0 0l7-7m-7 7h18" />
-                            </svg> Back to Dashboard </a>
+                            </svg> <span data-i18n="help.header.btn_back">Back to Dashboard</span> </a>
                     </div>
                 </div>
             </div>
             <div class="grid grid-cols-1 xl:grid-cols-12 gap-8">
                 <div class="lg:col-span-2">
                     <nav class="glass-panel rounded-xl p-4 sticky top-8 space-y-1 max-h-[85vh] overflow-y-auto custom-scrollbar">
-                        <div class="text-[12px] font-bold text-gray-100 uppercase tracking-widest px-3 mb-3 mt-1">Core Concepts</div>
-                        <a href="#core-behavior" class="block px-3 py-2 text-sm text-gray-300 hover:text-white hover:bg-white/5 rounded-lg transition">Default Behavior</a>
-                        <a href="#core-composition" class="block px-3 py-2 text-sm text-gray-300 hover:text-white hover:bg-white/5 rounded-lg transition">Chaining & Composition</a>
+                        <div class="text-[12px] font-bold text-gray-100 uppercase tracking-widest px-3 mb-3 mt-1" data-i18n="help.nav.core">Core Concepts</div>
+                        <a href="#core-behavior" class="block px-3 py-2 text-sm text-gray-300 hover:text-white hover:bg-white/5 rounded-lg transition" data-i18n="help.nav.behavior">Default Behavior</a>
+                        <a href="#core-composition" class="block px-3 py-2 text-sm text-gray-300 hover:text-white hover:bg-white/5 rounded-lg transition" data-i18n="help.nav.composition">Chaining & Composition</a>
                         <div class="my-4 border-b border-white/5"></div>
-                        <div class="text-[12px] font-bold text-gray-100 uppercase tracking-widest px-3 mb-3 pt-3">Strategies</div>
+                        <div class="text-[12px] font-bold text-gray-100 uppercase tracking-widest px-3 mb-3 pt-3" data-i18n="help.nav.strategies">Strategies</div>
                         <a href="#str-string" class="flex items-center gap-2 px-3 py-2 text-sm text-gray-300 hover:text-white hover:bg-white/5 rounded-lg transition">
-                            <span class="w-2 h-2 rounded-full bg-purple-500"></span> Text (String) </a>
+                            <span class="w-2 h-2 rounded-full bg-purple-500"></span> <span data-i18n="help.nav.str_string">Text (String)</span> </a>
                         <a href="#str-number" class="flex items-center gap-2 px-3 py-2 text-sm text-gray-300 hover:text-white hover:bg-white/5 rounded-lg transition">
-                            <span class="w-2 h-2 rounded-full bg-green-500"></span> Numbers & Currency </a>
+                            <span class="w-2 h-2 rounded-full bg-green-500"></span> <span data-i18n="help.nav.str_number">Numbers & Currency</span> </a>
                         <a href="#str-date" class="flex items-center gap-2 px-3 py-2 text-sm text-gray-300 hover:text-white hover:bg-white/5 rounded-lg transition">
-                            <span class="w-2 h-2 rounded-full bg-orange-500"></span> Dates & Time </a>
+                            <span class="w-2 h-2 rounded-full bg-orange-500"></span> <span data-i18n="help.nav.str_date">Dates & Time</span> </a>
                         <a href="#str-logic" class="flex items-center gap-2 px-3 py-2 text-sm text-gray-300 hover:text-white hover:bg-white/5 rounded-lg transition">
-                            <span class="w-2 h-2 rounded-full bg-red-500"></span> Logic & Defaults </a>
+                            <span class="w-2 h-2 rounded-full bg-red-500"></span> <span data-i18n="help.nav.str_logic">Logic & Defaults</span> </a>
                         <a href="#str-bool" class="flex items-center gap-2 px-3 py-2 text-sm text-gray-300 hover:text-white hover:bg-white/5 rounded-lg transition">
-                            <span class="w-2 h-2 rounded-full bg-cyan-500"></span> Booleans </a>
+                            <span class="w-2 h-2 rounded-full bg-cyan-500"></span> <span data-i18n="help.nav.str_bool">Booleans</span> </a>
                         <a href="#str-mask" class="flex items-center gap-2 px-3 py-2 text-sm text-gray-300 hover:text-white hover:bg-white/5 rounded-lg transition">
-                            <span class="w-2 h-2 rounded-full bg-gray-500"></span> Privacy & Masking </a>
+                            <span class="w-2 h-2 rounded-full bg-gray-500"></span> <span data-i18n="help.nav.str_mask">Privacy & Masking</span> </a>
                         <a href="#str-image" class="flex items-center gap-2 px-3 py-2 text-sm text-gray-300 hover:text-white hover:bg-white/5 rounded-lg transition">
-                            <span class="w-2 h-2 rounded-full bg-yellow-500"></span> Dynamic Images </a>
+                            <span class="w-2 h-2 rounded-full bg-yellow-500"></span> <span data-i18n="help.nav.str_image">Dynamic Images</span> </a>
                     </nav>
                 </div>
                 <div class="xl:col-span-10 space-y-16 pb-24">
@@ -64,20 +66,20 @@
                                     <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 10V3L4 14h7v7l9-11h-7z" />
                                 </svg>
                             </div>
-                            <h3 class="text-2xl font-bold text-white">Default Behavior</h3>
+                            <h3 class="text-2xl font-bold text-white" data-i18n="help.sections.behavior.title">Default Behavior</h3>
                         </div>
                         <div class="glass-panel rounded-xl p-6 space-y-6">
                             <div class="bg-yellow-500/10 border border-yellow-500/20 rounded-lg p-4">
                                 <h4 class="text-yellow-400 font-bold text-sm mb-2 flex items-center gap-2">
                                     <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                                         <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z" />
-                                    </svg> What happens if I don't use a formatter?
+                                    </svg> <span data-i18n="help.sections.behavior.card_title">What happens if I don't use a formatter?</span>
                                 </h4>
-                                <p class="text-sm text-yellow-200/80"> If you use <code>{{ variable }}</code> without a pipe (<code>|</code>), LogicPaper inserts the <strong>Raw Data</strong> exactly as it appears in the Excel cell. <br><br> Examples:
+                                <p class="text-sm text-yellow-200/80"> <span data-i18n="help.sections.behavior.card_text">If you use <code>{{ variable }}</code> without a pipe (<code>|</code>), LogicPaper inserts the <strong>Raw Data</strong> exactly as it appears in the Excel cell.</span> <br><br> Examples:
                                 <ul class="list-disc ml-5 mt-1 space-y-1 opacity-80">
-                                    <li>Dates may appear as <code>2023-12-25 00:00:00</code>.</li>
-                                    <li>Money may appear as <code>1500.5</code> (no symbol, no comma).</li>
-                                    <li>Empty cells will appear as empty strings.</li>
+                                    <li data-i18n="help.sections.behavior.list_dates">Dates may appear as <code>2023-12-25 00:00:00</code>.</li>
+                                    <li data-i18n="help.sections.behavior.list_money">Money may appear as <code>1500.5</code> (no symbol, no comma).</li>
+                                    <li data-i18n="help.sections.behavior.list_empty">Empty cells will appear as empty strings.</li>
                                 </ul>
                                 </p>
                             </div>
@@ -90,12 +92,12 @@
                                     <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19.428 15.428a2 2 0 00-1.022-.547l-2.384-.477a6 6 0 00-3.86.517l-.318.158a6 6 0 01-3.86.517L6.05 15.21a2 2 0 00-1.806.547M8 4h8l-1 1v5.172a2 2 0 00.586 1.414l5 5c1.26 1.26.367 3.414-1.415 3.414H4.828c-1.782 0-2.674-2.154-1.414-3.414l5-5A2 2 0 009 10.172V5L8 4z" />
                                 </svg>
                             </div>
-                            <h3 class="text-2xl font-bold text-white">Chaining & Composition</h3>
+                            <h3 class="text-2xl font-bold text-white" data-i18n="help.sections.composition.title">Chaining & Composition</h3>
                         </div>
                         <div class="glass-panel rounded-xl p-6">
-                            <p class="text-sm text-gray-300 mb-4"> You can apply multiple operations in a single filter by listing them as arguments. Operations are executed <strong>sequentially from left to right</strong>. </p>
+                            <p class="text-sm text-gray-300 mb-4" data-i18n="help.sections.composition.desc"> You can apply multiple operations in a single filter by listing them as arguments. Operations are executed <strong>sequentially from left to right</strong>. </p>
                             <div class="bg-black/40 border border-white/10 rounded-lg p-5 font-mono text-sm mb-6">
-                                <div class="text-gray-500 mb-2">// Syntax</div>
+                                <div class="text-gray-500 mb-2" data-i18n="help.sections.composition.syntax">// Syntax</div>
                                 <div class="mb-4">
                                     <span class="text-white">{{</span>
                                     <span class="syntax-var">variable_name</span>
@@ -103,7 +105,7 @@
                                     <span class="syntax-filter">filter_name</span><span class="text-white">(</span><span class="syntax-arg">'Op1'</span><span class="text-white">,</span> <span class="syntax-arg">'Op2'</span><span class="text-white">,</span> <span class="syntax-arg">'Op3'</span><span class="text-white">)</span>
                                     <span class="text-white">}}</span>
                                 </div>
-                                <div class="text-gray-500 mb-2">// Example: Clean, Uppercase, and Add Prefix</div>
+                                <div class="text-gray-500 mb-2" data-i18n="help.sections.composition.example_comment">// Example: Clean, Uppercase, and Add Prefix</div>
                                 <div>
                                     <span class="text-white">{{</span>
                                     <span class="syntax-var">client_name</span>
@@ -114,15 +116,15 @@
                             </div>
                             <div class="grid grid-cols-1 md:grid-cols-3 gap-4 text-xs">
                                 <div class="bg-white/5 p-3 rounded border border-white/5">
-                                    <span class="block text-gray-500 mb-1">Input</span>
+                                    <span class="block text-gray-500 mb-1" data-i18n="help.sections.composition.lbl_input">Input</span>
                                     <code class="text-white">"  john doe  "</code>
                                 </div>
                                 <div class="bg-white/5 p-3 rounded border border-white/5 text-center">
-                                    <span class="block text-gray-500 mb-1">Process Flow</span>
+                                    <span class="block text-gray-500 mb-1" data-i18n="help.sections.composition.lbl_flow">Process Flow</span>
                                     <span class="text-gray-400">trim &rarr; upper &rarr; prefix</span>
                                 </div>
                                 <div class="bg-green-500/10 p-3 rounded border border-green-500/20 text-right">
-                                    <span class="block text-green-500/70 mb-1">Final Output</span>
+                                    <span class="block text-green-500/70 mb-1" data-i18n="help.sections.composition.lbl_output">Final Output</span>
                                     <code class="text-green-300 font-bold">"MR. JOHN DOE"</code>
                                 </div>
                             </div>
@@ -137,8 +139,8 @@
                                     </svg>
                                 </div>
                                 <div>
-                                    <h3 class="text-2xl font-bold text-white">String Strategy</h3>
-                                    <p class="text-sm text-gray-500 font-mono mt-0.5">Filter Name: <span class="text-purple-400">format_string</span></p>
+                                    <h3 class="text-2xl font-bold text-white" data-i18n="help.sections.string.title">String Strategy</h3>
+                                    <p class="text-sm text-gray-500 font-mono mt-0.5"><span data-i18n="help.sections.string.filter_name">Filter Name:</span> <span class="text-purple-400">format_string</span></p>
                                 </div>
                             </div>
                         </div>
@@ -147,76 +149,76 @@
                                 <table class="doc-table">
                                     <thead>
                                         <tr>
-                                            <th width="15%">Operation</th>
-                                            <th width="35%">Full Template Syntax (Click to Copy)</th>
-                                            <th width="15%">Input Data</th>
-                                            <th width="15%">Output Result</th>
-                                            <th width="20%">Technical Details</th>
+                                            <th width="15%" data-i18n="help.sections.string.col_op">Operation</th>
+                                            <th width="35%" data-i18n="help.sections.string.col_syntax">Full Template Syntax (Click to Copy)</th>
+                                            <th width="15%" data-i18n="help.sections.string.col_input">Input Data</th>
+                                            <th width="15%" data-i18n="help.sections.string.col_output">Output Result</th>
+                                            <th width="20%" data-i18n="help.sections.string.col_details">Technical Details</th>
                                         </tr>
                                     </thead>
                                     <tbody>
                                         <tr>
-                                            <td><strong class="text-white">Upper</strong></td>
+                                            <td><strong class="text-white" data-i18n="help.sections.string.op_upper">Upper</strong></td>
                                             <td>
                                                 <div class="syntax-pill" onclick="copyToClipboard(this)">{{ val | format_string('upper') }}</div>
                                             </td>
                                             <td><span class="data-badge">text</span> "hello"</td>
                                             <td><span class="text-green-400 font-bold">"HELLO"</span></td>
-                                            <td>Converts entire string to uppercase.</td>
+                                            <td data-i18n="help.sections.string.desc_upper">Converts entire string to uppercase.</td>
                                         </tr>
                                         <tr>
-                                            <td><strong class="text-white">Lower</strong></td>
+                                            <td><strong class="text-white" data-i18n="help.sections.string.op_lower">Lower</strong></td>
                                             <td>
                                                 <div class="syntax-pill" onclick="copyToClipboard(this)">{{ val | format_string('lower') }}</div>
                                             </td>
                                             <td><span class="data-badge">text</span> "HELLO"</td>
                                             <td><span class="text-green-400 font-bold">"hello"</span></td>
-                                            <td>Converts entire string to lowercase.</td>
+                                            <td data-i18n="help.sections.string.desc_lower">Converts entire string to lowercase.</td>
                                         </tr>
                                         <tr>
-                                            <td><strong class="text-white">Title Case</strong></td>
+                                            <td><strong class="text-white" data-i18n="help.sections.string.op_title">Title Case</strong></td>
                                             <td>
                                                 <div class="syntax-pill" onclick="copyToClipboard(this)">{{ val | format_string('title') }}</div>
                                             </td>
                                             <td><span class="data-badge">text</span> "mr john doe"</td>
                                             <td><span class="text-green-400 font-bold">"Mr John Doe"</span></td>
-                                            <td>Capitalizes the first letter of every word.</td>
+                                            <td data-i18n="help.sections.string.desc_title">Capitalizes the first letter of every word.</td>
                                         </tr>
                                         <tr>
-                                            <td><strong class="text-white">Trim</strong></td>
+                                            <td><strong class="text-white" data-i18n="help.sections.string.op_trim">Trim</strong></td>
                                             <td>
                                                 <div class="syntax-pill" onclick="copyToClipboard(this)">{{ val | format_string('trim') }}</div>
                                             </td>
                                             <td><span class="data-badge">text</span> " data "</td>
                                             <td><span class="text-green-400 font-bold">"data"</span></td>
-                                            <td>Removes leading and trailing whitespace.</td>
+                                            <td data-i18n="help.sections.string.desc_trim">Removes leading and trailing whitespace.</td>
                                         </tr>
                                         <tr>
-                                            <td><strong class="text-white">Prefix</strong></td>
+                                            <td><strong class="text-white" data-i18n="help.sections.string.op_prefix">Prefix</strong></td>
                                             <td>
                                                 <div class="syntax-pill" onclick="copyToClipboard(this)">{{ val | format_string('prefix', 'Dr. ') }}</div>
                                             </td>
                                             <td><span class="data-badge">text</span> "House"</td>
                                             <td><span class="text-green-400 font-bold">"Dr. House"</span></td>
-                                            <td>Prepends text. 2nd Argument is the prefix string.</td>
+                                            <td data-i18n="help.sections.string.desc_prefix">Prepends text. 2nd Argument is the prefix string.</td>
                                         </tr>
                                         <tr>
-                                            <td><strong class="text-white">Suffix</strong></td>
+                                            <td><strong class="text-white" data-i18n="help.sections.string.op_suffix">Suffix</strong></td>
                                             <td>
                                                 <div class="syntax-pill" onclick="copyToClipboard(this)">{{ val | format_string('suffix', ' Esq.') }}</div>
                                             </td>
                                             <td><span class="data-badge">text</span> "John"</td>
                                             <td><span class="text-green-400 font-bold">"John Esq."</span></td>
-                                            <td>Appends text. 2nd Argument is the suffix string.</td>
+                                            <td data-i18n="help.sections.string.desc_suffix">Appends text. 2nd Argument is the suffix string.</td>
                                         </tr>
                                         <tr>
-                                            <td><strong class="text-white">Chained</strong></td>
+                                            <td><strong class="text-white" data-i18n="help.sections.string.op_chained">Chained</strong></td>
                                             <td>
                                                 <div class="syntax-pill" onclick="copyToClipboard(this)">{{ val | format_string('trim', 'upper', 'prefix', 'ID: ') }}</div>
                                             </td>
                                             <td><span class="data-badge">text</span> " abc "</td>
                                             <td><span class="text-green-400 font-bold">"ID: ABC"</span></td>
-                                            <td><strong>Composition:</strong> Trim &rarr; Upper &rarr; Prefix.</td>
+                                            <td data-i18n="help.sections.string.desc_chained"><strong>Composition:</strong> Trim &rarr; Upper &rarr; Prefix.</td>
                                         </tr>
                                     </tbody>
                                 </table>
@@ -232,8 +234,8 @@
                                     </svg>
                                 </div>
                                 <div>
-                                    <h3 class="text-2xl font-bold text-white">Number & Currency</h3>
-                                    <p class="text-sm text-gray-500 font-mono mt-0.5">Filter Name: <span class="text-green-400">format_number</span></p>
+                                    <h3 class="text-2xl font-bold text-white" data-i18n="help.sections.number.title">Number & Currency</h3>
+                                    <p class="text-sm text-gray-500 font-mono mt-0.5"><span data-i18n="help.sections.string.filter_name">Filter Name:</span> <span class="text-green-400">format_number</span></p>
                                 </div>
                             </div>
                         </div>
@@ -242,76 +244,76 @@
                                 <table class="doc-table">
                                     <thead>
                                         <tr>
-                                            <th width="15%">Operation</th>
-                                            <th width="35%">Full Template Syntax</th>
-                                            <th width="15%">Input Data</th>
-                                            <th width="15%">Output Result</th>
-                                            <th width="20%">Technical Details</th>
+                                            <th width="15%" data-i18n="help.sections.string.col_op">Operation</th>
+                                            <th width="35%" data-i18n="help.sections.string.col_syntax">Full Template Syntax</th>
+                                            <th width="15%" data-i18n="help.sections.string.col_input">Input Data</th>
+                                            <th width="15%" data-i18n="help.sections.string.col_output">Output Result</th>
+                                            <th width="20%" data-i18n="help.sections.string.col_details">Technical Details</th>
                                         </tr>
                                     </thead>
                                     <tbody>
                                         <tr>
-                                            <td><strong class="text-white">Integer</strong></td>
+                                            <td><strong class="text-white" data-i18n="help.sections.number.op_int">Integer</strong></td>
                                             <td>
                                                 <div class="syntax-pill" onclick="copyToClipboard(this)">{{ val | format_int }}</div>
                                             </td>
                                             <td><span class="data-badge">float</span> 15.99</td>
                                             <td><span class="text-green-400 font-bold">"15"</span></td>
-                                            <td>Truncates decimals (does not round up).</td>
+                                            <td data-i18n="help.sections.number.desc_int">Truncates decimals (does not round up).</td>
                                         </tr>
                                         <tr>
-                                            <td><strong class="text-white">Float</strong></td>
+                                            <td><strong class="text-white" data-i18n="help.sections.number.op_float">Float</strong></td>
                                             <td>
                                                 <div class="syntax-pill" onclick="copyToClipboard(this)">{{ val | format_number('float', '2') }}</div>
                                             </td>
                                             <td><span class="data-badge">num</span> 1500</td>
                                             <td><span class="text-green-400 font-bold">"1500.00"</span></td>
-                                            <td>Forces N decimal places (Standard dot notation).</td>
+                                            <td data-i18n="help.sections.number.desc_float">Forces N decimal places (Standard dot notation).</td>
                                         </tr>
                                         <tr>
-                                            <td><strong class="text-white">Currency (US)</strong></td>
+                                            <td><strong class="text-white" data-i18n="help.sections.number.op_usd">Currency (US)</strong></td>
                                             <td>
                                                 <div class="syntax-pill" onclick="copyToClipboard(this)">{{ val | format_currency('USD') }}</div>
                                             </td>
                                             <td><span class="data-badge">num</span> 1500.5</td>
                                             <td><span class="text-green-400 font-bold">"$1,500.50"</span></td>
-                                            <td>Locale aware formatting for US Dollar.</td>
+                                            <td data-i18n="help.sections.number.desc_usd">Locale aware formatting for US Dollar.</td>
                                         </tr>
                                         <tr>
-                                            <td><strong class="text-white">Currency (BR)</strong></td>
+                                            <td><strong class="text-white" data-i18n="help.sections.number.op_brl">Currency (BR)</strong></td>
                                             <td>
                                                 <div class="syntax-pill" onclick="copyToClipboard(this)">{{ val | format_currency('BRL') }}</div>
                                             </td>
                                             <td><span class="data-badge">num</span> 1500.5</td>
                                             <td><span class="text-green-400 font-bold">"R$ 1.500,50"</span></td>
-                                            <td>Locale aware formatting for Brazilian Real.</td>
+                                            <td data-i18n="help.sections.number.desc_brl">Locale aware formatting for Brazilian Real.</td>
                                         </tr>
                                         <tr>
-                                            <td><strong class="text-white">Spell Out (EN)</strong></td>
+                                            <td><strong class="text-white" data-i18n="help.sections.number.op_spell_en">Spell Out (EN)</strong></td>
                                             <td>
                                                 <div class="syntax-pill" onclick="copyToClipboard(this)">{{ val | format_number('spell_out', 'en') }}</div>
                                             </td>
                                             <td><span class="data-badge">int</span> 42</td>
                                             <td><span class="text-green-400 font-bold">"forty-two"</span></td>
-                                            <td>Converts numbers to words. Supports 'en', 'pt', 'es'.</td>
+                                            <td data-i18n="help.sections.number.desc_spell">Converts numbers to words. Supports 'en', 'pt', 'es'.</td>
                                         </tr>
                                         <tr>
-                                            <td><strong class="text-white">Spell Out (PT)</strong></td>
+                                            <td><strong class="text-white" data-i18n="help.sections.number.op_spell_pt">Spell Out (PT)</strong></td>
                                             <td>
                                                 <div class="syntax-pill" onclick="copyToClipboard(this)">{{ val | format_number('spell_out', 'pt') }}</div>
                                             </td>
                                             <td><span class="data-badge">int</span> 1050</td>
                                             <td><span class="text-green-400 font-bold">"mil e cinquenta"</span></td>
-                                            <td>Portuguese text conversion.</td>
+                                            <td data-i18n="help.sections.number.desc_spell">Portuguese text conversion.</td>
                                         </tr>
                                         <tr>
-                                            <td><strong class="text-white">Humanize</strong></td>
+                                            <td><strong class="text-white" data-i18n="help.sections.number.op_human">Humanize</strong></td>
                                             <td>
                                                 <div class="syntax-pill" onclick="copyToClipboard(this)">{{ val | format_number('humanize') }}</div>
                                             </td>
                                             <td><span class="data-badge">num</span> 1500000</td>
                                             <td><span class="text-green-400 font-bold">"1.5M"</span></td>
-                                            <td>Short scale notation (K, M, B).</td>
+                                            <td data-i18n="help.sections.number.desc_human">Short scale notation (K, M, B).</td>
                                         </tr>
                                     </tbody>
                                 </table>
@@ -327,8 +329,8 @@
                                     </svg>
                                 </div>
                                 <div>
-                                    <h3 class="text-2xl font-bold text-white">Date Strategy</h3>
-                                    <p class="text-sm text-gray-500 font-mono mt-0.5">Filter Name: <span class="text-orange-400">format_date</span></p>
+                                    <h3 class="text-2xl font-bold text-white" data-i18n="help.sections.date.title">Date Strategy</h3>
+                                    <p class="text-sm text-gray-500 font-mono mt-0.5"><span data-i18n="help.sections.string.filter_name">Filter Name:</span> <span class="text-orange-400">format_date</span></p>
                                 </div>
                             </div>
                         </div>
@@ -337,61 +339,61 @@
                                 <table class="doc-table">
                                     <thead>
                                         <tr>
-                                            <th width="15%">Operation</th>
-                                            <th width="35%">Full Template Syntax</th>
-                                            <th width="15%">Input Data</th>
-                                            <th width="15%">Output Result</th>
-                                            <th width="20%">Technical Details</th>
+                                            <th width="15%" data-i18n="help.sections.string.col_op">Operation</th>
+                                            <th width="35%" data-i18n="help.sections.string.col_syntax">Full Template Syntax</th>
+                                            <th width="15%" data-i18n="help.sections.string.col_input">Input Data</th>
+                                            <th width="15%" data-i18n="help.sections.string.col_output">Output Result</th>
+                                            <th width="20%" data-i18n="help.sections.string.col_details">Technical Details</th>
                                         </tr>
                                     </thead>
                                     <tbody>
                                         <tr>
-                                            <td><strong class="text-white">ISO Standard</strong></td>
+                                            <td><strong class="text-white" data-i18n="help.sections.date.op_iso">ISO Standard</strong></td>
                                             <td>
                                                 <div class="syntax-pill" onclick="copyToClipboard(this)">{{ val | format_date('iso') }}</div>
                                             </td>
                                             <td><span class="data-badge">date</span> 2025-12-25</td>
                                             <td><span class="text-green-400 font-bold">"2025-12-25"</span></td>
-                                            <td>Universal ISO 8601 format.</td>
+                                            <td data-i18n="help.sections.date.desc_iso">Universal ISO 8601 format.</td>
                                         </tr>
                                         <tr>
-                                            <td><strong class="text-white">Short (Locale)</strong></td>
+                                            <td><strong class="text-white" data-i18n="help.sections.date.op_short">Short (Locale)</strong></td>
                                             <td>
                                                 <div class="syntax-pill" onclick="copyToClipboard(this)">{{ val | format_date('short') }}</div>
                                             </td>
                                             <td><span class="data-badge">date</span> 2025-12-25</td>
                                             <td><span class="text-green-400 font-bold">"25/12/2025"</span></td>
-                                            <td>Depends on system locale (default pt_BR).</td>
+                                            <td data-i18n="help.sections.date.desc_short">Depends on system locale (default pt_BR).</td>
                                         </tr>
                                         <tr>
-                                            <td><strong class="text-white">Long Text</strong></td>
+                                            <td><strong class="text-white" data-i18n="help.sections.date.op_long">Long Text</strong></td>
                                             <td>
                                                 <div class="syntax-pill" onclick="copyToClipboard(this)">{{ val | format_date('long') }}</div>
                                             </td>
                                             <td><span class="data-badge">date</span> 2025-12-25</td>
                                             <td><span class="text-green-400 font-bold">"25 de dezembro de 2025"</span></td>
-                                            <td>Fully expanded localized date.</td>
+                                            <td data-i18n="help.sections.date.desc_long">Fully expanded localized date.</td>
                                         </tr>
                                         <tr>
-                                            <td><strong class="text-white">Custom Pattern</strong></td>
+                                            <td><strong class="text-white" data-i18n="help.sections.date.op_custom">Custom Pattern</strong></td>
                                             <td>
                                                 <div class="syntax-pill" onclick="copyToClipboard(this)">{{ val | format_date('fmt', '%d/%m') }}</div>
                                             </td>
                                             <td><span class="data-badge">date</span> 2025-12-25</td>
                                             <td><span class="text-green-400 font-bold">"25/12"</span></td>
-                                            <td>Uses Python strftime syntax.</td>
+                                            <td data-i18n="help.sections.date.desc_custom">Uses Python strftime syntax.</td>
                                         </tr>
                                         <tr>
-                                            <td><strong class="text-white">Add Days</strong></td>
+                                            <td><strong class="text-white" data-i18n="help.sections.date.op_add">Add Days</strong></td>
                                             <td>
                                                 <div class="syntax-pill" onclick="copyToClipboard(this)">{{ val | format_date('add_days', '7') }}</div>
                                             </td>
                                             <td><span class="data-badge">date</span> 2025-01-01</td>
                                             <td><span class="text-green-400 font-bold">"2025-01-08"</span></td>
-                                            <td>Arithmetic. Returns an ISO string by default.</td>
+                                            <td data-i18n="help.sections.date.desc_add">Arithmetic. Returns an ISO string by default.</td>
                                         </tr>
                                         <tr>
-                                            <td><strong class="text-white">Complex Chain</strong></td>
+                                            <td><strong class="text-white" data-i18n="help.sections.date.op_complex">Complex Chain</strong></td>
                                             <td>
                                                 <div class="syntax-pill" onclick="copyToClipboard(this)">{{ val | format_date('add_days', '1', 'long') }}</div>
                                             </td>
@@ -413,8 +415,8 @@
                                     </svg>
                                 </div>
                                 <div>
-                                    <h3 class="text-2xl font-bold text-white">Logic & Defaults</h3>
-                                    <p class="text-sm text-gray-500 font-mono mt-0.5">Filter Name: <span class="text-red-400">format_logic</span></p>
+                                    <h3 class="text-2xl font-bold text-white" data-i18n="help.sections.logic.title">Logic & Defaults</h3>
+                                    <p class="text-sm text-gray-500 font-mono mt-0.5"><span data-i18n="help.sections.string.filter_name">Filter Name:</span> <span class="text-red-400">format_logic</span></p>
                                 </div>
                             </div>
                         </div>
@@ -423,49 +425,49 @@
                                 <table class="doc-table">
                                     <thead>
                                         <tr>
-                                            <th width="15%">Operation</th>
-                                            <th width="35%">Full Template Syntax</th>
-                                            <th width="15%">Input Data</th>
-                                            <th width="15%">Output Result</th>
-                                            <th width="20%">Technical Details</th>
+                                            <th width="15%" data-i18n="help.sections.string.col_op">Operation</th>
+                                            <th width="35%" data-i18n="help.sections.string.col_syntax">Full Template Syntax</th>
+                                            <th width="15%" data-i18n="help.sections.string.col_input">Input Data</th>
+                                            <th width="15%" data-i18n="help.sections.string.col_output">Output Result</th>
+                                            <th width="20%" data-i18n="help.sections.string.col_details">Technical Details</th>
                                         </tr>
                                     </thead>
                                     <tbody>
                                         <tr>
-                                            <td><strong class="text-white">Default Value</strong></td>
+                                            <td><strong class="text-white" data-i18n="help.sections.logic.op_default">Default Value</strong></td>
                                             <td>
                                                 <div class="syntax-pill" onclick="copyToClipboard(this)">{{ val | format_logic('default', 'N/A') }}</div>
                                             </td>
                                             <td><span class="data-badge">null</span> <i>(empty)</i></td>
                                             <td><span class="text-green-400 font-bold">"N/A"</span></td>
-                                            <td>Used when Excel cell is empty.</td>
+                                            <td data-i18n="help.sections.logic.desc_default">Used when Excel cell is empty.</td>
                                         </tr>
                                         <tr>
-                                            <td><strong class="text-white">Status Mapping</strong></td>
+                                            <td><strong class="text-white" data-i18n="help.sections.logic.op_status">Status Mapping</strong></td>
                                             <td>
                                                 <div class="syntax-pill" onclick="copyToClipboard(this)">{{ val | format_logic('1=Draft', '2=Final') }}</div>
                                             </td>
                                             <td><span class="data-badge">int</span> 2</td>
                                             <td><span class="text-green-400 font-bold">"Final"</span></td>
-                                            <td>Maps Keys to Values. Great for Status Codes.</td>
+                                            <td data-i18n="help.sections.logic.desc_status">Maps Keys to Values. Great for Status Codes.</td>
                                         </tr>
                                         <tr>
-                                            <td><strong class="text-white">Empty If</strong></td>
+                                            <td><strong class="text-white" data-i18n="help.sections.logic.op_empty">Empty If</strong></td>
                                             <td>
                                                 <div class="syntax-pill" onclick="copyToClipboard(this)">{{ val | format_logic('empty_if', '0') }}</div>
                                             </td>
                                             <td><span class="data-badge">int</span> 0</td>
                                             <td><span class="text-green-400 font-bold">""</span></td>
-                                            <td>Hides the value if it matches the argument.</td>
+                                            <td data-i18n="help.sections.logic.desc_empty">Hides the value if it matches the argument.</td>
                                         </tr>
                                         <tr>
-                                            <td><strong class="text-white">Fallback Map</strong></td>
+                                            <td><strong class="text-white" data-i18n="help.sections.logic.op_fallback">Fallback Map</strong></td>
                                             <td>
                                                 <div class="syntax-pill" onclick="copyToClipboard(this)">{{ val | format_logic('1=A', 'default', 'Unknown') }}</div>
                                             </td>
                                             <td><span class="data-badge">int</span> 5</td>
                                             <td><span class="text-green-400 font-bold">"Unknown"</span></td>
-                                            <td>Combines mapping with a default fallback.</td>
+                                            <td data-i18n="help.sections.logic.desc_fallback">Combines mapping with a default fallback.</td>
                                         </tr>
                                     </tbody>
                                 </table>
@@ -481,8 +483,8 @@
                                     </svg>
                                 </div>
                                 <div>
-                                    <h3 class="text-2xl font-bold text-white">Boolean Strategy</h3>
-                                    <p class="text-sm text-gray-500 font-mono mt-0.5">Filter Name: <span class="text-cyan-400">format_bool</span></p>
+                                    <h3 class="text-2xl font-bold text-white" data-i18n="help.sections.bool.title">Boolean Strategy</h3>
+                                    <p class="text-sm text-gray-500 font-mono mt-0.5"><span data-i18n="help.sections.string.filter_name">Filter Name:</span> <span class="text-cyan-400">format_bool</span></p>
                                 </div>
                             </div>
                         </div>
@@ -491,34 +493,34 @@
                                 <table class="doc-table">
                                     <thead>
                                         <tr>
-                                            <th width="15%">Operation</th>
-                                            <th width="35%">Full Template Syntax</th>
-                                            <th width="15%">Input Data</th>
-                                            <th width="15%">Output Result</th>
-                                            <th width="20%">Technical Details</th>
+                                            <th width="15%" data-i18n="help.sections.string.col_op">Operation</th>
+                                            <th width="35%" data-i18n="help.sections.string.col_syntax">Full Template Syntax</th>
+                                            <th width="15%" data-i18n="help.sections.string.col_input">Input Data</th>
+                                            <th width="15%" data-i18n="help.sections.string.col_output">Output Result</th>
+                                            <th width="20%" data-i18n="help.sections.string.col_details">Technical Details</th>
                                         </tr>
                                     </thead>
                                     <tbody>
                                         <tr>
-                                            <td><strong class="text-white">Yes/No</strong></td>
+                                            <td><strong class="text-white" data-i18n="help.sections.bool.op_yesno">Yes/No</strong></td>
                                             <td>
                                                 <div class="syntax-pill" onclick="copyToClipboard(this)">{{ val | format_bool('Yes', 'No') }}</div>
                                             </td>
                                             <td><span class="data-badge">bool</span> TRUE</td>
                                             <td><span class="text-green-400 font-bold">"Yes"</span></td>
-                                            <td>Arg 1 is True value, Arg 2 is False value.</td>
+                                            <td data-i18n="help.sections.bool.desc_yesno">Arg 1 is True value, Arg 2 is False value.</td>
                                         </tr>
                                         <tr>
-                                            <td><strong class="text-white">Visual Checkbox</strong></td>
+                                            <td><strong class="text-white" data-i18n="help.sections.bool.op_check">Visual Checkbox</strong></td>
                                             <td>
                                                 <div class="syntax-pill" onclick="copyToClipboard(this)">{{ val | format_bool('check') }}</div>
                                             </td>
                                             <td><span class="data-badge">bool</span> TRUE</td>
                                             <td><span class="text-green-400 font-bold">"☑"</span></td>
-                                            <td>Outputs Wingdings-compatible checkbox characters.</td>
+                                            <td data-i18n="help.sections.bool.desc_check">Outputs Wingdings-compatible checkbox characters.</td>
                                         </tr>
                                         <tr>
-                                            <td><strong class="text-white">Visual Checkbox</strong></td>
+                                            <td><strong class="text-white" data-i18n="help.sections.bool.op_check">Visual Checkbox</strong></td>
                                             <td>
                                                 <div class="syntax-pill" onclick="copyToClipboard(this)">{{ val | format_bool('check') }}</div>
                                             </td>
@@ -540,8 +542,8 @@
                                     </svg>
                                 </div>
                                 <div>
-                                    <h3 class="text-2xl font-bold text-white">Privacy & Masking</h3>
-                                    <p class="text-sm text-gray-500 font-mono mt-0.5">Filter Name: <span class="text-gray-400">format_mask</span></p>
+                                    <h3 class="text-2xl font-bold text-white" data-i18n="help.sections.mask.title">Privacy & Masking</h3>
+                                    <p class="text-sm text-gray-500 font-mono mt-0.5"><span data-i18n="help.sections.string.filter_name">Filter Name:</span> <span class="text-gray-400">format_mask</span></p>
                                 </div>
                             </div>
                         </div>
@@ -550,40 +552,40 @@
                                 <table class="doc-table">
                                     <thead>
                                         <tr>
-                                            <th width="15%">Operation</th>
-                                            <th width="35%">Full Template Syntax</th>
-                                            <th width="15%">Input Data</th>
-                                            <th width="15%">Output Result</th>
-                                            <th width="20%">Technical Details</th>
+                                            <th width="15%" data-i18n="help.sections.string.col_op">Operation</th>
+                                            <th width="35%" data-i18n="help.sections.string.col_syntax">Full Template Syntax</th>
+                                            <th width="15%" data-i18n="help.sections.string.col_input">Input Data</th>
+                                            <th width="15%" data-i18n="help.sections.string.col_output">Output Result</th>
+                                            <th width="20%" data-i18n="help.sections.string.col_details">Technical Details</th>
                                         </tr>
                                     </thead>
                                     <tbody>
                                         <tr>
-                                            <td><strong class="text-white">Email</strong></td>
+                                            <td><strong class="text-white" data-i18n="help.sections.mask.op_email">Email</strong></td>
                                             <td>
                                                 <div class="syntax-pill" onclick="copyToClipboard(this)">{{ val | format_mask('email') }}</div>
                                             </td>
                                             <td><span class="data-badge">text</span> "admin@corp.com"</td>
                                             <td><span class="text-green-400 font-bold">"a***@corp.com"</span></td>
-                                            <td>Obfuscates user part, keeps domain.</td>
+                                            <td data-i18n="help.sections.mask.desc_email">Obfuscates user part, keeps domain.</td>
                                         </tr>
                                         <tr>
-                                            <td><strong class="text-white">Credit Card</strong></td>
+                                            <td><strong class="text-white" data-i18n="help.sections.mask.op_cc">Credit Card</strong></td>
                                             <td>
                                                 <div class="syntax-pill" onclick="copyToClipboard(this)">{{ val | format_mask('credit_card') }}</div>
                                             </td>
                                             <td><span class="data-badge">text</span> "1234567812345678"</td>
                                             <td><span class="text-green-400 font-bold">"**** 5678"</span></td>
-                                            <td>Keeps only last 4 digits (PCI Compliant).</td>
+                                            <td data-i18n="help.sections.mask.desc_cc">Keeps only last 4 digits (PCI Compliant).</td>
                                         </tr>
                                         <tr>
-                                            <td><strong class="text-white">Custom Pattern</strong></td>
+                                            <td><strong class="text-white" data-i18n="help.sections.mask.op_custom">Custom Pattern</strong></td>
                                             <td>
                                                 <div class="syntax-pill" onclick="copyToClipboard(this)">{{ val | format_mask('mask', '###.###') }}</div>
                                             </td>
                                             <td><span class="data-badge">text</span> "123456"</td>
                                             <td><span class="text-green-400 font-bold">"123.456"</span></td>
-                                            <td>Hashtags (#) are replaced by characters.</td>
+                                            <td data-i18n="help.sections.mask.desc_custom">Hashtags (#) are replaced by characters.</td>
                                         </tr>
                                     </tbody>
                                 </table>
@@ -599,8 +601,8 @@
                                     </svg>
                                 </div>
                                 <div>
-                                    <h3 class="text-2xl font-bold text-white">Dynamic Images</h3>
-                                    <p class="text-sm text-gray-500 font-mono mt-0.5">Filter Name: <span class="text-yellow-400">format_image</span></p>
+                                    <h3 class="text-2xl font-bold text-white" data-i18n="help.sections.image.title">Dynamic Images</h3>
+                                    <p class="text-sm text-gray-500 font-mono mt-0.5"><span data-i18n="help.sections.string.filter_name">Filter Name:</span> <span class="text-yellow-400">format_image</span></p>
                                 </div>
                             </div>
                         </div>
@@ -608,12 +610,12 @@
                             <div class="grid grid-cols-1 md:grid-cols-2 gap-8">
                                 <div class="space-y-4">
                                     <div class="bg-black/30 p-4 rounded-lg border border-white/5">
-                                        <h4 class="text-xs font-bold text-gray-400 uppercase mb-2">Requirement</h4>
-                                        <p class="text-sm text-gray-300"> The Excel cell must contain the exact <strong>filename</strong> (e.g., <code>photo.jpg</code>). This file must exist inside the <code>assets.zip</code> uploaded during generation. </p>
+                                        <h4 class="text-xs font-bold text-gray-400 uppercase mb-2" data-i18n="help.sections.image.req_title">Requirement</h4>
+                                        <p class="text-sm text-gray-300" data-i18n="help.sections.image.req_text"> The Excel cell must contain the exact <strong>filename</strong> (e.g., <code>photo.jpg</code>). This file must exist inside the <code>assets.zip</code> uploaded during generation. </p>
                                     </div>
                                     <div class="bg-black/30 p-4 rounded-lg border border-white/5">
-                                        <h4 class="text-xs font-bold text-gray-400 uppercase mb-2">Word vs PowerPoint</h4>
-                                        <p class="text-sm text-gray-300"> Fully supported in Word (.docx). <br>
+                                        <h4 class="text-xs font-bold text-gray-400 uppercase mb-2" data-i18n="help.sections.image.ppt_title">Word vs PowerPoint</h4>
+                                        <p class="text-sm text-gray-300" data-i18n="help.sections.image.ppt_text"> Fully supported in Word (.docx). <br>
                                             <span class="text-yellow-500 text-xs">Note: PowerPoint support is limited to text-replacement only in this version.</span>
                                         </p>
                                     </div>
@@ -622,8 +624,8 @@
                                     <table class="doc-table">
                                         <thead>
                                             <tr>
-                                                <th>Syntax (Click to Copy)</th>
-                                                <th>Description</th>
+                                                <th data-i18n="help.sections.string.col_syntax">Syntax (Click to Copy)</th>
+                                                <th data-i18n="help.sections.string.col_details">Description</th>
                                             </tr>
                                         </thead>
                                         <tbody>
@@ -631,19 +633,19 @@
                                                 <td>
                                                     <div class="syntax-pill" onclick="copyToClipboard(this)">{{ val | format_image('5', '3') }}</div>
                                                 </td>
-                                                <td>Resizes image to 5cm Width x 3cm Height.</td>
+                                                <td data-i18n="help.sections.image.desc_resize">Resizes image to 5cm Width x 3cm Height.</td>
                                             </tr>
                                             <tr>
                                                 <td>
                                                     <div class="syntax-pill" onclick="copyToClipboard(this)">{{ val | format_image('5', 'auto') }}</div>
                                                 </td>
-                                                <td>Fixes Width to 5cm, calculates Height automatically.</td>
+                                                <td data-i18n="help.sections.image.desc_width">Fixes Width to 5cm, calculates Height automatically.</td>
                                             </tr>
                                             <tr>
                                                 <td>
                                                     <div class="syntax-pill" onclick="copyToClipboard(this)">{{ val | format_image('auto', '4') }}</div>
                                                 </td>
-                                                <td>Fixes Height to 4cm, calculates Width automatically.</td>
+                                                <td data-i18n="help.sections.image.desc_height">Fixes Height to 4cm, calculates Width automatically.</td>
                                             </tr>
                                         </tbody>
                                     </table>
@@ -654,7 +656,7 @@
                 </div>
             </div>
         </main>
-        <div id="toast">Code copied to clipboard!</div>
+        <div id="toast" data-i18n="help.toast">Code copied to clipboard!</div>
         <script src="js/navbar.js"></script>
         <script src="js/copyToClipboard.js"></script>
     </body>
