@@ -194,7 +194,7 @@ Este projeto está licenciado sob a **Licença Creative Commons Atribuição-Nã
 
 ## 👨‍💻 Autor
 
-**Rubens Braz**
+**[Rubens Braz](https://rubensbraz.com/)**
 
 ---
 
