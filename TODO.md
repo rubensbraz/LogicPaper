@@ -1,4 +1,4 @@
-# 🚀 DocGenius Project To-Do List
+# 🚀 LogicPaper Project To-Do List
 
 ## 1. 🛡️ Security & Production Hardening (Priority: HIGH)
 

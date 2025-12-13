@@ -26,8 +26,8 @@ from app.core.validator import TemplateValidator
 logging.basicConfig(
     level=logging.INFO, format="%(asctime)s [%(levelname)s] %(message)s"
 )
-logger = logging.getLogger("DocGenius")
-app = FastAPI(title="DocGenius API", version="1.0")
+logger = logging.getLogger("LogicPaper")
+app = FastAPI(title="LogicPaper API", version="1.0")
 
 # Middleware
 app.add_middleware(
@@ -143,7 +143,7 @@ def generate_styled_report(
     ws_dash.title = "Executive Summary"
     ws_dash.sheet_view.showGridLines = False
 
-    ws_dash["B2"] = "DocGenius Execution Report"
+    ws_dash["B2"] = "LogicPaper Execution Report"
     ws_dash["B2"].font = title_font
 
     # Metrics
@@ -576,7 +576,7 @@ async def generate_sample(
 
         zip_file_path = f"{zip_base_name}.zip"
         timestamp = end_time.strftime("%Y-%m-%d_%H-%M")
-        download_filename = f"DocGenius_Sample_{row_identifier}_{timestamp}.zip"
+        download_filename = f"LogicPaper_Sample_{row_identifier}_{timestamp}.zip"
 
         return FileResponse(
             path=zip_file_path, filename=download_filename, media_type="application/zip"
@@ -799,7 +799,7 @@ async def download_result(session_id: str) -> Any:
     """
     Downloads the final ZIP file with a timestamped filename.
 
-    Format: DocGenius_YYYY-MM-DD_HH-MM.zip
+    Format: LogicPaper_YYYY-MM-DD_HH-MM.zip
     """
     try:
         file_path = os.path.join(TEMP_DIR, f"{session_id}_result.zip")
@@ -809,7 +809,7 @@ async def download_result(session_id: str) -> Any:
             now = datetime.now()
             # Format: YYYY-MM-DD_HH-MM
             timestamp = now.strftime("%Y-%m-%d_%H-%M")
-            filename = f"DocGenius_{timestamp}.zip"
+            filename = f"LogicPaper_{timestamp}.zip"
 
             return FileResponse(
                 path=file_path, filename=filename, media_type="application/zip"

@@ -82,10 +82,10 @@ class StringStrategy(BaseStrategy):
 
                 # --- Advanced Formats ---
                 elif op == "snake":
-                    # "Doc Genius" -> "doc_genius"
+                    # "Logic Paper" -> "logic_paper"
                     text = re.sub(r"[\s\-]+", "_", text).lower()
                 elif op == "kebab":
-                    # "Doc Genius" -> "doc-genius"
+                    # "Logic Paper" -> "logic-paper"
                     text = re.sub(r"[\s_]+", "-", text).lower()
                 elif op == "slug":
                     # Remove non-alphanumeric, lowercase, dashes

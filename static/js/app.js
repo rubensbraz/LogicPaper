@@ -373,7 +373,7 @@ async function generateSample() {
         const response = await fetch(CONFIG.endpoints.sample, { method: 'POST', body: formData });
 
         if (response.ok) {
-            downloadBlob(await response.blob(), "DocGenius_Sample.zip");
+            downloadBlob(await response.blob(), "LogicPaper_Sample.zip");
             logToTerminal('✅ Sample generated successfully.', 'success');
             Swal.fire({
                 icon: 'success', title: 'Sample Ready',

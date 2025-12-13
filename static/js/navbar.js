@@ -43,9 +43,9 @@ function renderNavbar() {
     const navbarHTML = `
     <header class="w-full max-w-7xl flex justify-between items-center mb-8 px-4 md:px-0 select-none">
         <div class="flex items-center gap-3">
-            <div class="w-10 h-10 bg-gradient-to-tr from-blue-500 to-purple-600 rounded-lg flex items-center justify-center font-bold text-xl shadow-lg shadow-blue-500/20">D</div>
+            <div class="w-10 h-10 bg-gradient-to-tr from-blue-500 to-purple-600 rounded-lg flex items-center justify-center font-bold text-xl shadow-lg shadow-blue-500/20">L</div>
             <div>
-                <h1 class="text-2xl font-bold tracking-tight text-gray-100">Doc<span class="text-blue-400">Genius</span></h1>
+                <h1 class="text-2xl font-bold tracking-tight text-gray-100">Logic<span class="text-blue-400">Paper</span></h1>
                 <p class="text-[10px] text-gray-400 font-mono tracking-widest uppercase">Batch Processing Engine v1.0</p>
             </div>
         </div>

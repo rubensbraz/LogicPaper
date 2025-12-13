@@ -1,4 +1,4 @@
-# DocGenius | Document Generation Engine
+# LogicPaper | Document Generation Engine
 
 ![Build Status](https://img.shields.io/badge/build-passing-brightgreen?style=for-the-badge&logo=github)
 ![Python](https://img.shields.io/badge/Python-3.11-3776AB?style=for-the-badge&logo=python&logoColor=white)
@@ -15,7 +15,7 @@
 
 ## 📖 Overview
 
-**DocGenius** is a tool designed to automate document creation workflows. It takes structured data from Excel files and populates Microsoft Office templates (`.docx`, `.pptx`) using a custom Jinja2-based templating system.
+**LogicPaper** is a tool designed to automate document creation workflows. It takes structured data from Excel files and populates Microsoft Office templates (`.docx`, `.pptx`) using a custom Jinja2-based templating system.
 
 Developed with **FastAPI** and **Docker**, it provides a web-based dashboard for managing batch jobs and includes a headless LibreOffice integration for converting generated documents into PDF format. It is suitable for generating contracts, reports, certificates, and presentations at scale.
 
@@ -46,7 +46,7 @@ Developed with **FastAPI** and **Docker**, it provides a web-based dashboard for
 
 ```mermaid
 graph LR
-    A[Excel Data] --> B(DocGenius Engine)
+    A[Excel Data] --> B(LogicPaper Engine)
     C[Word/PPT Templates] --> B
     D[Assets ZIP] --> B
     B --> E{Processing Core}
@@ -72,8 +72,8 @@ graph LR
 
 1.  **Clone the Repository**
     ```bash
-    git clone https://github.com/rubensbraz/DocGenius.git
-    cd DocGenius
+    git clone https://github.com/rubensbraz/LogicPaper.git
+    cd LogicPaper
     ```
 
 2.  **Start the Engine**
@@ -92,7 +92,7 @@ graph LR
 The project separates the processing logic (backend) from the user interface (frontend).
 
 ```text
-DocGenius/
+LogicPaper/
 ├── app/
 │   ├── core/
 │   │   ├── engine.py          # Document Processing (Docx/Pptx/Pdf)
@@ -115,8 +115,8 @@ DocGenius/
 
 ## 📘 Templating Syntax
 
-DocGenius uses the pipe character (`|`) to apply formatting filters to variables.
-*For a complete list of filters, refer to the "How to Use" section in the application ([Documentation in Github Pages](https://rubensbraz.github.io/DocGenius/help.html)).*
+LogicPaper uses the pipe character (`|`) to apply formatting filters to variables.
+*For a complete list of filters, refer to the "How to Use" section in the application ([Documentation in Github Pages](https://rubensbraz.github.io/LogicPaper/help.html)).*
 
 ### 1. Text Formatting
 ```jinja2
@@ -165,7 +165,7 @@ A utility script is included to generate sample data for testing purposes.
 
 1.  **Generate Sample Data (Inside Container):**
     ```bash
-    docker exec -it docgenius python /data/mock_data/generate_seeds.py
+    docker exec -it logicpaper python /data/mock_data/generate_seeds.py
     ```
     *This creates a `mock_data.xlsx`, `assets.zip`, and sample templates in the data folder.*
 

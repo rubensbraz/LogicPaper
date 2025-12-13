@@ -423,7 +423,7 @@ class SeedGenerator:
         # Parties
         doc.add_heading("1. The Parties", level=1)
         p = doc.add_paragraph()
-        p.add_run("PROVIDER: DocGenius Systems Ltd.\n").bold = True
+        p.add_run("PROVIDER: LogicPaper Systems Ltd.\n").bold = True
         p.add_run("CLIENT: ")
         run = p.add_run("{{ company | format_string('title') }}")
         run.bold = True
@@ -458,7 +458,7 @@ class SeedGenerator:
         # Signatures
         doc.add_paragraph().add_run().add_break()
         table = doc.add_table(rows=2, cols=2)
-        table.rows[0].cells[0].text = "Signed for DocGenius:"
+        table.rows[0].cells[0].text = "Signed for LogicPaper:"
         table.rows[0].cells[1].text = "Signed for Client:"
 
         # Client Sig Image

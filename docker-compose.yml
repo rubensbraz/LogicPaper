@@ -1,14 +1,14 @@
 services:
   # ==========================================
-  # DocGenius Core Service
+  # LogicPaper Core Service
   # Hosts FastAPI Backend & LibreOffice Engine
   # ==========================================
-  docgenius-app:
+  logicpaper-app:
     build:
       context: .
       dockerfile: Dockerfile
-    image: docgenius:v1
-    container_name: docgenius
+    image: logicpaper:v1
+    container_name: logicpaper
 
     # Network Configuration
     # Maps localhost:8000 to container:8000
