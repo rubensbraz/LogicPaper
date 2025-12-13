@@ -1,296 +1,351 @@
-import io
 import logging
 import os
+import shutil
 import zipfile
-from typing import Any, List
+from datetime import date
+from typing import Tuple
 
-import pandas as pd
+import xlsxwriter
 from docx import Document
 from docx.shared import Pt
-from PIL import Image, ImageDraw, ImageFont
+from PIL import Image
 from pptx import Presentation
-from pptx.util import Inches, Pt as PptxPt
 
-
-# Configure logging
-logging.basicConfig(level=logging.INFO, format="%(levelname)s: %(message)s")
+# --- Configuration ---
+logging.basicConfig(
+    level=logging.INFO, format="%(asctime)s [%(levelname)s] %(message)s"
+)
 logger = logging.getLogger(__name__)
 
-# Determine the directory where THIS script is located
-# Inside Docker, this will resolve to /data/mock_data/
-SCRIPT_DIR = os.path.dirname(os.path.abspath(__file__))
-OUTPUT_DIR = SCRIPT_DIR
+# --- Constants ---
+# Files will be generated in the same directory as this script
+BASE_DIR = os.path.dirname(os.path.abspath(__file__))
+# Temporary folder for generating raw images before zipping
+ASSETS_TEMP_DIR = os.path.join(BASE_DIR, ".temp_assets_gen")
 
 
-def get_path(filename: str) -> str:
+# --- Helper Functions ---
+
+
+def ensure_temp_directory() -> None:
+    """Creates the temporary assets directory."""
+    os.makedirs(ASSETS_TEMP_DIR, exist_ok=True)
+
+
+def create_dummy_image(filename: str, color: Tuple[int, int, int]) -> None:
     """
-    Helper to ensure file is saved in the script's directory.
+    Creates a simple colored square image for testing.
 
     Args:
-        filename (str): Name of the file.
-
-    Returns:
-        str: Absolute path to the file.
+        filename (str): Output filename.
+        color (Tuple[int, int, int]): RGB color tuple.
     """
-    return os.path.join(OUTPUT_DIR, filename)
+    try:
+        ensure_temp_directory()
+        img = Image.new("RGB", (200, 200), color)
+        path = os.path.join(ASSETS_TEMP_DIR, filename)
+        img.save(path)
+        logger.info(f"Generated temp image: {path}")
+    except Exception as e:
+        logger.error(f"Error generating image {filename}: {e}")
 
 
-def generate_excel(filename: str = "mock_data.xlsx") -> None:
+def create_assets_zip(zip_filename: str = "assets.zip") -> None:
     """
-    Generates an Excel file with the specific 3-row structure:
-    Row 1: Variable Names
-    Row 2: Formatter Protocol
-    Row 3+: Data
+    Generates dummy images, compresses them into a ZIP file in the base dir,
+    and then deletes the source images.
 
     Args:
-        filename (str): The name of the output file.
+        zip_filename (str): Name of the output zip file.
     """
-    file_path = get_path(filename)
-    logger.info(f"Generating Excel at {file_path}...")
+    # 1. Create dummy images in the temp folder
+    create_dummy_image("photo_a.jpg", (52, 152, 219))  # Blue
+    create_dummy_image("photo_b.jpg", (231, 76, 60))  # Red
+    create_dummy_image("signature.png", (46, 204, 113))  # Green
+
+    # 2. Zip them to the main directory
+    zip_path = os.path.join(BASE_DIR, zip_filename)
+    try:
+        with zipfile.ZipFile(zip_path, "w") as zipf:
+            for root, _, files in os.walk(ASSETS_TEMP_DIR):
+                for file in files:
+                    file_path = os.path.join(root, file)
+                    # Add file to zip with relative path (so they are at root of zip)
+                    zipf.write(file_path, os.path.relpath(file_path, ASSETS_TEMP_DIR))
+        logger.info(f"Assets ZIP created successfully: {zip_path}")
+    except Exception as e:
+        logger.error(f"Error creating assets ZIP: {e}")
+    finally:
+        # 3. Cleanup temp images immediately
+        if os.path.exists(ASSETS_TEMP_DIR):
+            shutil.rmtree(ASSETS_TEMP_DIR)
+            logger.info("Cleaned up temporary assets folder.")
+
+
+# --- Main Generation Functions ---
+
+
+def create_excel_data(filename: str = "mock_data.xlsx") -> None:
+    """
+    Creates the Excel data source file with Header and Raw Data.
+
+    Args:
+        filename (str): Output Excel filename.
+    """
+    filepath = os.path.join(BASE_DIR, filename)
 
     try:
-        rows: List[List[Any]] = [
-            # ROW 1: Headers (Variable Names)
-            [
-                "client_name",
-                "contract_value",
-                "start_date",
-                "tax_id",
-                "risk_level",
-                "signature_img",
-            ],
-            # ROW 2: Protocol (Formatter Rules)
-            [
-                "string;upper",
-                "currency;USD",
-                "date;long",
-                "mask;###-##-####",
-                "string;title",
-                "image;4;2",
-            ],
-            # ROW 3+: Sample Data
-            ["John Doe", 15000.50, "2024-01-15", "123456789", "low", "sig_john.png"],
-            ["Jane Smith", 2500.00, "2024-02-01", "987654321", "high", "sig_jane.png"],
-            ["Acme Corp", 1000000, "2024-03-10", "555666777", "medium", "sig_corp.png"],
+        workbook = xlsxwriter.Workbook(filepath)
+        worksheet = workbook.add_worksheet("Data")
+
+        # 1. Define Headers (Variables)
+        header_row = [
+            "client_id",  # String/Number identifier
+            "client_name",  # String
+            "contract_date",  # Date object
+            "contract_value",  # Float (Currency)
+            "completion_rate",  # Float (Percentage)
+            "is_active",  # Boolean
+            "has_debt",  # Boolean
+            "status_code",  # Integer (for Logic mapping)
+            "client_photo",  # String (Filename in assets.zip)
+            "signature_img",  # String (Filename in assets.zip)
         ]
 
-        df_final = pd.DataFrame(rows)
-        # Save without header/index because we manually built the headers in Row 1
-        df_final.to_excel(file_path, header=False, index=False)
-        logger.info("✅ Excel generated.")
+        # 2. Define Raw Data Rows
+        data_row_1 = [
+            "CL-12345",
+            "Acme Corporation International",
+            date(2023, 10, 25),
+            150000.50,
+            0.985,
+            True,
+            False,
+            10,  # e.g., 10 = Approved
+            "photo_a.jpg",
+            "signature.png",
+        ]
 
+        data_row_2 = [
+            "CL-98765",
+            "Jane Doe Enterprises LLC",
+            date(2024, 1, 15),
+            2500.00,
+            0.45,
+            False,
+            True,
+            20,  # e.g., 20 = Pending
+            "photo_b.jpg",
+            "None",  # No signature
+        ]
+
+        # Add formats for better readability in Excel
+        bold = workbook.add_format({"bold": True})
+        date_fmt = workbook.add_format({"num_format": "yyyy-mm-dd"})
+        money_fmt = workbook.add_format({"num_format": "$#,##0.00"})
+
+        # Write Header
+        worksheet.write_row(0, 0, header_row, bold)
+
+        # Write Data Row 1
+        worksheet.write(1, 0, data_row_1[0])
+        worksheet.write(1, 1, data_row_1[1])
+        worksheet.write(1, 2, data_row_1[2], date_fmt)
+        worksheet.write(1, 3, data_row_1[3], money_fmt)
+        worksheet.write(1, 4, data_row_1[4])
+        worksheet.write(1, 5, data_row_1[5])
+        worksheet.write(1, 6, data_row_1[6])
+        worksheet.write(1, 7, data_row_1[7])
+        worksheet.write(1, 8, data_row_1[8])
+        worksheet.write(1, 9, data_row_1[9])
+
+        # Write Data Row 2
+        worksheet.write(2, 0, data_row_2[0])
+        worksheet.write(2, 1, data_row_2[1])
+        worksheet.write(2, 2, data_row_2[2], date_fmt)
+        worksheet.write(2, 3, data_row_2[3], money_fmt)
+        worksheet.write(2, 4, data_row_2[4])
+        worksheet.write(2, 5, data_row_2[5])
+        worksheet.write(2, 6, data_row_2[6])
+        worksheet.write(2, 7, data_row_2[7])
+        worksheet.write(2, 8, data_row_2[8])
+        worksheet.write(2, 9, data_row_2[9])
+
+        workbook.close()
+        logger.info(f"Excel data file created successfully: {filepath}")
     except Exception as e:
-        logger.error(f"❌ Excel generation failed: {e}")
+        logger.error(f"Error creating Excel file: {e}")
 
 
-def generate_main_contract_template(filename: str = "template_contract.docx") -> None:
+def create_word_templates() -> None:
     """
-    Generates the main Service Contract Word template with Jinja2 tags.
-
-    Args:
-        filename (str): The name of the output file.
+    Creates DOCX templates with formatting tags.
     """
-    file_path = get_path(filename)
-    logger.info(f"Generating Contract Template at: {file_path}")
+    # --- Template 1: Contract (String, Date, Currency focus) ---
+    doc1 = Document()
+    doc1.add_heading("SERVICE AGREEMENT", 0)
 
+    p = doc1.add_paragraph("This agreement is made between ")
+    # Multi-step string formatting: Title case + prefix
+    p.add_run(
+        "{{ client_name | format_string('title', 'prefix', 'Client: ') }}"
+    ).bold = True
+    p.add_run(" and DocGenius Systems.")
+
+    doc1.add_heading("1. Contract Details", level=1)
+    p = doc1.add_paragraph()
+    p.add_run("Contract ID: ").bold = True
+    # Simple string format
+    p.add_run("{{ client_id | format_string('upper') }}")
+    p.add_run("\nDate Signed: ").bold = True
+    # Date format: standard long format
+    p.add_run("{{ contract_date | format_date('long') }}")
+    p.add_run("\n(Alternative Date Format for International filing: ")
+    # Date format: extended format with specific locale (Spain)
+    p.add_run("{{ contract_date | format_date('extended', 'es_ES') }}")
+    p.add_run(")")
+
+    doc1.add_heading("2. Financial Terms", level=1)
+    p = doc1.add_paragraph("The total value of this contract is ")
+    # Currency format: US Dollar
+    run = p.add_run("{{ contract_value | format_currency('USD') }}")
+    run.bold = True
+    run.font.size = Pt(14)
+    p.add_run(".")
+
+    p = doc1.add_paragraph("Written amount: ")
+    # Number spell-out in English
+    p.add_run("{{ contract_value | format_number('spell_out', 'en') }}").italic = True
+    p.add_run(" dollars.")
+
+    doc1.add_heading("Signatures", level=1)
+    p = doc1.add_paragraph("Client Representative:\n\n")
+    # Dynamic Image with specific dimensions
+    p.add_run("{{ signature_img | format_image('4', '2') }}")
+
+    doc1_path = os.path.join(BASE_DIR, "template_contract.docx")
+    doc1.save(doc1_path)
+    logger.info(f"Word template 1 created: {doc1_path}")
+
+    # --- Template 2: Technical Report (Advanced features focus) ---
+    doc2 = Document()
+    doc2.add_heading("CLIENT TECHNICAL PROFILE Status Report", 0)
+
+    # Image with standard size
+    p = doc2.add_paragraph()
+    p.alignment = 1  # Center
+    p.add_run("{{ client_photo | format_image('3', '3') }}")
+
+    doc2.add_heading("System Status & Metrics", level=1)
+
+    # Boolean Checkboxes
+    p = doc2.add_paragraph()
+    p.add_run("[ ")
+    p.add_run("{{ is_active | format_bool('checkbox') }}")
+    p.add_run(" ] Account Active status verified.")
+
+    p = doc2.add_paragraph()
+    p.add_run("Current Debt Flag: ")
+    # Boolean Yes/No
+    p.add_run("{{ has_debt | format_bool('yesno') }}").bold = True
+
+    doc2.add_heading("Performance Data", level=2)
+    table = doc2.add_table(rows=3, cols=2)
+    table.style = "Table Grid"
+
+    row0 = table.rows[0].cells
+    row0[0].text = "Metric"
+    row0[1].text = "Value / Formatting Demo"
+
+    row1 = table.rows[1].cells
+    row1[0].text = "Completion Rate"
+    # Number Percentage with 1 decimal place
+    row1[1].text = "{{ completion_rate | format_number('percent', '1') }}"
+
+    row2 = table.rows[2].cells
+    row2[0].text = "Workflow Status Code"
+    # Logic Mapping: Maps integers to readable strings
+    row2[1].text = (
+        "{{ status_code | format_logic('10=Approved Process', '20=Pending Review', '30=Rejected', 'Unknown Status') }}"
+    )
+
+    doc2.add_heading("Raw Data Dump (For Verification)", level=2)
+    p = doc2.add_paragraph("Raw Value: {{ contract_value }}")
+
+    doc2_path = os.path.join(BASE_DIR, "template_brief.docx")
+    doc2.save(doc2_path)
+    logger.info(f"Word template 2 created: {doc2_path}")
+
+
+def create_powerpoint_template(filename: str = "template_presentation.pptx") -> None:
+    """
+    Creates a PPTX template with formatting tags.
+    """
+    prs = Presentation()
+
+    # Slide 1: Title Slide (String and Date formatting)
+    slide_layout = prs.slide_layouts[0]  # Title Slide
+    slide = prs.slides.add_slide(slide_layout)
+    title = slide.shapes.title
+    subtitle = slide.placeholders[1]
+
+    # Multi-step string: Title case + Prefix
+    title.text = "Client Overview: {{ client_name | format_string('title') }}"
+    # Date: Medium format
+    subtitle.text = "Generated on: {{ contract_date | format_date('medium') }}"
+
+    # Slide 2: Financial Highlights (Currency and Logic)
+    slide_layout = prs.slide_layouts[1]  # Title and Content
+    slide = prs.slides.add_slide(slide_layout)
+    title = slide.shapes.title
+    content = slide.placeholders[1]
+
+    title.text = "Financial & Status Highlights"
+    tf = content.text_frame
+    tf.text = "Key Metrics:"
+
+    p = tf.add_paragraph()
+    # Currency: Brazilian Real
+    p.text = "Contract Value (BRL): {{ contract_value | format_currency('BRL') }}"
+    p.level = 1
+
+    p = tf.add_paragraph()
+    # Logic mapping in PPTX
+    p.text = "Current Status: {{ status_code | format_logic('10=Green (Go)', '20=Yellow (Hold)', 'Red (Stop)') }}"
+    p.level = 1
+
+    # Slide 3: Boolean Demonstrations
+    slide_layout = prs.slide_layouts[1]
+    slide = prs.slides.add_slide(slide_layout)
+    title = slide.shapes.title
+    content = slide.placeholders[1]
+
+    title.text = "Audit Checkpoints (Boolean Formats)"
+    tf = content.text_frame
+
+    p = tf.add_paragraph()
+    # Boolean True/False string
+    p.text = "Is Active User? -> {{ is_active | format_bool('truefalse') }}"
+
+    p = tf.add_paragraph()
+    # Boolean Checkbox visual
+    p.text = "Debt Clearance Checkbox: [ {{ has_debt | format_bool('checkbox') }} ]"
+
+    filepath = os.path.join(BASE_DIR, filename)
     try:
-        doc = Document()
-        doc.add_heading("Service Contract", 0)
-        doc.add_paragraph("Agreement between DocGenius Inc. and {{ client_name }}.")
-
-        # --- Table for Client Details ---
-        table = doc.add_table(rows=1, cols=2)
-        table.style = "Table Grid"
-        hdr_cells = table.rows[0].cells
-        hdr_cells[0].text = "Field"
-        hdr_cells[1].text = "Value"
-
-        def add_row(label: str, tag: str) -> None:
-            row_cells = table.add_row().cells
-            row_cells[0].text = label
-            row_cells[1].text = tag
-
-        add_row("Client Name", "{{ client_name }}")
-        add_row("Tax ID", "{{ tax_id }}")
-        add_row("Date", "{{ start_date }}")
-        add_row("Total Value", "{{ contract_value }}")
-
-        # --- Logic Section ---
-        doc.add_paragraph("\nTerms and Conditions:")
-        p = doc.add_paragraph("The risk level for this contract is assessed as: ")
-        p.add_run("{{ risk_level }}").bold = True
-
-        # Jinja2 Logic Example
-        doc.add_paragraph("\n{% if risk_level == 'High' %}")
-        doc.add_paragraph(
-            "WARNING: This contract requires executive approval due to high risk."
-        )
-        doc.add_paragraph("{% endif %}")
-
-        # --- Image Section ---
-        doc.add_paragraph("\nSignatures:")
-        doc.add_paragraph("{{ signature_img }}")
-
-        doc.save(file_path)
-        logger.info(f"✅ {filename} generated.")
-
+        prs.save(filepath)
+        logger.info(f"PowerPoint template created: {filepath}")
     except Exception as e:
-        logger.error(f"❌ Contract Template generation failed: {e}")
-
-
-def generate_brief_template(filename: str = "template_brief.docx") -> None:
-    """
-    Generates a second, distinct Word template (Project Brief).
-
-    Args:
-        filename (str): The name of the output file.
-    """
-    file_path = get_path(filename)
-    logger.info(f"Generating Brief Template at: {file_path}")
-
-    try:
-        doc = Document()
-
-        # Title
-        title = doc.add_heading("Executive Project Brief", 0)
-        title.alignment = 1  # Center
-
-        # Intro
-        doc.add_paragraph("Confidential document prepared for:")
-        doc.add_paragraph("{{ client_name }}").style = "Quote"
-
-        # Bullet points
-        doc.add_paragraph("Project Overview", style="Heading 1")
-        doc.add_paragraph(
-            "This project is valued at {{ contract_value }} and will commence on {{ start_date }}.",
-            style="List Bullet",
-        )
-        doc.add_paragraph("Tax Reference: {{ tax_id }}", style="List Bullet")
-
-        # Footer logic
-        section = doc.sections[0]
-        footer = section.footer
-        p = footer.paragraphs[0]
-        p.text = "Generated by DocGenius | Risk Level: {{ risk_level }}"
-
-        doc.save(file_path)
-        logger.info(f"✅ {filename} generated.")
-
-    except Exception as e:
-        logger.error(f"❌ Brief Template generation failed: {e}")
-
-
-def generate_presentation_template(
-    filename: str = "template_presentation.pptx",
-) -> None:
-    """
-    Generates a PowerPoint template with text placeholders for replacement.
-
-    Args:
-        filename (str): The name of the output file.
-    """
-    file_path = get_path(filename)
-    logger.info(f"Generating PPTX Template at: {file_path}")
-
-    try:
-        prs = Presentation()
-
-        # --- Slide 1: Title Slide ---
-        title_slide_layout = prs.slide_layouts[0]
-        slide = prs.slides.add_slide(title_slide_layout)
-
-        title = slide.shapes.title
-        subtitle = slide.placeholders[1]
-
-        # The engine looks for {{ variable }} patterns in text
-        title.text = "Proposal for {{ client_name }}"
-        subtitle.text = "Value: {{ contract_value }} | Date: {{ start_date }}"
-
-        # --- Slide 2: Details Slide ---
-        bullet_slide_layout = prs.slide_layouts[1]
-        slide2 = prs.slides.add_slide(bullet_slide_layout)
-
-        shapes = slide2.shapes
-        title_shape = shapes.title
-        body_shape = shapes.placeholders[1]
-
-        title_shape.text = "Risk Assessment"
-
-        tf = body_shape.text_frame
-        tf.text = "Current Risk Status: {{ risk_level }}"
-
-        p = tf.add_paragraph()
-        p.text = "Tax ID Reference: {{ tax_id }}"
-        p.level = 1
-
-        # Add a text box for the footer
-        left = Inches(0.5)
-        top = Inches(7.0)
-        width = Inches(9.0)
-        height = Inches(0.5)
-
-        txBox = slide2.shapes.add_textbox(left, top, width, height)
-        tf = txBox.text_frame
-        tf.text = "Confidential - DocGenius Generated"
-
-        prs.save(file_path)
-        logger.info(f"✅ {filename} generated.")
-
-    except Exception as e:
-        logger.error(f"❌ PPTX Template generation failed: {e}")
-
-
-def generate_assets(zip_name: str = "assets.zip") -> None:
-    """
-    Generates dummy images on the fly and saves them into a ZIP file.
-
-    Args:
-        zip_name (str): The name of the output zip file.
-    """
-    file_path = get_path(zip_name)
-    logger.info(f"Generating Assets at: {file_path}")
-
-    images = ["sig_john.png", "sig_jane.png", "sig_corp.png"]
-
-    try:
-        with zipfile.ZipFile(file_path, "w") as zf:
-            for img_name in images:
-                # Create a simple image using Pillow
-                img = Image.new("RGB", (200, 100), color=(240, 240, 240))
-                d = ImageDraw.Draw(img)
-
-                # Use default font or fallback logic
-                try:
-                    font = ImageFont.load_default()
-                except IOError:
-                    font = None
-
-                # Draw text roughly centered
-                d.text((10, 40), img_name, fill=(0, 0, 0), font=font)
-
-                # Save to memory buffer then write to zip
-                img_buffer = io.BytesIO()
-                img.save(img_buffer, format="PNG")
-                zf.writestr(img_name, img_buffer.getvalue())
-
-        logger.info("✅ Assets Zip generated.")
-
-    except Exception as e:
-        logger.error(f"❌ Assets generation failed: {e}")
+        logger.error(f"Error creating PowerPoint template: {e}")
 
 
 if __name__ == "__main__":
-    logger.info("🚀 Starting Seed Generation...")
-
-    # 1. Data Source
-    generate_excel()
-
-    # 2. Templates
-    generate_main_contract_template()
-    generate_brief_template()
-    generate_presentation_template()
-
-    # 3. Assets
-    generate_assets()
-
-    logger.info(f"🏁 Done! Files saved to: {OUTPUT_DIR}")
+    logger.info("--- Generating Seed Data ---")
+    # 1. Create Assets Zip First (so Excel can reference images)
+    create_assets_zip()
+    # 2. Create Raw Excel Data
+    create_excel_data()
+    # 3. Create Templates
+    create_word_templates()
+    create_powerpoint_template()
+    logger.info(f"--- Seed Generation Complete. Files located in: {BASE_DIR} ---")
