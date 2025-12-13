@@ -5,6 +5,10 @@
 ![Docker](https://img.shields.io/badge/Docker-Enabled-2496ED?style=for-the-badge&logo=docker&logoColor=white)
 ![License](https://img.shields.io/badge/License-CC%20BY--NC%204.0-lightgrey.svg?style=for-the-badge)
 
+<div align="center">
+  <a href="README_pt.md"><strong>Leia em Português</strong></a>
+</div>
+
 > **Automate the creation of Word, PowerPoint, and PDF documents from Excel data.**
 
 ---
@@ -112,7 +116,7 @@ DocGenius/
 ## 📘 Templating Syntax
 
 DocGenius uses the pipe character (`|`) to apply formatting filters to variables.
-*For a complete list of filters, refer to the "How to Use" section in the application.*
+*For a complete list of filters, refer to the "How to Use" section in the application ([Documentation in Github Pages](https://rubensbraz.github.io/DocGenius/help.html)).*
 
 ### 1. Text Formatting
 ```jinja2
