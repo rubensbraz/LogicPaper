@@ -95,7 +95,7 @@ The project separates the processing logic (backend) from the user interface (fr
 LogicPaper/
 ├── app/
 │   ├── core/
-│   │   ├── engine.py          # Document Processing (Docx/Pptx/Pdf)
+│   │   ├── engine.py          # Document Processing (docx/pptx/pdf)
 │   │   ├── formatter.py       # Filter Dispatcher
 │   │   ├── validator.py       # Template Checker
 │   │   └── strategies/        # Formatting Logic Modules

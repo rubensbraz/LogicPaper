@@ -4,16 +4,26 @@
  */
 class I18nHandler {
     constructor() {
+        // 1. State Initialization (Immediate)
+        // Must run immediately so other scripts (like navbar.js) can access i18n.currentLang right away
         this.currentLang = localStorage.getItem('logicpaper_lang') || 'en';
         this.translations = TRANSLATIONS;
+
+        // 2. DOM Initialization (Deferred)
         this.init();
     }
 
     /**
-     * Initializes the page language.
+     * Initializes the page language logic.
+     * Listens for DOMContentLoaded to ensure elements exist before translation.
      */
     init() {
-        this.setLanguage(this.currentLang);
+        // Safety Check: If DOM is already ready, update immediately. Otherwise, wait for the event
+        if (document.readyState === 'loading') {
+            document.addEventListener('DOMContentLoaded', () => this.updateDOM());
+        } else {
+            this.updateDOM();
+        }
     }
 
     /**

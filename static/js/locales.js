@@ -262,7 +262,7 @@ const TRANSLATIONS = {
                     sub: "Word ou PowerPoint"
                 },
                 drop_assets: {
-                    main: "Biblioteca de Ativos",
+                    main: "Biblioteca de Imagens",
                     sub: "Opcional (.zip)"
                 },
                 btn_validate: "Verificar Compatibilidade",
@@ -289,14 +289,14 @@ const TRANSLATIONS = {
                 btn_reset: "Começar de Novo"
             },
             preview: {
-                title: "PREVIA_DADOS_FONTE.JSON",
+                title: "PRÉVIA_DADOS_EXCEL.JSON",
                 badge: "SOMENTE LEITURA",
                 waiting: "Aguardando arquivo Excel...",
                 step1: "Passo 1: Lendo Estrutura do Excel...",
                 error: "Erro: "
             },
             logs: {
-                title: "LOGS_EXECUCAO",
+                title: "LOGS_EXECUÇÃO",
                 ready: "Sistema pronto. Aguardando comando..."
             }
         },
