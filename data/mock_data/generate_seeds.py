@@ -7,9 +7,12 @@ from typing import Tuple
 
 import xlsxwriter
 from docx import Document
+from docx.oxml import OxmlElement
+from docx.oxml.ns import qn
 from docx.shared import Pt
 from PIL import Image
 from pptx import Presentation
+
 
 # --- Configuration ---
 logging.basicConfig(
@@ -30,6 +33,19 @@ ASSETS_TEMP_DIR = os.path.join(BASE_DIR, ".temp_assets_gen")
 def ensure_temp_directory() -> None:
     """Creates the temporary assets directory."""
     os.makedirs(ASSETS_TEMP_DIR, exist_ok=True)
+
+
+def set_no_proof(run) -> None:
+    """
+    Marks a run as 'no proofing' to prevent Word from splitting tags during
+    spell check or grammar check. This is crucial for template stability.
+
+    Args:
+        run (Run): The docx Run object to modify.
+    """
+    rPr = run._element.get_or_add_rPr()
+    noProof = OxmlElement("w:noProof")
+    rPr.append(noProof)
 
 
 def create_dummy_image(filename: str, color: Tuple[int, int, int]) -> None:
@@ -88,6 +104,7 @@ def create_assets_zip(zip_filename: str = "assets.zip") -> None:
 def create_excel_data(filename: str = "mock_data.xlsx") -> None:
     """
     Creates the Excel data source file with Header and Raw Data.
+    NO PROTOCOL ROW (Row 2 contains data).
 
     Args:
         filename (str): Output Excel filename.
@@ -113,6 +130,7 @@ def create_excel_data(filename: str = "mock_data.xlsx") -> None:
         ]
 
         # 2. Define Raw Data Rows
+        # Note: We use real types (date, bool, float) to test raw data handling
         data_row_1 = [
             "CL-12345",
             "Acme Corporation International",
@@ -147,7 +165,7 @@ def create_excel_data(filename: str = "mock_data.xlsx") -> None:
         # Write Header
         worksheet.write_row(0, 0, header_row, bold)
 
-        # Write Data Row 1
+        # Write Data Row 1 (Excel Row 2)
         worksheet.write(1, 0, data_row_1[0])
         worksheet.write(1, 1, data_row_1[1])
         worksheet.write(1, 2, data_row_1[2], date_fmt)
@@ -159,7 +177,7 @@ def create_excel_data(filename: str = "mock_data.xlsx") -> None:
         worksheet.write(1, 8, data_row_1[8])
         worksheet.write(1, 9, data_row_1[9])
 
-        # Write Data Row 2
+        # Write Data Row 2 (Excel Row 3)
         worksheet.write(2, 0, data_row_2[0])
         worksheet.write(2, 1, data_row_2[1])
         worksheet.write(2, 2, data_row_2[2], date_fmt)
@@ -180,48 +198,69 @@ def create_excel_data(filename: str = "mock_data.xlsx") -> None:
 def create_word_templates() -> None:
     """
     Creates DOCX templates with formatting tags.
+    Applies 'no_proof' to all tags to ensure template integrity.
     """
     # --- Template 1: Contract (String, Date, Currency focus) ---
     doc1 = Document()
     doc1.add_heading("SERVICE AGREEMENT", 0)
 
     p = doc1.add_paragraph("This agreement is made between ")
-    # Multi-step string formatting: Title case + prefix
-    p.add_run(
-        "{{ client_name | format_string('title', 'prefix', 'Client: ') }}"
-    ).bold = True
+
+    # Tag: Client Name
+    run = p.add_run("{{ client_name | format_string('title', 'prefix', 'Client: ') }}")
+    run.bold = True
+    set_no_proof(run)
+
     p.add_run(" and DocGenius Systems.")
 
     doc1.add_heading("1. Contract Details", level=1)
     p = doc1.add_paragraph()
     p.add_run("Contract ID: ").bold = True
-    # Simple string format
-    p.add_run("{{ client_id | format_string('upper') }}")
+
+    # Tag: Client ID
+    run = p.add_run("{{ client_id | format_string('upper') }}")
+    set_no_proof(run)
+
     p.add_run("\nDate Signed: ").bold = True
-    # Date format: standard long format
-    p.add_run("{{ contract_date | format_date('long') }}")
+
+    # Tag: Date Long
+    run = p.add_run("{{ contract_date | format_date('long') }}")
+    set_no_proof(run)
+
     p.add_run("\n(Alternative Date Format for International filing: ")
-    # Date format: extended format with specific locale (Spain)
-    p.add_run("{{ contract_date | format_date('extended', 'es_ES') }}")
+
+    # Tag: Date Extended
+    run = p.add_run("{{ contract_date | format_date('extended', 'es_ES') }}")
+    set_no_proof(run)
+
     p.add_run(")")
 
     doc1.add_heading("2. Financial Terms", level=1)
     p = doc1.add_paragraph("The total value of this contract is ")
-    # Currency format: US Dollar
+
+    # Tag: Currency USD
     run = p.add_run("{{ contract_value | format_currency('USD') }}")
     run.bold = True
     run.font.size = Pt(14)
+    set_no_proof(run)
+
     p.add_run(".")
 
     p = doc1.add_paragraph("Written amount: ")
-    # Number spell-out in English
-    p.add_run("{{ contract_value | format_number('spell_out', 'en') }}").italic = True
+
+    # Tag: Spell Out
+    run = p.add_run("{{ contract_value | format_number('spell_out', 'en') }}")
+    run.italic = True
+    set_no_proof(run)
+
     p.add_run(" dollars.")
 
     doc1.add_heading("Signatures", level=1)
     p = doc1.add_paragraph("Client Representative:\n\n")
-    # Dynamic Image with specific dimensions
-    p.add_run("{{ signature_img | format_image('4', '2') }}")
+
+    # Tag: Image
+    run = p.add_run("{{ signature_img | format_image('4', '2') }}")
+    set_no_proof(run)
 
     doc1_path = os.path.join(BASE_DIR, "template_contract.docx")
     doc1.save(doc1_path)
@@ -231,23 +270,28 @@ def create_word_templates() -> None:
     doc2 = Document()
     doc2.add_heading("CLIENT TECHNICAL PROFILE Status Report", 0)
 
-    # Image with standard size
+    # Tag: Image (Photo)
     p = doc2.add_paragraph()
     p.alignment = 1  # Center
-    p.add_run("{{ client_photo | format_image('3', '3') }}")
+    run = p.add_run("{{ client_photo | format_image('3', '3') }}")
+    set_no_proof(run)
 
     doc2.add_heading("System Status & Metrics", level=1)
 
-    # Boolean Checkboxes
+    # Tag: Checkbox
     p = doc2.add_paragraph()
     p.add_run("[ ")
-    p.add_run("{{ is_active | format_bool('checkbox') }}")
+    run = p.add_run("{{ is_active | format_bool('check') }}")
+    set_no_proof(run)
     p.add_run(" ] Account Active status verified.")
 
     p = doc2.add_paragraph()
     p.add_run("Current Debt Flag: ")
-    # Boolean Yes/No
-    p.add_run("{{ has_debt | format_bool('yesno') }}").bold = True
+
+    # Tag: Yes/No
+    run = p.add_run("{{ has_debt | format_bool('yesno') }}")
+    run.bold = True
+    set_no_proof(run)
 
     doc2.add_heading("Performance Data", level=2)
     table = doc2.add_table(rows=3, cols=2)
@@ -259,18 +303,27 @@ def create_word_templates() -> None:
 
     row1 = table.rows[1].cells
     row1[0].text = "Completion Rate"
-    # Number Percentage with 1 decimal place
-    row1[1].text = "{{ completion_rate | format_number('percent', '1') }}"
+
+    # Tag: Percent
+    # Note: We must insert run into paragraph to set no_proof
+    p = row1[1].paragraphs[0]
+    run = p.add_run("{{ completion_rate | format_number('percent', '1') }}")
+    set_no_proof(run)
 
     row2 = table.rows[2].cells
     row2[0].text = "Workflow Status Code"
-    # Logic Mapping: Maps integers to readable strings
-    row2[1].text = (
+
+    # Tag: Logic Map
+    p = row2[1].paragraphs[0]
+    run = p.add_run(
         "{{ status_code | format_logic('10=Approved Process', '20=Pending Review', '30=Rejected', 'Unknown Status') }}"
     )
+    set_no_proof(run)
 
     doc2.add_heading("Raw Data Dump (For Verification)", level=2)
-    p = doc2.add_paragraph("Raw Value: {{ contract_value }}")
+    p = doc2.add_paragraph("Raw Value: ")
+    run = p.add_run("{{ contract_value }}")
+    set_no_proof(run)
 
     doc2_path = os.path.join(BASE_DIR, "template_brief.docx")
     doc2.save(doc2_path)

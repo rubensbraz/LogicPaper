@@ -1,5 +1,5 @@
 <!DOCTYPE html>
-<html lang="en">
+<html lang="en" class="scroll-smooth">
 
     <head>
         <meta charset="UTF-8">
@@ -8,10 +8,11 @@
         <link rel="icon" href="data:image/svg+xml,<svg xmlns=%22http://www.w3.org/2000/svg%22 viewBox=%220 0 100 100%22><text y=%22.9em%22 font-size=%2290%22>📘</text></svg>">
         <script src="https://cdn.tailwindcss.com"></script>
         <link href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;700&family=Inter:wght@300;400;600;800&display=swap" rel="stylesheet">
+        <script src="https://cdn.jsdelivr.net/npm/sweetalert2@11"></script>
         <link rel="stylesheet" href="/static/css/style.css">
         <script src="/static/js/config.js"></script>
         <style>
-            /* Custom Table Styles for Documentation */
+            /* Table Layout */
             .doc-table {
                 width: 100%;
                 border-collapse: separate;
@@ -20,20 +21,27 @@
 
             .doc-table th {
                 text-align: left;
-                padding: 12px;
+                padding: 16px;
                 border-bottom: 1px solid rgba(255, 255, 255, 0.1);
                 color: #94a3b8;
-                font-size: 0.75rem;
+                font-size: 0.7rem;
                 text-transform: uppercase;
                 letter-spacing: 0.05em;
+                font-weight: 700;
+                background: rgba(15, 23, 42, 0.6);
+                position: sticky;
+                top: 0;
+                backdrop-filter: blur(8px);
+                z-index: 10;
             }
 
             .doc-table td {
-                padding: 12px;
+                padding: 16px;
                 border-bottom: 1px solid rgba(255, 255, 255, 0.05);
                 font-size: 0.85rem;
                 color: #cbd5e1;
-                font-family: 'Inter', sans-serif;
+                vertical-align: middle;
+                transition: background 0.2s;
             }
 
             .doc-table tr:last-child td {
@@ -41,465 +49,730 @@
             }
 
             .doc-table tr:hover td {
-                background: rgba(255, 255, 255, 0.02);
+                background: rgba(59, 130, 246, 0.05);
             }
 
-            .code-pill {
-                background: rgba(59, 130, 246, 0.15);
-                color: #93c5fd;
-                padding: 4px 8px;
-                rounded: 6px;
+            /* Code Syntax Pills */
+            .syntax-pill {
                 font-family: 'JetBrains Mono', monospace;
                 font-size: 0.75rem;
-                border: 1px solid rgba(59, 130, 246, 0.2);
+                background: rgba(0, 0, 0, 0.3);
+                border: 1px solid rgba(255, 255, 255, 0.1);
+                border-radius: 6px;
+                padding: 6px 10px;
+                color: #a5b4fc;
+                cursor: pointer;
+                transition: all 0.2s;
+                display: inline-block;
+                position: relative;
+            }
+
+            .syntax-pill:hover {
+                border-color: #60a5fa;
+                background: rgba(59, 130, 246, 0.1);
+                color: #fff;
+                box-shadow: 0 0 10px rgba(59, 130, 246, 0.2);
+            }
+
+            .syntax-pill:active {
+                transform: scale(0.98);
+            }
+
+            /* Tooltip "Copy" */
+            .syntax-pill::after {
+                content: "Click to Copy";
+                position: absolute;
+                bottom: 100%;
+                left: 50%;
+                transform: translateX(-50%) translateY(-5px);
+                background: #0f172a;
+                border: 1px solid #334155;
+                color: #fff;
+                padding: 4px 8px;
+                border-radius: 4px;
+                font-size: 0.6rem;
+                opacity: 0;
+                pointer-events: none;
+                transition: opacity 0.2s;
                 white-space: nowrap;
             }
 
-            .example-pill {
-                background: rgba(16, 185, 129, 0.1);
-                color: #6ee7b7;
-                padding: 4px 8px;
-                rounded: 6px;
-                font-family: 'JetBrains Mono', monospace;
-                font-size: 0.75rem;
-                white-space: nowrap;
+            .syntax-pill:hover::after {
+                opacity: 1;
             }
 
-            .desc-text {
-                color: #94a3b8;
-                font-size: 0.75rem;
+            /* Data Badges */
+            .data-badge {
+                font-family: 'JetBrains Mono', monospace;
+                font-size: 0.7rem;
+                padding: 2px 6px;
+                border-radius: 4px;
+                color: #cbd5e1;
+                background: rgba(255, 255, 255, 0.05);
+            }
+
+            /* Toast Notification */
+            #toast {
+                visibility: hidden;
+                min-width: 250px;
+                background-color: #10b981;
+                color: #fff;
+                text-align: center;
+                border-radius: 8px;
+                padding: 12px;
+                position: fixed;
+                z-index: 50;
+                left: 50%;
+                bottom: 30px;
+                transform: translateX(-50%);
+                font-size: 0.9rem;
+                font-weight: 600;
+                box-shadow: 0 10px 30px rgba(0, 0, 0, 0.5);
+                opacity: 0;
+                transition: opacity 0.3s, bottom 0.3s;
+            }
+
+            #toast.show {
+                visibility: visible;
+                opacity: 1;
+                bottom: 50px;
             }
         </style>
     </head>
 
-    <body class="min-h-screen p-4 md:p-8 flex flex-col items-center bg-[#0B0C15]">
-        <div id="navbar-mount" class="w-full flex justify-center"></div>
-        <main class="w-full max-w-7xl animate-in fade-in zoom-in duration-300">
-            <div class="glass-panel rounded-2xl p-8 shadow-2xl mb-8">
-                <div class="flex flex-col md:flex-row justify-between items-start md:items-center gap-4">
+    <body class="min-h-screen p-4 md:p-8 flex flex-col items-center bg-[#0B0C15] text-slate-300">
+        <div id="navbar-mount" class="w-full flex justify-center z-50 relative"></div>
+        <main class="w-full max-w-[1400px] animate-in fade-in zoom-in duration-500 mt-4">
+            <div class="glass-panel rounded-2xl p-8 shadow-2xl mb-8 border-l-4 border-blue-500 relative overflow-hidden group">
+                <div class="absolute top-0 right-0 w-64 h-64 bg-blue-500/10 rounded-full blur-3xl -translate-y-1/2 translate-x-1/2 group-hover:bg-blue-500/20 transition duration-1000"></div>
+                <div class="relative z-10 flex flex-col md:flex-row justify-between items-start md:items-center gap-6">
                     <div>
-                        <h2 class="text-3xl font-bold text-blue-400">Reference Manual</h2>
-                        <p class="text-gray-400 mt-2 text-sm max-w-2xl"> Complete guide to the DocGenius Formatter Protocol. Use these codes in <strong>Row 2</strong> of your Excel file to transform data. </p>
+                        <h2 class="text-3xl font-bold text-white tracking-tight">Template Engine Reference</h2>
+                        <p class="text-gray-400 mt-2 text-sm max-w-2xl leading-relaxed"> Comprehensive documentation for the DocGenius formatting engine. Learn how to transform raw Excel data using <strong>Jinja2 Pipes</strong> directly inside your Word and PowerPoint templates. </p>
                     </div>
-                    <div class="flex gap-3">
-                        <a href="/" class="px-5 py-2.5 bg-white/5 hover:bg-white/10 border border-white/10 rounded-lg text-sm font-medium transition flex items-center gap-2">
-                            <span>← Back to Dashboard</span>
-                        </a>
+                    <div>
+                        <a href="/" class="px-6 py-3 bg-white/5 hover:bg-white/10 border border-white/10 hover:border-blue-500/50 rounded-xl text-sm font-bold text-white transition flex items-center gap-2 shadow-lg hover:shadow-blue-500/20">
+                            <svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M10 19l-7-7m0 0l7-7m-7 7h18" />
+                            </svg> Back to Dashboard </a>
                     </div>
                 </div>
             </div>
-            <div class="grid grid-cols-1 lg:grid-cols-12 gap-8">
-                <div class="lg:col-span-3">
-                    <nav class="glass-panel rounded-xl p-4 sticky top-8 space-y-1 max-h-[80vh] overflow-y-auto custom-scrollbar">
-                        <div class="text-xs font-bold text-gray-500 uppercase tracking-widest px-3 mb-3 mt-1">Directory</div>
-                        <a href="#section-schema" class="block px-3 py-2 text-sm text-gray-300 hover:text-white hover:bg-white/5 rounded-lg transition">1. Excel Schema</a>
-                        <div class="my-2 border-b border-white/5"></div>
-                        <a href="#section-strings" class="block px-3 py-2 text-sm text-gray-300 hover:text-white hover:bg-white/5 rounded-lg transition">2. Text Manipulation</a>
-                        <a href="#section-numbers" class="block px-3 py-2 text-sm text-gray-300 hover:text-white hover:bg-white/5 rounded-lg transition">3. Numbers & Currency</a>
-                        <a href="#section-dates" class="block px-3 py-2 text-sm text-gray-300 hover:text-white hover:bg-white/5 rounded-lg transition">4. Dates & Arithmetic</a>
-                        <a href="#section-logic" class="block px-3 py-2 text-sm text-gray-300 hover:text-white hover:bg-white/5 rounded-lg transition">5. Logic & Defaults</a>
-                        <a href="#section-privacy" class="block px-3 py-2 text-sm text-gray-300 hover:text-white hover:bg-white/5 rounded-lg transition">6. Privacy & Masking</a>
-                        <a href="#section-images" class="block px-3 py-2 text-sm text-gray-300 hover:text-white hover:bg-white/5 rounded-lg transition">7. Dynamic Images</a>
+            <div class="grid grid-cols-1 xl:grid-cols-12 gap-8">
+                <div class="lg:col-span-2">
+                    <nav class="glass-panel rounded-xl p-4 sticky top-8 space-y-1 max-h-[85vh] overflow-y-auto custom-scrollbar">
+                        <div class="text-[12px] font-bold text-gray-100 uppercase tracking-widest px-3 mb-3 mt-1">Core Concepts</div>
+                        <a href="#core-behavior" class="block px-3 py-2 text-sm text-gray-300 hover:text-white hover:bg-white/5 rounded-lg transition">Default Behavior</a>
+                        <a href="#core-composition" class="block px-3 py-2 text-sm text-gray-300 hover:text-white hover:bg-white/5 rounded-lg transition">Chaining & Composition</a>
+                        <div class="my-4 border-b border-white/5"></div>
+                        <div class="text-[12px] font-bold text-gray-100 uppercase tracking-widest px-3 mb-3 pt-3">Strategies</div>
+                        <a href="#str-string" class="flex items-center gap-2 px-3 py-2 text-sm text-gray-300 hover:text-white hover:bg-white/5 rounded-lg transition">
+                            <span class="w-2 h-2 rounded-full bg-purple-500"></span> Text (String) </a>
+                        <a href="#str-number" class="flex items-center gap-2 px-3 py-2 text-sm text-gray-300 hover:text-white hover:bg-white/5 rounded-lg transition">
+                            <span class="w-2 h-2 rounded-full bg-green-500"></span> Numbers & Currency </a>
+                        <a href="#str-date" class="flex items-center gap-2 px-3 py-2 text-sm text-gray-300 hover:text-white hover:bg-white/5 rounded-lg transition">
+                            <span class="w-2 h-2 rounded-full bg-orange-500"></span> Dates & Time </a>
+                        <a href="#str-logic" class="flex items-center gap-2 px-3 py-2 text-sm text-gray-300 hover:text-white hover:bg-white/5 rounded-lg transition">
+                            <span class="w-2 h-2 rounded-full bg-red-500"></span> Logic & Defaults </a>
+                        <a href="#str-bool" class="flex items-center gap-2 px-3 py-2 text-sm text-gray-300 hover:text-white hover:bg-white/5 rounded-lg transition">
+                            <span class="w-2 h-2 rounded-full bg-cyan-500"></span> Booleans </a>
+                        <a href="#str-mask" class="flex items-center gap-2 px-3 py-2 text-sm text-gray-300 hover:text-white hover:bg-white/5 rounded-lg transition">
+                            <span class="w-2 h-2 rounded-full bg-gray-500"></span> Privacy & Masking </a>
+                        <a href="#str-image" class="flex items-center gap-2 px-3 py-2 text-sm text-gray-300 hover:text-white hover:bg-white/5 rounded-lg transition">
+                            <span class="w-2 h-2 rounded-full bg-yellow-500"></span> Dynamic Images </a>
                     </nav>
                 </div>
-                <div class="lg:col-span-9 space-y-12 pb-20">
-                    <section id="section-schema" class="scroll-mt-24">
-                        <h3 class="text-xl font-bold text-white mb-6 border-l-4 border-blue-500 pl-4">01. The Excel Schema</h3>
+                <div class="xl:col-span-10 space-y-16 pb-24">
+                    <section id="core-behavior">
+                        <div class="flex items-center gap-3 mb-6">
+                            <div class="p-2 bg-blue-500/20 rounded-lg text-blue-400">
+                                <svg xmlns="http://www.w3.org/2000/svg" class="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 10V3L4 14h7v7l9-11h-7z" />
+                                </svg>
+                            </div>
+                            <h3 class="text-2xl font-bold text-white">Default Behavior</h3>
+                        </div>
+                        <div class="glass-panel rounded-xl p-6 space-y-6">
+                            <div class="bg-yellow-500/10 border border-yellow-500/20 rounded-lg p-4">
+                                <h4 class="text-yellow-400 font-bold text-sm mb-2 flex items-center gap-2">
+                                    <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z" />
+                                    </svg> What happens if I don't use a formatter?
+                                </h4>
+                                <p class="text-sm text-yellow-200/80"> If you use <code>{{ variable }}</code> without a pipe (<code>|</code>), DocGenius inserts the <strong>Raw Data</strong> exactly as it appears in the Excel cell. <br><br> Examples:
+                                <ul class="list-disc ml-5 mt-1 space-y-1 opacity-80">
+                                    <li>Dates may appear as <code>2023-12-25 00:00:00</code>.</li>
+                                    <li>Money may appear as <code>1500.5</code> (no symbol, no comma).</li>
+                                    <li>Empty cells will appear as empty strings.</li>
+                                </ul>
+                                </p>
+                            </div>
+                        </div>
+                    </section>
+                    <section id="core-composition">
+                        <div class="flex items-center gap-3 mb-6">
+                            <div class="p-2 bg-purple-500/20 rounded-lg text-purple-400">
+                                <svg xmlns="http://www.w3.org/2000/svg" class="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19.428 15.428a2 2 0 00-1.022-.547l-2.384-.477a6 6 0 00-3.86.517l-.318.158a6 6 0 01-3.86.517L6.05 15.21a2 2 0 00-1.806.547M8 4h8l-1 1v5.172a2 2 0 00.586 1.414l5 5c1.26 1.26.367 3.414-1.415 3.414H4.828c-1.782 0-2.674-2.154-1.414-3.414l5-5A2 2 0 009 10.172V5L8 4z" />
+                                </svg>
+                            </div>
+                            <h3 class="text-2xl font-bold text-white">Chaining & Composition</h3>
+                        </div>
                         <div class="glass-panel rounded-xl p-6">
-                            <p class="text-sm text-gray-400 mb-4">DocGenius ignores all rows except the header structure defined below.</p>
-                            <div class="bg-black/40 rounded-xl border border-white/5 overflow-hidden">
-                                <div class="grid grid-cols-12 text-xs font-mono border-b border-white/10 bg-white/5">
-                                    <div class="col-span-1 p-3 text-gray-500 border-r border-white/10">Row</div>
-                                    <div class="col-span-11 p-3 text-gray-300">Description</div>
+                            <p class="text-sm text-gray-300 mb-4"> You can apply multiple operations in a single filter by listing them as arguments. Operations are executed <strong>sequentially from left to right</strong>. </p>
+                            <div class="bg-black/40 border border-white/10 rounded-lg p-5 font-mono text-sm mb-6">
+                                <div class="text-gray-500 mb-2">// Syntax</div>
+                                <div class="mb-4">
+                                    <span class="text-white">{{</span>
+                                    <span class="syntax-var">variable_name</span>
+                                    <span class="text-white">|</span>
+                                    <span class="syntax-filter">filter_name</span><span class="text-white">(</span><span class="syntax-arg">'Op1'</span><span class="text-white">,</span> <span class="syntax-arg">'Op2'</span><span class="text-white">,</span> <span class="syntax-arg">'Op3'</span><span class="text-white">)</span>
+                                    <span class="text-white">}}</span>
                                 </div>
-                                <div class="grid grid-cols-12 text-xs font-mono border-b border-white/5">
-                                    <div class="col-span-1 p-3 text-gray-500 border-r border-white/5 bg-white/[0.02]">1</div>
-                                    <div class="col-span-11 p-3"><span class="text-white font-bold">Variable Name</span> <span class="text-gray-500">// Matches template tags (e.g. {{ client }})</span></div>
+                                <div class="text-gray-500 mb-2">// Example: Clean, Uppercase, and Add Prefix</div>
+                                <div>
+                                    <span class="text-white">{{</span>
+                                    <span class="syntax-var">client_name</span>
+                                    <span class="text-white">|</span>
+                                    <span class="syntax-filter">format_string</span><span class="text-white">(</span><span class="syntax-arg">'trim'</span><span class="text-white">,</span> <span class="syntax-arg">'upper'</span><span class="text-white">,</span> <span class="syntax-arg">'prefix'</span><span class="text-white">,</span> <span class="syntax-val">'MR. '</span><span class="text-white">)</span>
+                                    <span class="text-white">}}</span>
                                 </div>
-                                <div class="grid grid-cols-12 text-xs font-mono border-b border-white/5 bg-blue-500/10">
-                                    <div class="col-span-1 p-3 text-gray-500 border-r border-white/5 bg-white/[0.02]">2</div>
-                                    <div class="col-span-11 p-3"><span class="text-blue-400 font-bold">Protocol</span> <span class="text-gray-500">// Formatting rules (e.g. string;upper)</span></div>
+                            </div>
+                            <div class="grid grid-cols-1 md:grid-cols-3 gap-4 text-xs">
+                                <div class="bg-white/5 p-3 rounded border border-white/5">
+                                    <span class="block text-gray-500 mb-1">Input</span>
+                                    <code class="text-white">"  john doe  "</code>
                                 </div>
-                                <div class="grid grid-cols-12 text-xs font-mono">
-                                    <div class="col-span-1 p-3 text-gray-500 border-r border-white/5 bg-white/[0.02]">3+</div>
-                                    <div class="col-span-11 p-3 text-gray-400">Data Rows...</div>
+                                <div class="bg-white/5 p-3 rounded border border-white/5 text-center">
+                                    <span class="block text-gray-500 mb-1">Process Flow</span>
+                                    <span class="text-gray-400">trim &rarr; upper &rarr; prefix</span>
+                                </div>
+                                <div class="bg-green-500/10 p-3 rounded border border-green-500/20 text-right">
+                                    <span class="block text-green-500/70 mb-1">Final Output</span>
+                                    <code class="text-green-300 font-bold">"MR. JOHN DOE"</code>
                                 </div>
                             </div>
                         </div>
                     </section>
-                    <section id="section-strings" class="scroll-mt-24">
-                        <h3 class="text-xl font-bold text-white mb-6 border-l-4 border-purple-500 pl-4">02. Text Manipulation</h3>
-                        <div class="glass-panel rounded-xl overflow-hidden">
-                            <table class="doc-table">
-                                <thead>
-                                    <tr>
-                                        <th width="40%">Protocol</th>
-                                        <th width="20%">Input</th>
-                                        <th width="20%">Output</th>
-                                        <th width="20%">Description</th>
-                                    </tr>
-                                </thead>
-                                <tbody>
-                                    <tr>
-                                        <td><span class="code-pill">string;upper</span></td>
-                                        <td>John</td>
-                                        <td><span class="example-pill">JOHN</span></td>
-                                        <td>Uppercase</td>
-                                    </tr>
-                                    <tr>
-                                        <td><span class="code-pill">string;lower</span></td>
-                                        <td>John</td>
-                                        <td><span class="example-pill">john</span></td>
-                                        <td>Lowercase</td>
-                                    </tr>
-                                    <tr>
-                                        <td><span class="code-pill">string;title</span></td>
-                                        <td>the doc</td>
-                                        <td><span class="example-pill">The Doc</span></td>
-                                        <td>Title Case</td>
-                                    </tr>
-                                    <tr>
-                                        <td><span class="code-pill">string;capitalize</span></td>
-                                        <td>john doe</td>
-                                        <td><span class="example-pill">John doe</span></td>
-                                        <td>First Letter</td>
-                                    </tr>
-                                    <tr>
-                                        <td><span class="code-pill">string;swapcase</span></td>
-                                        <td>DocGen</td>
-                                        <td><span class="example-pill">dOCgEN</span></td>
-                                        <td>Invert Case</td>
-                                    </tr>
-                                    <tr>
-                                        <td><span class="code-pill">string;snake</span></td>
-                                        <td>My File</td>
-                                        <td><span class="example-pill">my_file</span></td>
-                                        <td>Snake Case</td>
-                                    </tr>
-                                    <tr>
-                                        <td><span class="code-pill">string;kebab</span></td>
-                                        <td>My File</td>
-                                        <td><span class="example-pill">my-file</span></td>
-                                        <td>Kebab Case</td>
-                                    </tr>
-                                    <tr>
-                                        <td><span class="code-pill">string;slug</span></td>
-                                        <td>Doc & Gen!</td>
-                                        <td><span class="example-pill">doc-gen</span></td>
-                                        <td>URL Slug</td>
-                                    </tr>
-                                    <tr>
-                                        <td><span class="code-pill">string;trim</span></td>
-                                        <td>" data "</td>
-                                        <td><span class="example-pill">"data"</span></td>
-                                        <td>Remove whitespace</td>
-                                    </tr>
-                                    <tr>
-                                        <td><span class="code-pill">string;reverse</span></td>
-                                        <td>ABC</td>
-                                        <td><span class="example-pill">CBA</span></td>
-                                        <td>Reverse Text</td>
-                                    </tr>
-                                    <tr>
-                                        <td><span class="code-pill">prefix;"Dr. "</span></td>
-                                        <td>House</td>
-                                        <td><span class="example-pill">Dr. House</span></td>
-                                        <td>Add Start</td>
-                                    </tr>
-                                    <tr>
-                                        <td><span class="code-pill">suffix;" (CEO)"</span></td>
-                                        <td>John</td>
-                                        <td><span class="example-pill">John (CEO)</span></td>
-                                        <td>Add End</td>
-                                    </tr>
-                                    <tr>
-                                        <td><span class="code-pill">truncate;5</span></td>
-                                        <td>Document</td>
-                                        <td><span class="example-pill">Docum...</span></td>
-                                        <td>Cut text</td>
-                                    </tr>
-                                </tbody>
-                            </table>
-                        </div>
-                    </section>
-                    <section id="section-numbers" class="scroll-mt-24">
-                        <h3 class="text-xl font-bold text-white mb-6 border-l-4 border-green-500 pl-4">03. Numbers & Finance</h3>
-                        <div class="glass-panel rounded-xl overflow-hidden">
-                            <table class="doc-table">
-                                <thead>
-                                    <tr>
-                                        <th width="40%">Protocol</th>
-                                        <th width="20%">Input</th>
-                                        <th width="20%">Output</th>
-                                        <th width="20%">Description</th>
-                                    </tr>
-                                </thead>
-                                <tbody>
-                                    <tr>
-                                        <td><span class="code-pill">int</span></td>
-                                        <td>10.5</td>
-                                        <td><span class="example-pill">10</span></td>
-                                        <td>Integer</td>
-                                    </tr>
-                                    <tr>
-                                        <td><span class="code-pill">int;pad;04d</span></td>
-                                        <td>42</td>
-                                        <td><span class="example-pill">0042</span></td>
-                                        <td>Zero Padding</td>
-                                    </tr>
-                                    <tr>
-                                        <td><span class="code-pill">float;2</span></td>
-                                        <td>1500.5</td>
-                                        <td><span class="example-pill">1500.50</span></td>
-                                        <td>Precision</td>
-                                    </tr>
-                                    <tr>
-                                        <td><span class="code-pill">float;round;0</span></td>
-                                        <td>15.8</td>
-                                        <td><span class="example-pill">16</span></td>
-                                        <td>Rounding</td>
-                                    </tr>
-                                    <tr>
-                                        <td><span class="code-pill">separator;.,</span></td>
-                                        <td>1234.5</td>
-                                        <td><span class="example-pill">1.234,50</span></td>
-                                        <td>EU/BR Standard</td>
-                                    </tr>
-                                    <tr>
-                                        <td><span class="code-pill">separator;,.</span></td>
-                                        <td>1234.5</td>
-                                        <td><span class="example-pill">1,234.50</span></td>
-                                        <td>US Standard</td>
-                                    </tr>
-                                    <tr>
-                                        <td><span class="code-pill">currency;USD</span></td>
-                                        <td>1000</td>
-                                        <td><span class="example-pill">$1,000.00</span></td>
-                                        <td>US Dollar</td>
-                                    </tr>
-                                    <tr>
-                                        <td><span class="code-pill">currency;BRL</span></td>
-                                        <td>1000</td>
-                                        <td><span class="example-pill">R$ 1.000,00</span></td>
-                                        <td>Reais</td>
-                                    </tr>
-                                    <tr>
-                                        <td><span class="code-pill">currency;EUR</span></td>
-                                        <td>1000</td>
-                                        <td><span class="example-pill">€1,000.00</span></td>
-                                        <td>Euros</td>
-                                    </tr>
-                                    <tr>
-                                        <td><span class="code-pill">percent</span></td>
-                                        <td>0.5</td>
-                                        <td><span class="example-pill">50%</span></td>
-                                        <td>Percentage</td>
-                                    </tr>
-                                    <tr>
-                                        <td><span class="code-pill">scientific</span></td>
-                                        <td>10000</td>
-                                        <td><span class="example-pill">1E+04</span></td>
-                                        <td>Scientific Not.</td>
-                                    </tr>
-                                    <tr>
-                                        <td><span class="code-pill">humanize</span></td>
-                                        <td>1500000</td>
-                                        <td><span class="example-pill">1.5M</span></td>
-                                        <td>Short Scale</td>
-                                    </tr>
-                                    <tr>
-                                        <td><span class="code-pill">ordinal</span></td>
-                                        <td>1</td>
-                                        <td><span class="example-pill">1st</span></td>
-                                        <td>Rank</td>
-                                    </tr>
-                                    <tr>
-                                        <td><span class="code-pill">spell_out;en</span></td>
-                                        <td>10</td>
-                                        <td><span class="example-pill">ten</span></td>
-                                        <td>Text (EN)</td>
-                                    </tr>
-                                    <tr>
-                                        <td><span class="code-pill">spell_out;pt</span></td>
-                                        <td>10</td>
-                                        <td><span class="example-pill">dez</span></td>
-                                        <td>Text (PT)</td>
-                                    </tr>
-                                </tbody>
-                            </table>
-                        </div>
-                    </section>
-                    <section id="section-dates" class="scroll-mt-24">
-                        <h3 class="text-xl font-bold text-white mb-6 border-l-4 border-orange-500 pl-4">04. Dates & Arithmetic</h3>
-                        <div class="glass-panel rounded-xl overflow-hidden">
-                            <table class="doc-table">
-                                <thead>
-                                    <tr>
-                                        <th width="40%">Protocol</th>
-                                        <th width="20%">Input (2025-12-25)</th>
-                                        <th width="20%">Output</th>
-                                        <th width="20%">Description</th>
-                                    </tr>
-                                </thead>
-                                <tbody>
-                                    <tr>
-                                        <td><span class="code-pill">date;iso</span></td>
-                                        <td>2025-12-25</td>
-                                        <td><span class="example-pill">2025-12-25</span></td>
-                                        <td>ISO 8601</td>
-                                    </tr>
-                                    <tr>
-                                        <td><span class="code-pill">date;long</span></td>
-                                        <td>2025-12-25</td>
-                                        <td><span class="example-pill">25 de dezembro de 2025</span></td>
-                                        <td>Localized Long</td>
-                                    </tr>
-                                    <tr>
-                                        <td><span class="code-pill">date;short</span></td>
-                                        <td>2025-12-25</td>
-                                        <td><span class="example-pill">25/12/2025</span></td>
-                                        <td>Localized Short</td>
-                                    </tr>
-                                    <tr>
-                                        <td><span class="code-pill">date;fmt;"%d/%m"</span></td>
-                                        <td>2025-12-25</td>
-                                        <td><span class="example-pill">25/12</span></td>
-                                        <td>Custom Pattern</td>
-                                    </tr>
-                                    <tr>
-                                        <td><span class="code-pill">date;year</span></td>
-                                        <td>2025-12-25</td>
-                                        <td><span class="example-pill">2025</span></td>
-                                        <td>Year Only</td>
-                                    </tr>
-                                    <tr>
-                                        <td><span class="code-pill">date;month_name</span></td>
-                                        <td>2025-12-25</td>
-                                        <td><span class="example-pill">Dezembro</span></td>
-                                        <td>Month Name</td>
-                                    </tr>
-                                    <tr>
-                                        <td><span class="code-pill">date;add_days;5</span></td>
-                                        <td>2025-12-25</td>
-                                        <td><span class="example-pill">2025-12-30</span></td>
-                                        <td>Add Days</td>
-                                    </tr>
-                                    <tr>
-                                        <td><span class="code-pill">date;add_years;1</span></td>
-                                        <td>2025-12-25</td>
-                                        <td><span class="example-pill">2026-12-25</span></td>
-                                        <td>Add Years</td>
-                                    </tr>
-                                </tbody>
-                            </table>
-                        </div>
-                    </section>
-                    <section id="section-logic" class="scroll-mt-24">
-                        <h3 class="text-xl font-bold text-white mb-6 border-l-4 border-red-500 pl-4">05. Logic & Defaults</h3>
-                        <div class="glass-panel rounded-xl overflow-hidden">
-                            <table class="doc-table">
-                                <thead>
-                                    <tr>
-                                        <th width="40%">Protocol</th>
-                                        <th width="20%">Input</th>
-                                        <th width="20%">Output</th>
-                                        <th width="20%">Description</th>
-                                    </tr>
-                                </thead>
-                                <tbody>
-                                    <tr>
-                                        <td><span class="code-pill">default;"N/A"</span></td>
-                                        <td><i>(empty)</i></td>
-                                        <td><span class="example-pill">N/A</span></td>
-                                        <td>Fallback</td>
-                                    </tr>
-                                    <tr>
-                                        <td><span class="code-pill">bool;Yes;No</span></td>
-                                        <td>TRUE</td>
-                                        <td><span class="example-pill">Yes</span></td>
-                                        <td>Map Boolean</td>
-                                    </tr>
-                                    <tr>
-                                        <td><span class="code-pill">bool;Sim;Não</span></td>
-                                        <td>FALSE</td>
-                                        <td><span class="example-pill">Não</span></td>
-                                        <td>Map Boolean (PT)</td>
-                                    </tr>
-                                    <tr>
-                                        <td><span class="code-pill">bool;check</span></td>
-                                        <td>TRUE</td>
-                                        <td><span class="example-pill">☑</span></td>
-                                        <td>Checkbox</td>
-                                    </tr>
-                                    <tr>
-                                        <td><span class="code-pill">bool;on_off</span></td>
-                                        <td>1</td>
-                                        <td><span class="example-pill">On</span></td>
-                                        <td>On/Off Switch</td>
-                                    </tr>
-                                </tbody>
-                            </table>
-                        </div>
-                    </section>
-                    <section id="section-privacy" class="scroll-mt-24">
-                        <h3 class="text-xl font-bold text-white mb-6 border-l-4 border-gray-500 pl-4">06. Privacy & Masking</h3>
-                        <div class="glass-panel rounded-xl overflow-hidden">
-                            <table class="doc-table">
-                                <thead>
-                                    <tr>
-                                        <th width="40%">Protocol</th>
-                                        <th width="20%">Input</th>
-                                        <th width="20%">Output</th>
-                                        <th width="20%">Compliance</th>
-                                    </tr>
-                                </thead>
-                                <tbody>
-                                    <tr>
-                                        <td><span class="code-pill">mask;email</span></td>
-                                        <td>john@acme.com</td>
-                                        <td><span class="example-pill">j***@acme.com</span></td>
-                                        <td>GDPR/LGPD</td>
-                                    </tr>
-                                    <tr>
-                                        <td><span class="code-pill">mask;name</span></td>
-                                        <td>John Doe</td>
-                                        <td><span class="example-pill">J*** D**</span></td>
-                                        <td>Anonymization</td>
-                                    </tr>
-                                    <tr>
-                                        <td><span class="code-pill">mask;credit_card</span></td>
-                                        <td>1234567812345678</td>
-                                        <td><span class="example-pill">**** **** **** 5678</span></td>
-                                        <td>PCI DSS</td>
-                                    </tr>
-                                    <tr>
-                                        <td><span class="code-pill">mask;###.###.###-##</span></td>
-                                        <td>12345678900</td>
-                                        <td><span class="example-pill">123.456.789-00</span></td>
-                                        <td>Generic Pattern</td>
-                                    </tr>
-                                </tbody>
-                            </table>
-                        </div>
-                    </section>
-                    <section id="section-images" class="scroll-mt-24">
-                        <h3 class="text-xl font-bold text-white mb-6 border-l-4 border-yellow-500 pl-4">07. Dynamic Images</h3>
-                        <p class="text-sm text-gray-400 mb-6">Inject images directly into Word documents using the `InlineImage` engine.</p>
-                        <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
-                            <div class="bg-black/40 p-5 rounded-xl border border-white/5">
-                                <h4 class="text-xs font-bold text-gray-500 uppercase mb-3">Step 1: Protocol</h4>
-                                <div class="text-sm text-white mb-2">Use the <span class="code-pill">image</span> strategy.</div>
-                                <code class="block bg-black/60 p-3 rounded text-blue-300 text-xs mb-3 font-mono">image;[Width];[Height]</code>
-                                <div class="text-xs text-gray-500">
-                                    <strong>Example:</strong> <code>image;5;3</code><br> (Width=5cm, Height=3cm)<br> Use <code>auto</code> to keep aspect ratio.
+                    <section id="str-string" class="scroll-mt-24">
+                        <div class="flex items-center justify-between mb-4">
+                            <div class="flex items-center gap-3">
+                                <div class="p-2 bg-purple-500/10 border border-purple-500/20 rounded-lg">
+                                    <svg xmlns="http://www.w3.org/2000/svg" class="h-6 w-6 text-purple-400" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M3 5h12M9 3v2m1.048 9.5A18.022 18.022 0 016.412 9m6.088 9h7M11 21l5-10 5 10M12.751 5C11.783 10.77 8.07 15.61 3 18.129" />
+                                    </svg>
+                                </div>
+                                <div>
+                                    <h3 class="text-2xl font-bold text-white">String Strategy</h3>
+                                    <p class="text-sm text-gray-500 font-mono mt-0.5">Filter Name: <span class="text-purple-400">format_string</span></p>
                                 </div>
                             </div>
-                            <div class="bg-black/40 p-5 rounded-xl border border-white/5">
-                                <h4 class="text-xs font-bold text-gray-500 uppercase mb-3">Step 2: Data</h4>
-                                <div class="text-sm text-white mb-2">Cell content must match the filename.</div>
-                                <code class="block bg-black/60 p-3 rounded text-green-300 text-xs mb-3 font-mono">signature_john.png</code>
-                                <div class="text-xs text-gray-500">
-                                    <strong>Requirement:</strong> This file must exist inside the uploaded <code>assets.zip</code> file.
+                        </div>
+                        <div class="glass-panel rounded-xl overflow-hidden shadow-2xl border border-white/5">
+                            <div class="overflow-x-auto">
+                                <table class="doc-table">
+                                    <thead>
+                                        <tr>
+                                            <th width="15%">Operation</th>
+                                            <th width="35%">Full Template Syntax (Click to Copy)</th>
+                                            <th width="15%">Input Data</th>
+                                            <th width="15%">Output Result</th>
+                                            <th width="20%">Technical Details</th>
+                                        </tr>
+                                    </thead>
+                                    <tbody>
+                                        <tr>
+                                            <td><strong class="text-white">Upper</strong></td>
+                                            <td>
+                                                <div class="syntax-pill" onclick="copyToClipboard(this)">{{ val | format_string('upper') }}</div>
+                                            </td>
+                                            <td><span class="data-badge">text</span> "hello"</td>
+                                            <td><span class="text-green-400 font-bold">"HELLO"</span></td>
+                                            <td>Converts entire string to uppercase.</td>
+                                        </tr>
+                                        <tr>
+                                            <td><strong class="text-white">Lower</strong></td>
+                                            <td>
+                                                <div class="syntax-pill" onclick="copyToClipboard(this)">{{ val | format_string('lower') }}</div>
+                                            </td>
+                                            <td><span class="data-badge">text</span> "HELLO"</td>
+                                            <td><span class="text-green-400 font-bold">"hello"</span></td>
+                                            <td>Converts entire string to lowercase.</td>
+                                        </tr>
+                                        <tr>
+                                            <td><strong class="text-white">Title Case</strong></td>
+                                            <td>
+                                                <div class="syntax-pill" onclick="copyToClipboard(this)">{{ val | format_string('title') }}</div>
+                                            </td>
+                                            <td><span class="data-badge">text</span> "mr john doe"</td>
+                                            <td><span class="text-green-400 font-bold">"Mr John Doe"</span></td>
+                                            <td>Capitalizes the first letter of every word.</td>
+                                        </tr>
+                                        <tr>
+                                            <td><strong class="text-white">Trim</strong></td>
+                                            <td>
+                                                <div class="syntax-pill" onclick="copyToClipboard(this)">{{ val | format_string('trim') }}</div>
+                                            </td>
+                                            <td><span class="data-badge">text</span> " data "</td>
+                                            <td><span class="text-green-400 font-bold">"data"</span></td>
+                                            <td>Removes leading and trailing whitespace.</td>
+                                        </tr>
+                                        <tr>
+                                            <td><strong class="text-white">Prefix</strong></td>
+                                            <td>
+                                                <div class="syntax-pill" onclick="copyToClipboard(this)">{{ val | format_string('prefix', 'Dr. ') }}</div>
+                                            </td>
+                                            <td><span class="data-badge">text</span> "House"</td>
+                                            <td><span class="text-green-400 font-bold">"Dr. House"</span></td>
+                                            <td>Prepends text. 2nd Argument is the prefix string.</td>
+                                        </tr>
+                                        <tr>
+                                            <td><strong class="text-white">Suffix</strong></td>
+                                            <td>
+                                                <div class="syntax-pill" onclick="copyToClipboard(this)">{{ val | format_string('suffix', ' Esq.') }}</div>
+                                            </td>
+                                            <td><span class="data-badge">text</span> "John"</td>
+                                            <td><span class="text-green-400 font-bold">"John Esq."</span></td>
+                                            <td>Appends text. 2nd Argument is the suffix string.</td>
+                                        </tr>
+                                        <tr>
+                                            <td><strong class="text-white">Chained</strong></td>
+                                            <td>
+                                                <div class="syntax-pill" onclick="copyToClipboard(this)">{{ val | format_string('trim', 'upper', 'prefix', 'ID: ') }}</div>
+                                            </td>
+                                            <td><span class="data-badge">text</span> " abc "</td>
+                                            <td><span class="text-green-400 font-bold">"ID: ABC"</span></td>
+                                            <td><strong>Composition:</strong> Trim &rarr; Upper &rarr; Prefix.</td>
+                                        </tr>
+                                    </tbody>
+                                </table>
+                            </div>
+                        </div>
+                    </section>
+                    <section id="str-number" class="scroll-mt-24">
+                        <div class="flex items-center justify-between mb-4">
+                            <div class="flex items-center gap-3">
+                                <div class="p-2 bg-green-500/10 border border-green-500/20 rounded-lg">
+                                    <svg xmlns="http://www.w3.org/2000/svg" class="h-6 w-6 text-green-400" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 8c-1.657 0-3 .895-3 2s1.343 2 3 2 3 .895 3 2-1.343 2-3 2m0-8c1.11 0 2.08.402 2.599 1M12 8V7m0 1v8m0 0v1m0-1c-1.11 0-2.08-.402-2.599-1M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
+                                    </svg>
+                                </div>
+                                <div>
+                                    <h3 class="text-2xl font-bold text-white">Number & Currency</h3>
+                                    <p class="text-sm text-gray-500 font-mono mt-0.5">Filter Name: <span class="text-green-400">format_number</span></p>
+                                </div>
+                            </div>
+                        </div>
+                        <div class="glass-panel rounded-xl overflow-hidden shadow-2xl border border-white/5">
+                            <div class="overflow-x-auto">
+                                <table class="doc-table">
+                                    <thead>
+                                        <tr>
+                                            <th width="15%">Operation</th>
+                                            <th width="35%">Full Template Syntax</th>
+                                            <th width="15%">Input Data</th>
+                                            <th width="15%">Output Result</th>
+                                            <th width="20%">Technical Details</th>
+                                        </tr>
+                                    </thead>
+                                    <tbody>
+                                        <tr>
+                                            <td><strong class="text-white">Integer</strong></td>
+                                            <td>
+                                                <div class="syntax-pill" onclick="copyToClipboard(this)">{{ val | format_int }}</div>
+                                            </td>
+                                            <td><span class="data-badge">float</span> 15.99</td>
+                                            <td><span class="text-green-400 font-bold">"15"</span></td>
+                                            <td>Truncates decimals (does not round up).</td>
+                                        </tr>
+                                        <tr>
+                                            <td><strong class="text-white">Float</strong></td>
+                                            <td>
+                                                <div class="syntax-pill" onclick="copyToClipboard(this)">{{ val | format_number('float', '2') }}</div>
+                                            </td>
+                                            <td><span class="data-badge">num</span> 1500</td>
+                                            <td><span class="text-green-400 font-bold">"1500.00"</span></td>
+                                            <td>Forces N decimal places (Standard dot notation).</td>
+                                        </tr>
+                                        <tr>
+                                            <td><strong class="text-white">Currency (US)</strong></td>
+                                            <td>
+                                                <div class="syntax-pill" onclick="copyToClipboard(this)">{{ val | format_currency('USD') }}</div>
+                                            </td>
+                                            <td><span class="data-badge">num</span> 1500.5</td>
+                                            <td><span class="text-green-400 font-bold">"$1,500.50"</span></td>
+                                            <td>Locale aware formatting for US Dollar.</td>
+                                        </tr>
+                                        <tr>
+                                            <td><strong class="text-white">Currency (BR)</strong></td>
+                                            <td>
+                                                <div class="syntax-pill" onclick="copyToClipboard(this)">{{ val | format_currency('BRL') }}</div>
+                                            </td>
+                                            <td><span class="data-badge">num</span> 1500.5</td>
+                                            <td><span class="text-green-400 font-bold">"R$ 1.500,50"</span></td>
+                                            <td>Locale aware formatting for Brazilian Real.</td>
+                                        </tr>
+                                        <tr>
+                                            <td><strong class="text-white">Spell Out (EN)</strong></td>
+                                            <td>
+                                                <div class="syntax-pill" onclick="copyToClipboard(this)">{{ val | format_number('spell_out', 'en') }}</div>
+                                            </td>
+                                            <td><span class="data-badge">int</span> 42</td>
+                                            <td><span class="text-green-400 font-bold">"forty-two"</span></td>
+                                            <td>Converts numbers to words. Supports 'en', 'pt', 'es'.</td>
+                                        </tr>
+                                        <tr>
+                                            <td><strong class="text-white">Spell Out (PT)</strong></td>
+                                            <td>
+                                                <div class="syntax-pill" onclick="copyToClipboard(this)">{{ val | format_number('spell_out', 'pt') }}</div>
+                                            </td>
+                                            <td><span class="data-badge">int</span> 1050</td>
+                                            <td><span class="text-green-400 font-bold">"mil e cinquenta"</span></td>
+                                            <td>Portuguese text conversion.</td>
+                                        </tr>
+                                        <tr>
+                                            <td><strong class="text-white">Humanize</strong></td>
+                                            <td>
+                                                <div class="syntax-pill" onclick="copyToClipboard(this)">{{ val | format_number('humanize') }}</div>
+                                            </td>
+                                            <td><span class="data-badge">num</span> 1500000</td>
+                                            <td><span class="text-green-400 font-bold">"1.5M"</span></td>
+                                            <td>Short scale notation (K, M, B).</td>
+                                        </tr>
+                                    </tbody>
+                                </table>
+                            </div>
+                        </div>
+                    </section>
+                    <section id="str-date" class="scroll-mt-24">
+                        <div class="flex items-center justify-between mb-4">
+                            <div class="flex items-center gap-3">
+                                <div class="p-2 bg-orange-500/10 border border-orange-500/20 rounded-lg">
+                                    <svg xmlns="http://www.w3.org/2000/svg" class="h-6 w-6 text-orange-400" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z" />
+                                    </svg>
+                                </div>
+                                <div>
+                                    <h3 class="text-2xl font-bold text-white">Date Strategy</h3>
+                                    <p class="text-sm text-gray-500 font-mono mt-0.5">Filter Name: <span class="text-orange-400">format_date</span></p>
+                                </div>
+                            </div>
+                        </div>
+                        <div class="glass-panel rounded-xl overflow-hidden shadow-2xl border border-white/5">
+                            <div class="overflow-x-auto">
+                                <table class="doc-table">
+                                    <thead>
+                                        <tr>
+                                            <th width="15%">Operation</th>
+                                            <th width="35%">Full Template Syntax</th>
+                                            <th width="15%">Input Data</th>
+                                            <th width="15%">Output Result</th>
+                                            <th width="20%">Technical Details</th>
+                                        </tr>
+                                    </thead>
+                                    <tbody>
+                                        <tr>
+                                            <td><strong class="text-white">ISO Standard</strong></td>
+                                            <td>
+                                                <div class="syntax-pill" onclick="copyToClipboard(this)">{{ val | format_date('iso') }}</div>
+                                            </td>
+                                            <td><span class="data-badge">date</span> 2025-12-25</td>
+                                            <td><span class="text-green-400 font-bold">"2025-12-25"</span></td>
+                                            <td>Universal ISO 8601 format.</td>
+                                        </tr>
+                                        <tr>
+                                            <td><strong class="text-white">Short (Locale)</strong></td>
+                                            <td>
+                                                <div class="syntax-pill" onclick="copyToClipboard(this)">{{ val | format_date('short') }}</div>
+                                            </td>
+                                            <td><span class="data-badge">date</span> 2025-12-25</td>
+                                            <td><span class="text-green-400 font-bold">"25/12/2025"</span></td>
+                                            <td>Depends on system locale (default pt_BR).</td>
+                                        </tr>
+                                        <tr>
+                                            <td><strong class="text-white">Long Text</strong></td>
+                                            <td>
+                                                <div class="syntax-pill" onclick="copyToClipboard(this)">{{ val | format_date('long') }}</div>
+                                            </td>
+                                            <td><span class="data-badge">date</span> 2025-12-25</td>
+                                            <td><span class="text-green-400 font-bold">"25 de dezembro de 2025"</span></td>
+                                            <td>Fully expanded localized date.</td>
+                                        </tr>
+                                        <tr>
+                                            <td><strong class="text-white">Custom Pattern</strong></td>
+                                            <td>
+                                                <div class="syntax-pill" onclick="copyToClipboard(this)">{{ val | format_date('fmt', '%d/%m') }}</div>
+                                            </td>
+                                            <td><span class="data-badge">date</span> 2025-12-25</td>
+                                            <td><span class="text-green-400 font-bold">"25/12"</span></td>
+                                            <td>Uses Python strftime syntax.</td>
+                                        </tr>
+                                        <tr>
+                                            <td><strong class="text-white">Add Days</strong></td>
+                                            <td>
+                                                <div class="syntax-pill" onclick="copyToClipboard(this)">{{ val | format_date('add_days', '7') }}</div>
+                                            </td>
+                                            <td><span class="data-badge">date</span> 2025-01-01</td>
+                                            <td><span class="text-green-400 font-bold">"2025-01-08"</span></td>
+                                            <td>Arithmetic. Returns an ISO string by default.</td>
+                                        </tr>
+                                        <tr>
+                                            <td><strong class="text-white">Complex Chain</strong></td>
+                                            <td>
+                                                <div class="syntax-pill" onclick="copyToClipboard(this)">{{ val | format_date('add_days', '1', 'long') }}</div>
+                                            </td>
+                                            <td><span class="data-badge">date</span> 2025-01-01</td>
+                                            <td><span class="text-green-400 font-bold">"02 de janeiro de 2025"</span></td>
+                                            <td>Adds 1 day first, THEN formats as Long text.</td>
+                                        </tr>
+                                    </tbody>
+                                </table>
+                            </div>
+                        </div>
+                    </section>
+                    <section id="str-logic" class="scroll-mt-24">
+                        <div class="flex items-center justify-between mb-4">
+                            <div class="flex items-center gap-3">
+                                <div class="p-2 bg-red-500/10 border border-red-500/20 rounded-lg">
+                                    <svg xmlns="http://www.w3.org/2000/svg" class="h-6 w-6 text-red-400" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19.428 15.428a2 2 0 00-1.022-.547l-2.384-.477a6 6 0 00-3.86.517l-.318.158a6 6 0 01-3.86.517L6.05 15.21a2 2 0 00-1.806.547M8 4h8l-1 1v5.172a2 2 0 00.586 1.414l5 5c1.26 1.26.367 3.414-1.415 3.414H4.828c-1.782 0-2.674-2.154-1.414-3.414l5-5A2 2 0 009 10.172V5L8 4z" />
+                                    </svg>
+                                </div>
+                                <div>
+                                    <h3 class="text-2xl font-bold text-white">Logic & Defaults</h3>
+                                    <p class="text-sm text-gray-500 font-mono mt-0.5">Filter Name: <span class="text-red-400">format_logic</span></p>
+                                </div>
+                            </div>
+                        </div>
+                        <div class="glass-panel rounded-xl overflow-hidden shadow-2xl border border-white/5">
+                            <div class="overflow-x-auto">
+                                <table class="doc-table">
+                                    <thead>
+                                        <tr>
+                                            <th width="15%">Operation</th>
+                                            <th width="35%">Full Template Syntax</th>
+                                            <th width="15%">Input Data</th>
+                                            <th width="15%">Output Result</th>
+                                            <th width="20%">Technical Details</th>
+                                        </tr>
+                                    </thead>
+                                    <tbody>
+                                        <tr>
+                                            <td><strong class="text-white">Default Value</strong></td>
+                                            <td>
+                                                <div class="syntax-pill" onclick="copyToClipboard(this)">{{ val | format_logic('default', 'N/A') }}</div>
+                                            </td>
+                                            <td><span class="data-badge">null</span> <i>(empty)</i></td>
+                                            <td><span class="text-green-400 font-bold">"N/A"</span></td>
+                                            <td>Used when Excel cell is empty.</td>
+                                        </tr>
+                                        <tr>
+                                            <td><strong class="text-white">Status Mapping</strong></td>
+                                            <td>
+                                                <div class="syntax-pill" onclick="copyToClipboard(this)">{{ val | format_logic('1=Draft', '2=Final') }}</div>
+                                            </td>
+                                            <td><span class="data-badge">int</span> 2</td>
+                                            <td><span class="text-green-400 font-bold">"Final"</span></td>
+                                            <td>Maps Keys to Values. Great for Status Codes.</td>
+                                        </tr>
+                                        <tr>
+                                            <td><strong class="text-white">Empty If</strong></td>
+                                            <td>
+                                                <div class="syntax-pill" onclick="copyToClipboard(this)">{{ val | format_logic('empty_if', '0') }}</div>
+                                            </td>
+                                            <td><span class="data-badge">int</span> 0</td>
+                                            <td><span class="text-green-400 font-bold">""</span></td>
+                                            <td>Hides the value if it matches the argument.</td>
+                                        </tr>
+                                        <tr>
+                                            <td><strong class="text-white">Fallback Map</strong></td>
+                                            <td>
+                                                <div class="syntax-pill" onclick="copyToClipboard(this)">{{ val | format_logic('1=A', 'default', 'Unknown') }}</div>
+                                            </td>
+                                            <td><span class="data-badge">int</span> 5</td>
+                                            <td><span class="text-green-400 font-bold">"Unknown"</span></td>
+                                            <td>Combines mapping with a default fallback.</td>
+                                        </tr>
+                                    </tbody>
+                                </table>
+                            </div>
+                        </div>
+                    </section>
+                    <section id="str-bool" class="scroll-mt-24">
+                        <div class="flex items-center justify-between mb-4">
+                            <div class="flex items-center gap-3">
+                                <div class="p-2 bg-cyan-500/10 border border-cyan-500/20 rounded-lg">
+                                    <svg xmlns="http://www.w3.org/2000/svg" class="h-6 w-6 text-cyan-400" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" />
+                                    </svg>
+                                </div>
+                                <div>
+                                    <h3 class="text-2xl font-bold text-white">Boolean Strategy</h3>
+                                    <p class="text-sm text-gray-500 font-mono mt-0.5">Filter Name: <span class="text-cyan-400">format_bool</span></p>
+                                </div>
+                            </div>
+                        </div>
+                        <div class="glass-panel rounded-xl overflow-hidden shadow-2xl border border-white/5">
+                            <div class="overflow-x-auto">
+                                <table class="doc-table">
+                                    <thead>
+                                        <tr>
+                                            <th width="15%">Operation</th>
+                                            <th width="35%">Full Template Syntax</th>
+                                            <th width="15%">Input Data</th>
+                                            <th width="15%">Output Result</th>
+                                            <th width="20%">Technical Details</th>
+                                        </tr>
+                                    </thead>
+                                    <tbody>
+                                        <tr>
+                                            <td><strong class="text-white">Yes/No</strong></td>
+                                            <td>
+                                                <div class="syntax-pill" onclick="copyToClipboard(this)">{{ val | format_bool('Yes', 'No') }}</div>
+                                            </td>
+                                            <td><span class="data-badge">bool</span> TRUE</td>
+                                            <td><span class="text-green-400 font-bold">"Yes"</span></td>
+                                            <td>Arg 1 is True value, Arg 2 is False value.</td>
+                                        </tr>
+                                        <tr>
+                                            <td><strong class="text-white">Visual Checkbox</strong></td>
+                                            <td>
+                                                <div class="syntax-pill" onclick="copyToClipboard(this)">{{ val | format_bool('check') }}</div>
+                                            </td>
+                                            <td><span class="data-badge">bool</span> TRUE</td>
+                                            <td><span class="text-green-400 font-bold">"☑"</span></td>
+                                            <td>Outputs Wingdings-compatible checkbox characters.</td>
+                                        </tr>
+                                        <tr>
+                                            <td><strong class="text-white">Visual Checkbox</strong></td>
+                                            <td>
+                                                <div class="syntax-pill" onclick="copyToClipboard(this)">{{ val | format_bool('check') }}</div>
+                                            </td>
+                                            <td><span class="data-badge">bool</span> FALSE</td>
+                                            <td><span class="text-green-400 font-bold">"☐"</span></td>
+                                            <td>Empty box for false values.</td>
+                                        </tr>
+                                    </tbody>
+                                </table>
+                            </div>
+                        </div>
+                    </section>
+                    <section id="str-mask" class="scroll-mt-24">
+                        <div class="flex items-center justify-between mb-4">
+                            <div class="flex items-center gap-3">
+                                <div class="p-2 bg-gray-500/10 border border-gray-500/20 rounded-lg">
+                                    <svg xmlns="http://www.w3.org/2000/svg" class="h-6 w-6 text-gray-400" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 15v2m-6 4h12a2 2 0 002-2v-6a2 2 0 00-2-2H6a2 2 0 00-2 2v6a2 2 0 002 2zm10-10V7a4 4 0 00-8 0v4h8z" />
+                                    </svg>
+                                </div>
+                                <div>
+                                    <h3 class="text-2xl font-bold text-white">Privacy & Masking</h3>
+                                    <p class="text-sm text-gray-500 font-mono mt-0.5">Filter Name: <span class="text-gray-400">format_mask</span></p>
+                                </div>
+                            </div>
+                        </div>
+                        <div class="glass-panel rounded-xl overflow-hidden shadow-2xl border border-white/5">
+                            <div class="overflow-x-auto">
+                                <table class="doc-table">
+                                    <thead>
+                                        <tr>
+                                            <th width="15%">Operation</th>
+                                            <th width="35%">Full Template Syntax</th>
+                                            <th width="15%">Input Data</th>
+                                            <th width="15%">Output Result</th>
+                                            <th width="20%">Technical Details</th>
+                                        </tr>
+                                    </thead>
+                                    <tbody>
+                                        <tr>
+                                            <td><strong class="text-white">Email</strong></td>
+                                            <td>
+                                                <div class="syntax-pill" onclick="copyToClipboard(this)">{{ val | format_mask('email') }}</div>
+                                            </td>
+                                            <td><span class="data-badge">text</span> "admin@corp.com"</td>
+                                            <td><span class="text-green-400 font-bold">"a***@corp.com"</span></td>
+                                            <td>Obfuscates user part, keeps domain.</td>
+                                        </tr>
+                                        <tr>
+                                            <td><strong class="text-white">Credit Card</strong></td>
+                                            <td>
+                                                <div class="syntax-pill" onclick="copyToClipboard(this)">{{ val | format_mask('credit_card') }}</div>
+                                            </td>
+                                            <td><span class="data-badge">text</span> "1234567812345678"</td>
+                                            <td><span class="text-green-400 font-bold">"**** 5678"</span></td>
+                                            <td>Keeps only last 4 digits (PCI Compliant).</td>
+                                        </tr>
+                                        <tr>
+                                            <td><strong class="text-white">Custom Pattern</strong></td>
+                                            <td>
+                                                <div class="syntax-pill" onclick="copyToClipboard(this)">{{ val | format_mask('mask', '###.###') }}</div>
+                                            </td>
+                                            <td><span class="data-badge">text</span> "123456"</td>
+                                            <td><span class="text-green-400 font-bold">"123.456"</span></td>
+                                            <td>Hashtags (#) are replaced by characters.</td>
+                                        </tr>
+                                    </tbody>
+                                </table>
+                            </div>
+                        </div>
+                    </section>
+                    <section id="str-image" class="scroll-mt-24">
+                        <div class="flex items-center justify-between mb-4">
+                            <div class="flex items-center gap-3">
+                                <div class="p-2 bg-yellow-500/10 border border-yellow-500/20 rounded-lg">
+                                    <svg xmlns="http://www.w3.org/2000/svg" class="h-6 w-6 text-yellow-400" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 16l4.586-4.586a2 2 0 012.828 0L16 16m-2-2l1.586-1.586a2 2 0 012.828 0L20 14m-6-6h.01M6 20h12a2 2 0 002-2V6a2 2 0 00-2-2H6a2 2 0 00-2 2v12a2 2 0 002 2z" />
+                                    </svg>
+                                </div>
+                                <div>
+                                    <h3 class="text-2xl font-bold text-white">Dynamic Images</h3>
+                                    <p class="text-sm text-gray-500 font-mono mt-0.5">Filter Name: <span class="text-yellow-400">format_image</span></p>
+                                </div>
+                            </div>
+                        </div>
+                        <div class="glass-panel rounded-xl p-6 border border-white/5">
+                            <div class="grid grid-cols-1 md:grid-cols-2 gap-8">
+                                <div class="space-y-4">
+                                    <div class="bg-black/30 p-4 rounded-lg border border-white/5">
+                                        <h4 class="text-xs font-bold text-gray-400 uppercase mb-2">Requirement</h4>
+                                        <p class="text-sm text-gray-300"> The Excel cell must contain the exact <strong>filename</strong> (e.g., <code>photo.jpg</code>). This file must exist inside the <code>assets.zip</code> uploaded during generation. </p>
+                                    </div>
+                                    <div class="bg-black/30 p-4 rounded-lg border border-white/5">
+                                        <h4 class="text-xs font-bold text-gray-400 uppercase mb-2">Word vs PowerPoint</h4>
+                                        <p class="text-sm text-gray-300"> Fully supported in Word (.docx). <br>
+                                            <span class="text-yellow-500 text-xs">Note: PowerPoint support is limited to text-replacement only in this version.</span>
+                                        </p>
+                                    </div>
+                                </div>
+                                <div>
+                                    <table class="doc-table">
+                                        <thead>
+                                            <tr>
+                                                <th>Syntax (Click to Copy)</th>
+                                                <th>Description</th>
+                                            </tr>
+                                        </thead>
+                                        <tbody>
+                                            <tr>
+                                                <td>
+                                                    <div class="syntax-pill" onclick="copyToClipboard(this)">{{ val | format_image('5', '3') }}</div>
+                                                </td>
+                                                <td>Resizes image to 5cm Width x 3cm Height.</td>
+                                            </tr>
+                                            <tr>
+                                                <td>
+                                                    <div class="syntax-pill" onclick="copyToClipboard(this)">{{ val | format_image('5', 'auto') }}</div>
+                                                </td>
+                                                <td>Fixes Width to 5cm, calculates Height automatically.</td>
+                                            </tr>
+                                            <tr>
+                                                <td>
+                                                    <div class="syntax-pill" onclick="copyToClipboard(this)">{{ val | format_image('auto', '4') }}</div>
+                                                </td>
+                                                <td>Fixes Height to 4cm, calculates Width automatically.</td>
+                                            </tr>
+                                        </tbody>
+                                    </table>
                                 </div>
                             </div>
                         </div>
@@ -507,7 +780,28 @@
                 </div>
             </div>
         </main>
+        <div id="toast">Code copied to clipboard!</div>
         <script src="/static/js/navbar.js"></script>
+        <script>
+            function copyToClipboard(element) {
+                const text = element.innerText;
+                navigator.clipboard.writeText(text).then(() => {
+                    // Show Toast
+                    const toast = document.getElementById("toast");
+                    toast.className = "show";
+                    setTimeout(function () { toast.className = toast.className.replace("show", ""); }, 3000);
+
+                    // Visual feedback on element
+                    const originalBg = element.style.borderColor;
+                    element.style.borderColor = "#4ade80";
+                    element.style.color = "#4ade80";
+                    setTimeout(() => {
+                        element.style.borderColor = "";
+                        element.style.color = "";
+                    }, 500);
+                });
+            }
+        </script>
     </body>
 
 </html>

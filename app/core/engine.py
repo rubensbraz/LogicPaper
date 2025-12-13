@@ -8,6 +8,7 @@ from typing import Any, Dict, List, Optional
 
 from docx.shared import Cm
 from docxtpl import DocxTemplate, InlineImage
+from jinja2 import Environment
 from pptx import Presentation
 
 from app.core.formatter import DataFormatter
@@ -105,21 +106,25 @@ class DocumentEngine:
         try:
             tpl = DocxTemplate(template_path)
 
-            # 1. Register Standard Filters (String, Date, Number, etc.)
-            filters = self.formatter.get_jinja_filters()
-            tpl.render_context.jinja_env.filters.update(filters)
+            # 1. Create a fresh Jinja2 Environment
+            # This fixes the 'NoneType' object has no attribute 'render_context' error
+            jinja_env = Environment(autoescape=True)
 
-            # 2. Register Special Image Filter (Requires closure for 'tpl' and 'assets_path')
+            # 2. Register Standard Filters (String, Date, Number, etc.)
+            filters = self.formatter.get_jinja_filters()
+            jinja_env.filters.update(filters)
+
+            # 3. Register Special Image Filter (Requires closure for 'tpl' and 'assets_path')
             # Usage in DOCX: {{ image_var | format_image(width, height) }}
             def format_image_wrapper(val, *args):
                 if not assets_path:
                     return "[NO ASSETS PATH]"
                 return self._get_image_object(tpl, val, list(args), assets_path)
 
-            tpl.render_context.jinja_env.filters["format_image"] = format_image_wrapper
+            jinja_env.filters["format_image"] = format_image_wrapper
 
-            # 3. Render and Save
-            tpl.render(context)
+            # 4. Render and Save (Pass the custom env here)
+            tpl.render(context, jinja_env=jinja_env)
             tpl.save(output_path)
             self._remove_office_thumbnail(output_path)
             return True
@@ -274,5 +279,5 @@ class DocumentEngine:
 
             return True
         except Exception as e:
-            logger.error(f"PDF Convert Wrapper Error: {e}")
+            logger.error(f"PDF Convert Error: {e}")
             raise e
