@@ -1,0 +1,27 @@
+name: Deploy Static Site to GitHub Pages
+
+on:
+  push:
+    branches:
+      - main
+
+permissions:
+  contents: write
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    steps:
+      # Step 1: Check out your code
+      - name: Checkout Code
+        uses: actions/checkout@v4
+
+      # Step 2: Deploy ONLY the 'static' folder
+      - name: Deploy to GitHub Pages
+        uses: peaceiris/actions-gh-pages@v3
+        with:
+          github_token: ${{ secrets.GITHUB_TOKEN }}
+          publish_dir: ./static
+          force_orphan: true  # Keeps the deployment branch clean and history-free
+          user_name: 'github-actions[bot]'
+          user_email: 'github-actions[bot]@users.noreply.github.com'
