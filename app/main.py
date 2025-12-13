@@ -45,9 +45,6 @@ STATIC_DIR = os.path.join(BASE_DIR, "static")
 # Start Scheduler
 start_scheduler(TEMP_DIR)
 
-# Mount Static for Frontend
-app.mount("/static", StaticFiles(directory=STATIC_DIR), name="static")
-
 
 # --- Real-time Logging (SSE) ---
 
@@ -836,3 +833,10 @@ async def read_help():
     Serves the documentation page (How to Use).
     """
     return FileResponse(os.path.join(STATIC_DIR, "help.html"))
+
+
+# --- STATIC FILES CONFIGURATION (SPA/Static Site Mode) ---
+# This mounts the 'static' folder to the root URL ("/").
+# It allows relative paths (e.g., "css/style.css") to work locally AND on GitHub Pages.
+# 'html=True' automatically serves 'index.html' when accessing root.
+app.mount("/", StaticFiles(directory=STATIC_DIR, html=True), name="site")

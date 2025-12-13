@@ -9,135 +9,9 @@
         <script src="https://cdn.tailwindcss.com"></script>
         <link href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;700&family=Inter:wght@300;400;600;800&display=swap" rel="stylesheet">
         <script src="https://cdn.jsdelivr.net/npm/sweetalert2@11"></script>
-        <link rel="stylesheet" href="/static/css/style.css">
-        <script src="/static/js/config.js"></script>
-        <style>
-            /* Table Layout */
-            .doc-table {
-                width: 100%;
-                border-collapse: separate;
-                border-spacing: 0;
-            }
-
-            .doc-table th {
-                text-align: left;
-                padding: 16px;
-                border-bottom: 1px solid rgba(255, 255, 255, 0.1);
-                color: #94a3b8;
-                font-size: 0.7rem;
-                text-transform: uppercase;
-                letter-spacing: 0.05em;
-                font-weight: 700;
-                background: rgba(15, 23, 42, 0.6);
-                position: sticky;
-                top: 0;
-                backdrop-filter: blur(8px);
-                z-index: 10;
-            }
-
-            .doc-table td {
-                padding: 16px;
-                border-bottom: 1px solid rgba(255, 255, 255, 0.05);
-                font-size: 0.85rem;
-                color: #cbd5e1;
-                vertical-align: middle;
-                transition: background 0.2s;
-            }
-
-            .doc-table tr:last-child td {
-                border-bottom: none;
-            }
-
-            .doc-table tr:hover td {
-                background: rgba(59, 130, 246, 0.05);
-            }
-
-            /* Code Syntax Pills */
-            .syntax-pill {
-                font-family: 'JetBrains Mono', monospace;
-                font-size: 0.75rem;
-                background: rgba(0, 0, 0, 0.3);
-                border: 1px solid rgba(255, 255, 255, 0.1);
-                border-radius: 6px;
-                padding: 6px 10px;
-                color: #a5b4fc;
-                cursor: pointer;
-                transition: all 0.2s;
-                display: inline-block;
-                position: relative;
-            }
-
-            .syntax-pill:hover {
-                border-color: #60a5fa;
-                background: rgba(59, 130, 246, 0.1);
-                color: #fff;
-                box-shadow: 0 0 10px rgba(59, 130, 246, 0.2);
-            }
-
-            .syntax-pill:active {
-                transform: scale(0.98);
-            }
-
-            /* Tooltip "Copy" */
-            .syntax-pill::after {
-                content: "Click to Copy";
-                position: absolute;
-                bottom: 100%;
-                left: 50%;
-                transform: translateX(-50%) translateY(-5px);
-                background: #0f172a;
-                border: 1px solid #334155;
-                color: #fff;
-                padding: 4px 8px;
-                border-radius: 4px;
-                font-size: 0.6rem;
-                opacity: 0;
-                pointer-events: none;
-                transition: opacity 0.2s;
-                white-space: nowrap;
-            }
-
-            .syntax-pill:hover::after {
-                opacity: 1;
-            }
-
-            /* Data Badges */
-            .data-badge {
-                font-family: 'JetBrains Mono', monospace;
-                font-size: 0.7rem;
-                padding: 2px 6px;
-                border-radius: 4px;
-                color: #cbd5e1;
-                background: rgba(255, 255, 255, 0.05);
-            }
-
-            /* Toast Notification */
-            #toast {
-                visibility: hidden;
-                min-width: 250px;
-                background-color: #10b981;
-                color: #fff;
-                text-align: center;
-                border-radius: 8px;
-                padding: 12px;
-                position: fixed;
-                z-index: 50;
-                left: 50%;
-                bottom: 30px;
-                transform: translateX(-50%);
-                font-size: 0.9rem;
-                font-weight: 600;
-                box-shadow: 0 10px 30px rgba(0, 0, 0, 0.5);
-                opacity: 0;
-                transition: opacity 0.3s, bottom 0.3s;
-            }
-
-            #toast.show {
-                visibility: visible;
-                opacity: 1;
-                bottom: 50px;
-            }
-        </style>
+        <link rel="stylesheet" href="css/style.css">
+        <link rel="stylesheet" href="css/help.css">
+        <script src="js/config.js"></script>
     </head>
 
     <body class="min-h-screen p-4 md:p-8 flex flex-col items-center bg-[#0B0C15] text-slate-300">
@@ -781,27 +655,8 @@
             </div>
         </main>
         <div id="toast">Code copied to clipboard!</div>
-        <script src="/static/js/navbar.js"></script>
-        <script>
-            function copyToClipboard(element) {
-                const text = element.innerText;
-                navigator.clipboard.writeText(text).then(() => {
-                    // Show Toast
-                    const toast = document.getElementById("toast");
-                    toast.className = "show";
-                    setTimeout(function () { toast.className = toast.className.replace("show", ""); }, 3000);
-
-                    // Visual feedback on element
-                    const originalBg = element.style.borderColor;
-                    element.style.borderColor = "#4ade80";
-                    element.style.color = "#4ade80";
-                    setTimeout(() => {
-                        element.style.borderColor = "";
-                        element.style.color = "";
-                    }, 500);
-                });
-            }
-        </script>
+        <script src="js/navbar.js"></script>
+        <script src="js/copyToClipboard.js"></script>
     </body>
 
 </html>

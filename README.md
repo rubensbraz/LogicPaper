@@ -50,8 +50,8 @@ Built with **FastAPI** and **Docker**, it features a modern "Glassmorphism" UI f
 
 1.  **Clone the Repository**
     ```bash
-    git clone https://github.com/rubensbraz/docgenius.git
-    cd docgenius
+    git clone https://github.com/rubensbraz/DocGenius.git
+    cd DocGenius
     ```
 
 2.  **Start the Engine**
@@ -98,7 +98,9 @@ DocGenius/
 
 ## 📘 Templating Guide (Strategies)
 
-DocGenius uses a powerful **Piping Syntax** (`|`) to transform data. Below is the complete reference for the available strategies.
+DocGenius uses a powerful **Piping Syntax** (`|`) to transform data. Below is the simple reference for the available strategies.
+
+For full Documentation, see: 
 
 ### 1. String Manipulation
 Control text casing, trimming, and concatenation.
@@ -154,7 +156,7 @@ Example: {{ client_photo | format_image('3', '4') }}
 
 ## 🧪 Testing & Mock Data
 
-The system includes a `generate_seeds.py` script to create a robust testing environment.
+The system includes a `generate_seeds.py` script to create mock data.
 
 1.  **Generate Seeds:**
     ```bash
@@ -173,9 +175,7 @@ Configure the system via `docker-compose.yml`:
 
 ```yaml
 environment:
-  - TEMP_DIR=/data/temp        # Internal processing path
   - TZ=America/Sao_Paulo       # Timezone for logs
-  - PYTHONUNBUFFERED=1         # Real-time logging
 ```
 
 ---
