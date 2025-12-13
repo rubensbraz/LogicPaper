@@ -28,11 +28,24 @@ class DateStrategy(BaseStrategy):
     """
 
     def __init__(self, locale: str = "pt_BR"):
+        """
+        Initialize the strategies with the given locale.
+
+        Args:
+            locale (str): Locale string (e.g., 'pt_BR', 'en_US').
+        """
         self.locale = locale
 
     def process(self, value: Any, ops: List[str]) -> str:
         """
         Applies date transformations based on the operations list.
+
+        Args:
+            value (Any): The raw input value.
+            ops (List[str]): List of operation tokens.
+
+        Returns:
+            str: The formatted date string.
         """
         if value is None or str(value).strip() == "":
             return ""
@@ -43,7 +56,7 @@ class DateStrategy(BaseStrategy):
             try:
                 # Attempt to parse string (ISO format preferred)
                 # Excel usually passes datetime objects directly via pandas,
-                # but if it's a string, we assume ISO-like format.
+                # but if it's a string, we assume ISO-like format
                 dt_val = datetime.fromisoformat(str(value).replace("Z", "+00:00"))
             except ValueError:
                 # If fail, log and return original text (fail-safe)
@@ -55,6 +68,10 @@ class DateStrategy(BaseStrategy):
         i = 0
         total_ops = len(ops)
 
+        # Flag to track if the user explicitly requested a string format
+        # If False at the end, we clean up the time component from arithmetic
+        format_applied = False
+
         try:
             while i < total_ops:
                 op = ops[i].lower().strip()
@@ -64,12 +81,14 @@ class DateStrategy(BaseStrategy):
                 if op == "iso":
                     if isinstance(formatted_result, datetime):
                         formatted_result = formatted_result.isoformat().split("T")[0]
+                        format_applied = True
 
                 elif op in ("long", "short", "full", "medium"):
                     if isinstance(formatted_result, datetime):
                         formatted_result = babel.dates.format_date(
                             formatted_result, format=op, locale=self.locale
                         )
+                        format_applied = True
 
                 # --- Custom Format (fmt;%d/%m/%Y) ---
                 elif op == "fmt":
@@ -78,6 +97,7 @@ class DateStrategy(BaseStrategy):
                             # Clean quotes from Excel if present
                             pattern = next_token.replace('"', "").replace("'", "")
                             formatted_result = formatted_result.strftime(pattern)
+                            format_applied = True
                             i += 1  # Consume argument
                         except Exception as e:
                             logger.warning(f"DateStrategy [fmt] error: {e}")
@@ -86,13 +106,16 @@ class DateStrategy(BaseStrategy):
                 elif op == "year":
                     if isinstance(formatted_result, datetime):
                         formatted_result = str(formatted_result.year)
+                        format_applied = True
 
                 elif op == "month_name":
                     if isinstance(formatted_result, datetime):
                         formatted_result = formatted_result.strftime("%B")
+                        format_applied = True
 
                 # --- Arithmetic (Calculations) ---
                 # These operations keep the result as a datetime object for further chaining
+                # We DO NOT set format_applied = True here, because we want the clean-up logic to run
                 elif op == "add_days":
                     if (
                         next_token
@@ -129,10 +152,18 @@ class DateStrategy(BaseStrategy):
             logger.error(f"DateStrategy Pipeline Error: {e}")
             return str(value)
 
+        # 3. Final Clean-up
+        # If result is still a datetime object and NO format was explicitly requested
+        # (e.g. user just did 'add_days' without 'iso'), return strictly the Date part
+        # This prevents "2025-01-08 00:00:00" in contracts.
+        if isinstance(formatted_result, datetime) and not format_applied:
+            return formatted_result.date().isoformat()
+
         # Final check: ensure string return
         return str(formatted_result)
 
     def _is_int(self, val: str) -> bool:
+        """Helper to check if a string is a valid integer."""
         try:
             int(val)
             return True

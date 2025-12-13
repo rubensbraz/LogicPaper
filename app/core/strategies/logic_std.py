@@ -10,16 +10,26 @@ logger = logging.getLogger(__name__)
 
 class LogicStrategy(BaseStrategy):
     """
-    Handles Logical operations and Defaults.
+    Handles Logical operations, Defaults, and Strict Value Mapping (Switch Case).
 
     Supported Operations:
-    - default;[value]: Returns [value] if input is None or Empty.
+    - default;[value]: Returns [value] if input is None or Empty. Also acts as a fallback "Else" value if used in a mapping chain.
     - empty_if;[value]: Returns "" if input matches [value].
     - Mapping: "key=value". Example: "10=Approved". Returns "Approved" if input is "10".
     - Fallback: Any argument without "=" and not a keyword acts as a fallback return value.
     """
 
     def process(self, value: Any, ops: List[str]) -> Any:
+        """
+        Process the value through a list of logical operations.
+
+        Args:
+            value (Any): The raw data.
+            ops (List[str]): List of operation tokens.
+
+        Returns:
+            Any: The processed value.
+        """
         # Determine if "empty" (None or empty string)
         is_empty = value is None or str(value).strip() == ""
 
@@ -27,7 +37,9 @@ class LogicStrategy(BaseStrategy):
         str_val = str(value).strip() if value is not None else ""
 
         current_val = value
-        mapping_fallback = None  # Stores the "else" value if no map matches
+
+        # Variable to store the "Else" value (if no key=value map matches)
+        mapping_fallback = None
 
         # Create an iterator to allow consuming arguments dynamically
         iterator = iter(ops)
@@ -41,12 +53,18 @@ class LogicStrategy(BaseStrategy):
                 # --- 1. Standard Logic Keywords ---
                 if op_key == "default":
                     try:
-                        default_val = next(iterator)
+                        fallback_arg = next(iterator)
                         # Remove Excel quotes if present
-                        default_val = default_val.replace('"', "").replace("'", "")
+                        fallback_arg = fallback_arg.replace('"', "").replace("'", "")
 
+                        # CASE A: Value is Empty -> Use Default immediately
                         if is_empty:
-                            return default_val
+                            return fallback_arg
+
+                        # CASE B: Value exists -> Store this as the potential "Else" fallback
+                        # This aligns with documentation: {{ val | format_logic('1=A', 'default', 'Unknown') }}
+                        mapping_fallback = fallback_arg
+
                     except StopIteration:
                         logger.warning("LogicStrategy: Missing 'default' value.")
 
@@ -66,19 +84,24 @@ class LogicStrategy(BaseStrategy):
 
                     # Check if the current value matches this key
                     if str_val == key.strip():
+                        # Match found! Returning immediately
                         return output.strip()
 
-                # --- 3. Fallback Value (Else) ---
+                # --- 3. Implicit Fallback Value (Standalone String) ---
                 else:
                     # If it's not a keyword and has no '=', treat it as the fallback return
+                    # Example: {{ val | format_logic('1=A', 'Unknown') }}
                     mapping_fallback = raw_op
 
         except Exception as e:
             logger.error(f"LogicStrategy Error: {e}")
             return current_val
 
-        # If loop finished and we found a fallback (and no map matched earlier), return it
-        if mapping_fallback is not None:
+        # --- Final Resolution ---
+
+        # If the input was NOT empty, and we found NO mapping match,
+        # but we DO have a fallback (from 'default' or implicit), return it
+        if not is_empty and mapping_fallback is not None:
             return mapping_fallback
 
         return current_val
