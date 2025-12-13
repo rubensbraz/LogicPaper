@@ -35,6 +35,9 @@ tailwind.config = {
  * @type {Object}
  */
 const CONFIG = {
+    env: {
+        isGithubPages: window.location.hostname.includes('github.io')
+    },
     endpoints: {
         preview: '/api/preview',
         process: '/api/process',

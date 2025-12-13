@@ -376,6 +376,30 @@ async function generateSample() {
  * Permanently locks the Sample button during execution.
  */
 function startProcessing() {
+    // Environment Guard: Check for Static Demo (GitHub Pages)
+    // Since GitHub Pages only hosts static files, the backend API is unreachable
+    if (CONFIG.env.isGithubPages) {
+        Swal.fire({
+            icon: 'info',
+            title: 'Static Demo Mode',
+            html: `
+                <div class="text-left text-sm">
+                    <p class="mb-2">Backend processing is <strong>unavailable</strong> in this live preview.</p>
+                    <p>To run the full document generation engine:</p>
+                    <ul class="list-disc pl-5 mt-1 text-gray-400">
+                        <li>Clone the repository</li>
+                        <li>Run via Docker Compose</li>
+                    </ul>
+                </div>
+             `,
+            background: '#1e293b',
+            color: '#fff',
+            confirmButtonColor: '#3b82f6',
+            confirmButtonText: 'Understood'
+        });
+        return; // Halt execution immediately
+    }
+
     const params = validateInputs();
     if (!params) return;
 
