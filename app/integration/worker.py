@@ -5,7 +5,7 @@ from typing import Optional
 import pandas as pd
 
 from app.core.config import settings, logger
-from app.integration.state import job_store
+from app.integration.state import JobRepository
 from app.core.batch import process_batch_core
 
 
@@ -61,13 +61,15 @@ async def run_headless_generation(
         shutil.make_archive(zip_base, "zip", dir_outputs)
 
         # Update State: Completed
-        job_store[job_id]["status"] = "completed"
-        job_store[job_id]["files_generated"] = result["total_files"]
-        job_store[job_id]["download_url"] = f"/api/v1/integration/download/{job_id}"
+        JobRepository.update_status(
+            job_id,
+            status="completed",
+            files_generated=result["total_files"],
+            download_url=f"/api/v1/integration/download/{job_id}",
+        )
 
         logger.info(f"Job {job_id} finished. Files: {result['total_files']}")
 
     except Exception as e:
         logger.error(f"Job {job_id} failed: {e}")
-        job_store[job_id]["status"] = "failed"
-        job_store[job_id]["error"] = str(e)
+        JobRepository.update_status(job_id, status="failed", error=str(e))

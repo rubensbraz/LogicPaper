@@ -11,7 +11,7 @@ from app.core.config import settings, logger
 from app.integration.schemas import GenerationRequest, JobStatusResponse
 from app.integration.security import get_api_key
 from app.integration.worker import run_headless_generation
-from app.integration.state import job_store
+from app.integration.state import JobRepository
 
 
 router = APIRouter()
@@ -84,12 +84,13 @@ async def trigger_generation(
         # Convert JSON to DataFrame
         df = pd.json_normalize(request.data)
 
-        # Initialize State
-        job_store[job_id] = {
+        # Initialize Job State
+        initial_state = {
             "status": "processing",
             "start_time": datetime.now(),
             "path": session_path,
         }
+        JobRepository.save(job_id, initial_state)
 
         # 4. Dispatch Background Task
         background_tasks.add_task(
@@ -123,7 +124,7 @@ async def check_job_status(job_id: str, api_key: str = Security(get_api_key)):
     """
     Polls the status of a specific generation job.
     """
-    job = job_store.get(job_id)
+    job = JobRepository.get(job_id)
     if not job:
         raise HTTPException(status_code=404, detail="Job ID not found.")
 
@@ -150,7 +151,7 @@ async def download_integration_result(
     file_path = os.path.join(settings.TEMP_DIR, f"{job_id}_result.zip")
 
     if not os.path.exists(file_path):
-        job = job_store.get(job_id)
+        job = JobRepository.get(job_id)
         if job and job["status"] != "completed":
             raise HTTPException(
                 status_code=400,

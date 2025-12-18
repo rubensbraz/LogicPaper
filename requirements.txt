@@ -13,3 +13,4 @@ APScheduler
 babel
 Pillow
 num2words
+redis

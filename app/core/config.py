@@ -55,6 +55,11 @@ class Settings(BaseSettings):
     DEFAULT_LOCALE: str = "pt_BR"
     TIMEZONE: str = Field(alias="TZ", default="UTC")
 
+    # --- Data Layer ---
+    REDIS_HOST: str = "redis"
+    REDIS_PORT: int = 6379
+    REDIS_JOB_TTL: int = 86400
+
     # Pydantic Config
     model_config = SettingsConfigDict(
         env_file=".env",

@@ -1,14 +1,12 @@
 services:
-  # ==========================================
-  # LogicPaper Core Service
+  # --- LogicPaper Core Service ---
   # Hosts FastAPI Backend & LibreOffice Engine
-  # ==========================================
   logicpaper-app:
     build:
       context: .
       dockerfile: Dockerfile
     image: logicpaper:v1
-    container_name: logicpaper
+    container_name: logicpaper_core
 
     # .env File
     env_file:
@@ -34,6 +32,10 @@ services:
 
       # 3. Templates Storage:
       - ./persistent_templates:/app/persistent_templates
+    
+    # Ensures the app only starts after Redis
+    depends_on:
+      - redis
 
     # Execution Command
     # Uses Uvicorn with --reload for development agility
@@ -54,3 +56,19 @@ services:
           memory: 2G        # Cap at 2GB RAM
         reservations:
           memory: 512M      # Reserve minimal 512MB RAM
+  
+  # --- Redis ---
+  redis:
+    image: redis:7-alpine
+    container_name: logicpaper_redis
+    ports:
+      - "6379:6379"
+    volumes:
+      - redis_data:/data
+    restart: always
+    # Optional configuration for persistence on disk (AOF)
+    command: redis-server --appendonly yes
+
+# --- Volumes ---
+volumes:
+  redis_data:
