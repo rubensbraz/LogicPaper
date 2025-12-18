@@ -12,6 +12,7 @@ from docxtpl import DocxTemplate, InlineImage
 from jinja2 import Environment, BaseLoader
 from pptx import Presentation
 
+from app.core.config import settings
 from app.core.formatter import DataFormatter
 
 
@@ -322,14 +323,25 @@ class DocumentEngine:
             ]
 
             process = await asyncio.to_thread(
-                subprocess.run, cmd, stdout=subprocess.PIPE, stderr=subprocess.PIPE
+                subprocess.run,
+                cmd,
+                stdout=subprocess.PIPE,
+                stderr=subprocess.PIPE,
+                timeout=settings.LIBREOFFICE_TIMEOUT,
             )
 
             if process.returncode != 0:
                 logger.error(f"LibreOffice failed: {process.stderr.decode()}")
-                raise Exception("PDF Conversion Failed")
+                raise Exception("PDF Conversion Failed: LibreOffice Error")
 
             return True
+
+        except subprocess.TimeoutExpired:
+            logger.error(
+                f"PDF Conversion Timed Out after {settings.LIBREOFFICE_TIMEOUT}s for: {input_path}"
+            )
+            raise Exception("PDF Conversion Failed: Timeout")
+
         except Exception as e:
             logger.error(f"PDF Convert Error: {e}")
             raise e

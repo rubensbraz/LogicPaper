@@ -37,7 +37,7 @@ class Settings(BaseSettings):
             return v
         raise ValueError(v)
 
-    # --- Paths ---
+    # --- Filesystem ---
     # Base dir is calculated relative to this file
     BASE_DIR: str = os.path.dirname(
         os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
@@ -47,11 +47,12 @@ class Settings(BaseSettings):
     PERSISTENT_TEMPLATES_DIR: str = os.path.join(BASE_DIR, "persistent_templates")
     STATIC_DIR: str = os.path.join(BASE_DIR, "static")
 
-    # --- Logic ---
+    # --- Woker / Jobs ---
     CLEANUP_INTERVAL_SECONDS: int = 3600
+    LIBREOFFICE_TIMEOUT: int = 1800
+
+    # --- Localization ---
     DEFAULT_LOCALE: str = "pt_BR"
-    
-    # --- System ---
     TIMEZONE: str = Field(alias="TZ", default="UTC")
 
     # Pydantic Config

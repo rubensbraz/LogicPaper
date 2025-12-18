@@ -31,13 +31,35 @@ async def trigger_generation(
     """
     Endpoint for system-to-system integration.
     """
-    # 1. Validate Template Existence
-    # Security Note: This basic join allows subdirectories but relies on user sending valid relative paths
-    source_template_path = os.path.join(
-        settings.PERSISTENT_TEMPLATES_DIR, request.template_path
-    )
+    # 1. Security & Validation: Path Traversal Prevention
 
-    if not os.path.exists(source_template_path):
+    # Resolve the absolute path of the persistent storage
+    base_dir = os.path.abspath(settings.PERSISTENT_TEMPLATES_DIR)
+
+    # Sanitize user input (remove leading slashes to prevent absolute path override) and join with base directory
+    safe_template_input = request.template_path.lstrip(os.sep)
+    target_path = os.path.abspath(os.path.join(base_dir, safe_template_input))
+
+    # Security Check: Ensure the resolved path is actually INSIDE the base directory
+    # os.path.commonpath returns the longest common sub-path.
+    # If the target is valid, the common path must be equal to the base_dir
+    try:
+        common = os.path.commonpath([base_dir, target_path])
+    except ValueError:
+        # Happens on Windows if paths are on different drives
+        common = ""
+
+    if common != base_dir:
+        logger.warning(
+            f"SECURITY ALERT: Path traversal attempt detected. "
+            f"Input: '{request.template_path}' | Resolved: '{target_path}'"
+        )
+        raise HTTPException(
+            status_code=403, detail="Access denied: Invalid template path."
+        )
+
+    # Existence Check
+    if not os.path.exists(target_path):
         raise HTTPException(
             status_code=404, detail=f"Template not found: {request.template_path}"
         )
