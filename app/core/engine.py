@@ -268,7 +268,7 @@ class DocumentEngine:
         self, template_path: str, output_path: str, context: Dict[str, Any]
     ) -> bool:
         """
-        Renders a PPTX by text search/replace with regex support for formatting filters.
+        Renders a PPTX by consolidating paragraph runs to prevent broken tags.
         """
         try:
             prs = Presentation(template_path)
@@ -277,28 +277,41 @@ class DocumentEngine:
                 for shape in slide.shapes:
                     if not shape.has_text_frame:
                         continue
-                    for paragraph in shape.text_frame.paragraphs:
-                        for run in paragraph.runs:
-                            # Apply regex replacement on run text
-                            # Warning: Splitting runs might break tags if {{ is in one run and }} in another
-                            # Assuming tags are within a single run for this implementation
-                            if "{{" in run.text:
-                                run.text = self._parse_and_replace_pptx_text(
-                                    run.text, context
-                                )
 
-                    # Handle Tables (Recurse)
+                    for paragraph in shape.text_frame.paragraphs:
+                        # 1. Consolidate all text from runs
+                        full_text = "".join(run.text for run in paragraph.runs)
+
+                        if "{{" in full_text:
+                            # 2. Process the consolidated text
+                            new_text = self._parse_and_replace_pptx_text(
+                                full_text, context
+                            )
+
+                            # 3. Clear runs and update the first one to preserve minimal styling
+                            if paragraph.runs:
+                                paragraph.runs[0].text = new_text
+                                for i in range(1, len(paragraph.runs)):
+                                    paragraph.runs[i].text = ""
+
+                    # Handle Tables
                     if shape.has_table:
                         for row in shape.table.rows:
                             for cell in row.cells:
                                 for paragraph in cell.text_frame.paragraphs:
-                                    for run in paragraph.runs:
-                                        if "{{" in run.text:
-                                            run.text = (
-                                                self._parse_and_replace_pptx_text(
-                                                    run.text, context
-                                                )
+                                    full_cell_text = "".join(
+                                        run.text for run in paragraph.runs
+                                    )
+                                    if "{{" in full_cell_text:
+                                        new_cell_text = (
+                                            self._parse_and_replace_pptx_text(
+                                                full_cell_text, context
                                             )
+                                        )
+                                        if paragraph.runs:
+                                            paragraph.runs[0].text = new_cell_text
+                                            for i in range(1, len(paragraph.runs)):
+                                                paragraph.runs[i].text = ""
 
             prs.save(output_path)
             self._remove_office_thumbnail(output_path)
