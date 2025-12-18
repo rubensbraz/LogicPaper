@@ -4,7 +4,7 @@ from typing import Optional
 
 import pandas as pd
 
-from app.core.config import TEMP_DIR, logger
+from app.core.config import settings, logger
 from app.integration.state import job_store
 from app.core.batch import process_batch_core
 
@@ -57,7 +57,7 @@ async def run_headless_generation(
         )
 
         # Create Result ZIP
-        zip_base = os.path.join(TEMP_DIR, f"{job_id}_result")
+        zip_base = os.path.join(settings.TEMP_DIR, f"{job_id}_result")
         shutil.make_archive(zip_base, "zip", dir_outputs)
 
         # Update State: Completed

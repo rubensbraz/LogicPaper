@@ -1,6 +1,7 @@
 import logging
 from typing import Any, Callable, Dict, List, Tuple
 
+from app.core.config import settings
 from app.core.strategies.base import BaseStrategy
 from app.core.strategies.boolean_std import BooleanStrategy
 from app.core.strategies.date_std import DateStrategy
@@ -29,7 +30,7 @@ class DataFormatter:
         Args:
             locale (str): Locale string (e.g., 'pt_BR', 'en_US').
         """
-        self.locale = locale
+        self.locale = locale or settings.DEFAULT_LOCALE
 
         # Registry of Strategies
         self.strategies: Dict[str, BaseStrategy] = {

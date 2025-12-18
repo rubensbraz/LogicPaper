@@ -1,7 +1,7 @@
 from fastapi import Security, HTTPException, status
 from fastapi.security.api_key import APIKeyHeader
 
-from app.core.config import API_KEY
+from app.core.config import settings
 
 
 # Define the header key expected in requests
@@ -21,7 +21,7 @@ async def get_api_key(api_key_header: str = Security(api_key_header)) -> str:
     Raises:
         HTTPException: If the key is invalid or missing.
     """
-    if api_key_header == API_KEY:
+    if api_key_header == settings.LOGICPAPER_API_KEY:
         return api_key_header
     raise HTTPException(
         status_code=status.HTTP_403_FORBIDDEN,

@@ -19,7 +19,7 @@ from openpyxl.utils.dataframe import dataframe_to_rows
 from openpyxl.worksheet.table import Table, TableStyleInfo
 
 from app.core.batch import process_batch_core
-from app.core.config import BASE_DIR, TEMP_DIR, STATIC_DIR, logger
+from app.core.config import settings, logger
 from app.core.engine import DocumentEngine
 from app.core.validator import TemplateValidator
 from app.utils import extract_zip, sanitize_filename, start_scheduler
@@ -47,8 +47,8 @@ tags_metadata = [
 
 # Initialize FastAPI with metadata
 app = FastAPI(
-    title="LogicPaper API",
-    version="1.1",
+    title=settings.PROJECT_NAME, 
+    version=settings.VERSION,
     description="Batch Processing Engine.",
     openapi_tags=tags_metadata,
 )
@@ -56,20 +56,22 @@ app = FastAPI(
 # Middleware
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["*"],
+    allow_origins=settings.ALLOWED_ORIGINS,
     allow_methods=["*"],
     allow_headers=["*"],
 )
 
 # Start Cleanup Scheduler
-start_scheduler(TEMP_DIR)
+start_scheduler(settings.TEMP_DIR, settings.CLEANUP_INTERVAL_SECONDS)
 
 
 # --- Register Routers ---
 
 
 app.include_router(
-    integration_router, prefix="/api/v1/integration", tags=["Integration (Headless)"]
+    integration_router,
+    prefix=f"{settings.API_PREFIX}/integration",
+    tags=["Integration (Headless)"],
 )
 
 
@@ -408,7 +410,7 @@ async def validate_compatibility(
     Validates that template tags exist in Excel/JSON headers.
     """
     session_id = f"val_{uuid.uuid4().hex[:8]}"
-    session_path = os.path.join(TEMP_DIR, session_id)
+    session_path = os.path.join(settings.TEMP_DIR, session_id)
     os.makedirs(session_path, exist_ok=True)
 
     try:
@@ -457,7 +459,7 @@ async def generate_sample(
 
     # 1. Setup Temporary Session
     sample_session_id = f"{session_id}_sample"
-    session_path = os.path.join(TEMP_DIR, sample_session_id)
+    session_path = os.path.join(settings.TEMP_DIR, sample_session_id)
 
     dir_inputs = os.path.join(session_path, "inputs")
     dir_output = os.path.join(session_path, "output")
@@ -652,7 +654,7 @@ async def generate_sample(
             shutil.rmtree(dir_assets_internal)
 
         # Zip Output
-        zip_base_name = os.path.join(TEMP_DIR, f"{session_id}_sample_result")
+        zip_base_name = os.path.join(settings.TEMP_DIR, f"{session_id}_sample_result")
         shutil.make_archive(base_name=zip_base_name, format="zip", root_dir=dir_output)
 
         zip_file_path = f"{zip_base_name}.zip"
@@ -683,7 +685,7 @@ async def process_batch(
     Main batch processing endpoint.
     """
     start_time = datetime.now()
-    session_path = os.path.join(TEMP_DIR, session_id)
+    session_path = os.path.join(settings.TEMP_DIR, session_id)
 
     dir_inputs = os.path.join(session_path, "1 Input documents")
     dir_outputs = os.path.join(session_path, "2 Generated documents")
@@ -782,7 +784,7 @@ async def process_batch(
             report_path, batch_result["report"], metadata, input_manifest
         )
 
-        zip_base_name = os.path.join(TEMP_DIR, f"{session_id}_result")
+        zip_base_name = os.path.join(settings.TEMP_DIR, f"{session_id}_result")
         shutil.make_archive(
             base_name=zip_base_name, format="zip", root_dir=session_path
         )
@@ -806,7 +808,7 @@ async def download_result(session_id: str) -> Any:
     Format: LogicPaper_YYYY-MM-DD_HH-MM.zip
     """
     try:
-        file_path = os.path.join(TEMP_DIR, f"{session_id}_result.zip")
+        file_path = os.path.join(settings.TEMP_DIR, f"{session_id}_result.zip")
 
         if os.path.exists(file_path):
             # Get current time
@@ -837,13 +839,13 @@ async def download_result(session_id: str) -> Any:
 @app.get("/", tags=["Static Pages"])
 async def read_root():
     """Serves the main application page."""
-    return FileResponse(os.path.join(STATIC_DIR, "index.html"))
+    return FileResponse(os.path.join(settings.STATIC_DIR, "index.html"))
 
 
 @app.get("/help", tags=["Static Pages"])
 async def read_help():
     """Serves the documentation page."""
-    return FileResponse(os.path.join(STATIC_DIR, "help.html"))
+    return FileResponse(os.path.join(settings.STATIC_DIR, "help.html"))
 
 
 # --- STATIC FILES CONFIGURATION (SPA/Static Site Mode) ---
@@ -852,4 +854,4 @@ async def read_help():
 # This mounts the 'static' folder to the root URL ("/")
 # It allows relative paths (e.g., "css/style.css") to work locally AND on GitHub Pages
 # 'html=True' automatically serves 'index.html' when accessing root
-app.mount("/", StaticFiles(directory=STATIC_DIR, html=True), name="site")
+app.mount("/", StaticFiles(directory=settings.STATIC_DIR, html=True), name="site")

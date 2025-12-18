@@ -7,7 +7,7 @@ import pandas as pd
 from fastapi import APIRouter, BackgroundTasks, Security, HTTPException
 from fastapi.responses import FileResponse
 
-from app.core.config import TEMP_DIR, PERSISTENT_TEMPLATES_DIR, logger
+from app.core.config import settings, logger
 from app.integration.schemas import GenerationRequest, JobStatusResponse
 from app.integration.security import get_api_key
 from app.integration.worker import run_headless_generation
@@ -33,7 +33,9 @@ async def trigger_generation(
     """
     # 1. Validate Template Existence
     # Security Note: This basic join allows subdirectories but relies on user sending valid relative paths
-    source_template_path = os.path.join(PERSISTENT_TEMPLATES_DIR, request.template_path)
+    source_template_path = os.path.join(
+        settings.PERSISTENT_TEMPLATES_DIR, request.template_path
+    )
 
     if not os.path.exists(source_template_path):
         raise HTTPException(
@@ -42,7 +44,7 @@ async def trigger_generation(
 
     # 2. Initialize Session
     job_id = f"job_{uuid.uuid4().hex}"
-    session_path = os.path.join(TEMP_DIR, job_id)
+    session_path = os.path.join(settings.TEMP_DIR, job_id)
 
     dir_inputs = os.path.join(session_path, "inputs")
     dir_outputs = os.path.join(session_path, "outputs")
@@ -123,7 +125,7 @@ async def download_integration_result(
     """
     Downloads the final ZIP file. Requires authentication.
     """
-    file_path = os.path.join(TEMP_DIR, f"{job_id}_result.zip")
+    file_path = os.path.join(settings.TEMP_DIR, f"{job_id}_result.zip")
 
     if not os.path.exists(file_path):
         job = job_store.get(job_id)

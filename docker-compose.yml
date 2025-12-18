@@ -10,6 +10,10 @@ services:
     image: logicpaper:v1
     container_name: logicpaper
 
+    # .env File
+    env_file:
+      - .env
+
     # Network Configuration
     # Maps localhost:8000 to container:8000
     ports:
@@ -30,17 +34,6 @@ services:
 
       # 3. Templates Storage:
       - ./persistent_templates:/app/persistent_templates
-
-    # Environment Variables
-    environment:
-      # Force stdout/stderr to be unbuffered (real-time logs)
-      - PYTHONUNBUFFERED=1
-      # Prevent Python from generating .pyc files
-      - PYTHONDONTWRITEBYTECODE=1
-      # Internal absolute path for temporary file processing
-      - TEMP_DIR=/data/temp
-      # Set explicit Timezone to prevent tzlocal warnings
-      - TZ=America/Sao_Paulo
 
     # Execution Command
     # Uses Uvicorn with --reload for development agility

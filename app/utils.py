@@ -6,9 +6,7 @@ import zipfile
 
 from apscheduler.schedulers.background import BackgroundScheduler
 
-
-# Configure Logging
-logger = logging.getLogger(__name__)
+from app.core.config import logger
 
 
 def sanitize_filename(filename: str) -> str:
@@ -39,8 +37,14 @@ def cleanup_job(temp_dir: str, max_age_seconds: int = 3600):
                 logger.info(f"Deleted old session: {filename}")
 
 
-def start_scheduler(temp_dir: str):
+def start_scheduler(temp_dir: str, interval_seconds: int = 3600):
     """Start scheduler for cleaning old files."""
     scheduler = BackgroundScheduler()
-    scheduler.add_job(cleanup_job, "interval", minutes=10, args=[temp_dir])
+    scheduler.add_job(
+        cleanup_job,
+        "interval",
+        seconds=interval_seconds,
+        args=[temp_dir, interval_seconds],
+    )
     scheduler.start()
+    logger.info(f"Scheduler started. Cleanup every {interval_seconds}s.")
