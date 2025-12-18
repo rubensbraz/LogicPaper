@@ -77,9 +77,9 @@ async def trigger_generation(
 
     try:
         # 3. Prepare Inputs
-        template_filename = os.path.basename(source_template_path)
+        template_filename = os.path.basename(target_path)
         dest_template_path = os.path.join(dir_inputs, template_filename)
-        shutil.copy2(source_template_path, dest_template_path)
+        shutil.copy2(target_path, dest_template_path)
 
         # Convert JSON to DataFrame
         df = pd.json_normalize(request.data)
