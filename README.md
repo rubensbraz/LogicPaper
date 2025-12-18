@@ -2,6 +2,8 @@
 
 ![Build Status](https://img.shields.io/badge/build-passing-brightgreen?style=for-the-badge&logo=github)
 ![Python](https://img.shields.io/badge/Python-3.11-3776AB?style=for-the-badge&logo=python&logoColor=white)
+![FastAPI](https://img.shields.io/badge/FastAPI-0.100+-009688?style=for-the-badge&logo=fastapi&logoColor=white)
+![Redis](https://img.shields.io/badge/Redis-Enabled-DC382D?style=for-the-badge&logo=redis&logoColor=white)
 ![Docker](https://img.shields.io/badge/Docker-Enabled-2496ED?style=for-the-badge&logo=docker&logoColor=white)
 ![License](https://img.shields.io/badge/License-CC%20BY--NC%204.0-lightgrey.svg?style=for-the-badge)
 
@@ -9,66 +11,82 @@
   <a href="README_pt.md"><strong>Leia em Português</strong></a>
 </div>
 
-> **Automate the creation of Word, PowerPoint, and PDF documents from Excel data.**
-
 ---
 
 ## 📖 Overview
 
-**LogicPaper** is a tool designed to automate document creation workflows. It takes structured data from Excel files and populates Microsoft Office templates (`.docx`, `.pptx`) and (`.md`, `.txt`) using a custom Jinja2-based templating system.
+**LogicPaper** is a high-performance document generation engine designed to automate complex reporting and contract workflows. It merges structured data (Excel/JSON) with Microsoft Office templates (`.docx`, `.pptx`) or text-based files (`.md`, `.txt`) using an advanced Jinja2-based strategy system.
 
-Developed with **FastAPI** and **Docker**, it provides a web-based dashboard for managing batch jobs and includes a headless LibreOffice integration for converting generated documents into PDF format. It is suitable for generating contracts, reports, certificates, and presentations at scale.
+The application follows an **Enterprise Architecture** (Hexagonal Architecture), utilizing **FastAPI** for high-concurrency requests, **Redis** for state management, and **LibreOffice Headless** for reliable PDF conversion.
 
-### 🌟 Key Features
-
-* **Batch Processing:** Efficiently processes multiple rows of data from Excel files.
-* **Format Support:** Compatible with standard Word (`.docx`), PowerPoint (`.pptx`), Markdown (`.md`) and Plain Text (`.txt`).
-* **Templating Logic:** Includes filters for text manipulation, date arithmetic, currency formatting, and conditional logic directly within the template.
-* **Asset Management:** Supports dynamic insertion and resizing of images (e.g., photos, signatures) from a ZIP archive.
-* **PDF Conversion:** Integrated LibreOffice for reliable conversion of Office files to PDF.
-* **Web Dashboard:** A clean user interface to upload files, monitor progress, and download results.
-
----
-
-## 🖼️ System Preview
+### 🖼️ System Preview
 
 ### Dashboard Interface
+
 ![Dashboard Interface](docs/images/dashboard_preview.png)
 *Drag & Drop interface with real-time process logs.*
 
 ### Documentation & Help
+
 ![Documentation Interface](docs/images/documentation_preview.png)
 *Built-in guide for templating syntax.*
 
 ---
 
-## 🔄 How It Works
+## 🌟 Key Features
+
+* **Asynchronous Batch Processing:** Handles large datasets via background workers to prevent request timeouts.
+* **Multi-Format Support:** Native rendering for Word, PowerPoint, Markdown, and Plain Text.
+* **Enterprise Integration API:** Dedicated headless endpoints with X-API-Key authentication for ERP/CRM integration.
+* **State Persistence:** Job tracking and session management powered by Redis.
+* **Complex Formatting Strategies:** Custom filters for text manipulation, date arithmetic, localized currency, and conditional logic.
+* **Dynamic Asset Management:** Automatic extraction, insertion, and resizing of images from ZIP archives.
+* **PDF Engine:** Integrated LibreOffice for high-fidelity conversion of Office documents to PDF.
+
+## 🔄 System Architecture
 
 ```mermaid
-graph LR
-    A[Excel Data] --> B(LogicPaper Engine)
-    C[Word/PPT Templates] --> B
-    D[Assets ZIP] --> B
-    B --> E{Processing Core}
-    E --> F[Jinja2 Logic]
-    E --> G[Image Resizing]
-    E --> H[PDF Conversion]
-    F --> I[Final Documents]
-    G --> I
-    H --> I
-    I --> J[Downloadable ZIP]
+graph TD
+    API[Client / API Key] -->|JSON/Multipart| FastAPI[FastAPI Web Server]
+    FastAPI -->|Enqueue Job| Worker[Background Worker]
+    Worker -->|Read/Write State| Redis[(Redis State Store)]
+    Worker -->|Templates| Core[Processing Core]
+    Core -->|Formatting| Strategies[Strategy Modules]
+    Core -->|Conversion| LibreOffice[LibreOffice Headless]
+    Worker -->|Output| Storage[/Persistent Storage/]
 ```
 
----
+## 🛠️ Project Structure
+
+```text
+LogicPaper/
+├── app/
+│   ├── core/                  # Core Business Logic
+│   │   ├── engine.py          # Document Rendering Engine
+│   │   ├── formatter.py       # Strategy Dispatcher
+│   │   ├── batch.py           # Batch Execution Logic
+│   │   └── strategies/        # Formatting Logic (Date, Number, String, etc.)
+│   ├── integration/           # Headless API Layer
+│   │   ├── router.py          # API Endpoints
+│   │   ├── state.py           # Redis Persistence Layer
+│   │   └── worker.py          # Background Job Execution
+│   ├── main.py                # FastAPI Main Application & UI Routes
+│   └── utils.py               # Shared Utilities & Schedulers
+├── static/                    # Frontend UI (HTML/CSS/JS)
+├── persistent_templates/      # Storage for API Template Library
+├── data/                      # Docker Volume for Temp Files
+├── Dockerfile                 # Image definition
+└── docker-compose.yml         # Container orchestration
+```
 
 ## 🚀 Quick Start
 
 ### Prerequisites
 
-* **Docker Desktop** (version 20.10+)
+* **Docker Desktop** (20.10+)
 * **Docker Compose**
 
-### Installation
+### Installation & Deployment
 
 1.  **Clone the Repository**
     ```bash
@@ -76,40 +94,25 @@ graph LR
     cd LogicPaper
     ```
 
-2.  **Start the Engine**
+2.  **Configure Environment**
+    Create a `.env` file based on the provided configuration (ensure `LOGICPAPER_API_KEY` is set).
+
+3.  **Start Services**
     ```bash
     docker-compose up --build
     ```
 
-3.  **Access the Application**
-    Open your browser and navigate to:
-    `http://localhost:8000`
+4.  **Access**
+    * **UI Dashboard:** `http://localhost:8000`
+    * **API Documentation:** `http://localhost:8000/docs`
 
----
+## 💻 API Integration
 
-## 🛠️ Project Structure
+LogicPaper provides a dedicated integration layer for external systems.
 
-The project separates the processing logic (backend) from the user interface (frontend).
-
-```text
-LogicPaper/
-├── app/
-│   ├── core/
-│   │   ├── engine.py          # Document Processing (docx/pptx/pdf)
-│   │   ├── formatter.py       # Filter Dispatcher
-│   │   ├── validator.py       # Template Checker
-│   │   └── strategies/        # Formatting Logic Modules
-│   │       ├── base.py
-│   │       ├── date_std.py    # Date Formatting
-│   │       ├── logic_std.py   # Conditional Logic
-│   │       └── ...
-│   ├── main.py                # FastAPI Application
-│   └── utils.py               # Utilities
-├── static/                    # Frontend Assets (HTML/CSS/JS)
-├── data/                      # Docker Volume for Data
-├── Dockerfile                 # Image definition
-└── docker-compose.yml         # Container orchestration
-```
+* **Endpoint:** `POST /api/v1/integration/generate`
+* **Authentication:** `X-API-Key` header.
+* **Workflow:** Submit a JSON payload with data and template path; receive a `job_id` to poll for status and download the result.
 
 ---
 
@@ -119,12 +122,14 @@ LogicPaper uses the pipe character (`|`) to apply formatting filters to variable
 *For a complete list of filters, refer to the "How to Use" section in the application ([Documentation in Github Pages](https://rubensbraz.github.io/LogicPaper/help.html)).*
 
 ### 1. Text Formatting
+
 ```jinja2
 {{ client_name | format_string('upper') }}            -> "ACME CORP"
 {{ client_id | format_string('prefix', 'ID: ') }}     -> "ID: 12345"
 ```
 
 ### 2. Numbers & Currency
+
 ```jinja2
 {{ contract_value | format_currency('USD') }}         -> "$ 1,500.00"
 {{ tax_rate | format_number('percent', '2') }}        -> "12.50%"
@@ -132,12 +137,14 @@ LogicPaper uses the pipe character (`|`) to apply formatting filters to variable
 ```
 
 ### 3. Date Operations
+
 ```jinja2
 {{ start_date | format_date('long') }}                -> "January 12, 2024"
 {{ start_date | format_date('add_days', '30') }}      -> "2024-02-11"
 ```
 
 ### 4. Conditional Logic
+
 Map status codes or values directly in the document:
 ```jinja2
 {{ status_code | format_logic(
@@ -148,29 +155,16 @@ Map status codes or values directly in the document:
 ```
 
 ### 5. Data Masking
+
 ```jinja2
 {{ email | format_mask('email') }}                    -> "j***@domain.com"
 ```
 
 ### 6. Images
+
 ```jinja2
 {{ photo_filename | format_image('3', '4') }}         -> (Resizes image to 3x4cm)
 ```
-
----
-
-## 🧪 Testing
-
-A utility script is included to generate sample data for testing purposes.
-
-1.  **Generate Sample Data (Inside Container):**
-    ```bash
-    docker exec -it logicpaper python /data/mock_data/generate_seeds.py
-    ```
-    *This creates a `mock_data.xlsx`, `assets.zip`, and sample templates in the data folder.*
-
-2.  **Run Test:**
-    Upload the generated files to the dashboard to verify the output.
 
 ---
 

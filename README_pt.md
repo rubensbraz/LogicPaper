@@ -2,6 +2,8 @@
 
 ![Build Status](https://img.shields.io/badge/build-passing-brightgreen?style=for-the-badge&logo=github)
 ![Python](https://img.shields.io/badge/Python-3.11-3776AB?style=for-the-badge&logo=python&logoColor=white)
+![FastAPI](https://img.shields.io/badge/FastAPI-0.100+-009688?style=for-the-badge&logo=fastapi&logoColor=white)
+![Redis](https://img.shields.io/badge/Redis-Enabled-DC382D?style=for-the-badge&logo=redis&logoColor=white)
 ![Docker](https://img.shields.io/badge/Docker-Enabled-2496ED?style=for-the-badge&logo=docker&logoColor=white)
 ![License](https://img.shields.io/badge/License-CC%20BY--NC%204.0-lightgrey.svg?style=for-the-badge)
 
@@ -9,107 +11,108 @@
   <a href="README.md"><strong>Read in English</strong></a>
 </div>
 
-> **Automatize a criação de documentos Word, PowerPoint e PDF a partir de dados do Excel.**
-
 ---
 
 ## 📖 Visão Geral
 
-**LogicPaper** é uma ferramenta projetada para automatizar fluxos de trabalho de criação de documentos. Ele recebe dados estruturados de arquivos Excel e preenche templates do Microsoft Office (`.docx`, `.pptx`) e de texto (`.md`, `.txt`) usando um sistema de templates customizado baseado em Jinja2.
+O **LogicPaper** é um motor de geração de documentos de alta performance, projetado para automatizar fluxos complexos de relatórios e contratos. Ele combina dados estruturados (Excel/JSON) com modelos de Microsoft Office (`.docx`, `.pptx`) ou arquivos de texto (`.md`, `.txt`) através de um sistema avançado de estratégias baseado em Jinja2.
 
-Desenvolvido com **FastAPI** e **Docker**, ele fornece um painel web para gerenciar trabalhos em lote e inclui integração com LibreOffice (headless) para converter documentos gerados em formato PDF. É adequado para gerar contratos, relatórios, certificados e apresentações em escala.
+A aplicação segue uma **Arquitetura Enterprise** (Arquitetura Hexagonal), utilizando **FastAPI** para alta concorrência, **Redis** para gerenciamento de estado e persistência de jobs, e **LibreOffice Headless** para conversão confiável de arquivos Office para PDF.
 
-### 🌟 Principais Recursos
-
-* **Processamento em Lote:** Processa eficientemente múltiplas linhas de dados de arquivos Excel.
-* **Suporte a Formatos:** Compatível com templates padrão de Word (`.docx`), PowerPoint (`.pptx`), Markdown (`.md`) e Texto Plano (`.txt`).
-* **Lógica de Templates:** Inclui filtros para manipulação de texto, aritmética de datas, formatação de moedas e lógica condicional diretamente dentro do template.
-* **Gestão de Assets:** Suporta inserção dinâmica e redimensionamento de imagens (ex: fotos, assinaturas) a partir de um arquivo ZIP.
-* **Conversão PDF:** LibreOffice integrado para conversão confiável de arquivos Office para PDF.
-* **Painel Web:** Uma interface de usuário limpa para enviar arquivos, monitorar o progresso e baixar resultados.
-
----
-
-## 🖼️ Prévia do Sistema
+### 🖼️ Prévia do Sistema
 
 ### Interface do Painel
+
 ![Dashboard Interface](docs/images/dashboard_preview.png)
 *Interface Drag & Drop com logs de processo em tempo real.*
 
 ### Documentação & Ajuda
+
 ![Documentation Interface](docs/images/documentation_preview.png)
 *Guia integrado para sintaxe de templates.*
 
 ---
 
-## 🔄 Como Funciona
+## 🌟 Principais Recursos
+
+* **Processamento Assíncrono em Lote:** Gerenciamento de grandes volumes de dados via workers em segundo plano, evitando timeouts de requisição.
+* **Suporte Multi-Formato:** Renderização nativa para Word, PowerPoint, Markdown e Texto Simples.
+* **API de Integração:** Endpoints dedicados para integração com sistemas externos (ERP/CRM) via autenticação X-API-Key.
+* **Persistência de Estado:** Rastreamento de jobs e gerenciamento de sessões utilizando Redis.
+* **Estratégias de Formatação Complexas:** Filtros customizados para manipulação de strings, aritmética de datas, moedas localizadas e lógica condicional.
+* **Gestão Dinâmica de Assets:** Extração, inserção e redimensionamento automático de imagens a partir de arquivos ZIP.
+* **Conversão PDF:** Motor LibreOffice integrado para conversão de alta fidelidade para PDF.
+
+## 🔄 System Architecture
 
 ```mermaid
-graph LR
-    A[Dados Excel] --> B(Motor LogicPaper)
-    C[Templates Word/PPT] --> B
-    D[ZIP de Assets] --> B
-    B --> E{Núcleo de Processamento}
-    E --> F[Lógica Jinja2]
-    E --> G[Redimensionamento de Imagens]
-    E --> H[Conversão PDF]
-    F --> I[Documentos Finais]
-    G --> I
-    H --> I
-    I --> J[ZIP para Download]
+graph TD
+    API[Cliente / API Key] -->|JSON/Multipart| FastAPI[Servidor Web FastAPI]
+    FastAPI -->|Enfileirar Job| Worker[Background Worker]
+    Worker -->|Leitura/Escrita| Redis[(Redis Store)]
+    Worker -->|Templates| Core[Núcleo de Processamento]
+    Core -->|Formatação| Strategies[Módulos de Estratégia]
+    Core -->|Conversão| LibreOffice[LibreOffice Headless]
+    Worker -->|Saída| Storage[/Armazenamento Persistente/]
 ```
 
----
+## 🛠️ Estrutura do Projeto
+
+```text
+LogicPaper/
+├── app/
+│   ├── core/                  # Lógica de Negócio Central
+│   │   ├── engine.py          # Motor de Renderização de Documentos
+│   │   ├── formatter.py       # Despachante de Estratégias
+│   │   ├── batch.py           # Lógica de Execução em Lote
+│   │   └── strategies/        # Lógica de Formatação (Data, Número, String, etc.)
+│   ├── integration/           # Camada de API Headless
+│   │   ├── router.py          # Endpoints da API
+│   │   ├── state.py           # Camada de Persistência Redis
+│   │   └── worker.py          # Execução de Jobs em Background
+│   ├── main.py                # Aplicação Principal e Rotas da UI
+│   └── utils.py               # Utilitários e Agendadores
+├── static/                    # Interface Frontend (HTML/CSS/JS)
+├── persistent_templates/      # Biblioteca de Modelos para API
+├── data/                      # Volume Docker para Arquivos Temporários
+├── Dockerfile                 # Definição da imagem
+└── docker-compose.yml         # Orquestração de Containers
+```
 
 ## 🚀 Início Rápido
 
 ### Pré-requisitos
 
-* **Docker Desktop** (versão 20.10+)
+* **Docker Desktop** (20.10+)
 * **Docker Compose**
 
-### Instalação
+### Instalação e Execução
 
 1.  **Clonar o Repositório**
     ```bash
-    git clone [https://github.com/rubensbraz/LogicPaper.git](https://github.com/rubensbraz/LogicPaper.git)
+    git clone https://github.com/rubensbraz/LogicPaper.git
     cd LogicPaper
     ```
 
-2.  **Iniciar o Motor**
+2.  **Configurar Ambiente**
+    Crie um arquivo `.env` baseado nas configurações do projeto (certifique-se de definir a `LOGICPAPER_API_KEY`).
+
+3.  **Iniciar os Serviços**
     ```bash
     docker-compose up --build
     ```
 
-3.  **Acessar a Aplicação**
-    Abra seu navegador e navegue para:
-    `http://localhost:8000`
+4.  **Acesso**
+    * **Painel UI:** `http://localhost:8000`
+    * **Documentação API:** `http://localhost:8000/docs`
 
----
+## 💻 Integração via API
 
-## 🛠️ Estrutura do Projeto
+O LogicPaper fornece uma camada de integração dedicada para sistemas externos.
 
-O projeto separa a lógica de processamento (backend) da interface do usuário (frontend).
-
-```text
-LogicPaper/
-├── app/
-│   ├── core/
-│   │   ├── engine.py          # Processamento de Documentos (docx/pptx/pdf)
-│   │   ├── formatter.py       # Despachante de Filtros
-│   │   ├── validator.py       # Verificador de Templates
-│   │   └── strategies/        # Módulos de Lógica de Formatação
-│   │       ├── base.py
-│   │       ├── date_std.py    # Formatação de Datas
-│   │       ├── logic_std.py   # Lógica Condicional
-│   │       └── ...
-│   ├── main.py                # Aplicação FastAPI
-│   └── utils.py               # Utilitários
-├── static/                    # Assets do Frontend (HTML/CSS/JS)
-├── data/                      # Volume Docker para Dados
-├── Dockerfile                 # Definição da Imagem
-└── docker-compose.yml         # Orquestração de Containers
-```
+* **Endpoint:** `POST /api/v1/integration/generate`
+* **Autenticação:** Header `X-API-Key`.
+* **Fluxo:** Envie o payload JSON com os dados e o caminho do template; receba um `job_id` para consultar o status e baixar o resultado final.
 
 ---
 
@@ -119,12 +122,14 @@ LogicPaper usa o caractere pipe (`|`) para aplicar filtros de formatação às v
 *Para a lista completa de filtros, consulte a seção "How to Use" na aplicação ([Documentação no Github Pages](https://rubensbraz.github.io/LogicPaper/help.html)).*
 
 ### 1. Formatação de Texto
+
 ```jinja2
 {{ client_name | format_string('upper') }}            -> "ACME CORP"
 {{ client_id | format_string('prefix', 'ID: ') }}     -> "ID: 12345"
 ```
 
 ### 2. Números & Moeda
+
 ```jinja2
 {{ contract_value | format_currency('USD') }}         -> "$ 1,500.00"
 {{ tax_rate | format_number('percent', '2') }}        -> "12.50%"
@@ -132,12 +137,14 @@ LogicPaper usa o caractere pipe (`|`) para aplicar filtros de formatação às v
 ```
 
 ### 3. Operações com Datas
+
 ```jinja2
 {{ start_date | format_date('long') }}                -> "January 12, 2024"
 {{ start_date | format_date('add_days', '30') }}      -> "2024-02-11"
 ```
 
 ### 4. Lógica Condicional
+
 Mapeie códigos de status ou valores diretamente no documento:
 ```jinja2
 {{ status_code | format_logic(
@@ -148,29 +155,16 @@ Mapeie códigos de status ou valores diretamente no documento:
 ```
 
 ### 5. Mascaramento de Dados
+
 ```jinja2
 {{ email | format_mask('email') }}                    -> "j***@domain.com"
 ```
 
 ### 6. Imagens
+
 ```jinja2
 {{ photo_filename | format_image('3', '4') }}         -> (Redimensiona imagem para 3x4cm)
 ```
-
----
-
-## 🧪 Testes
-
-Um script utilitário está incluído para gerar dados de exemplo para fins de teste.
-
-1.  **Gerar Dados de Exemplo (Dentro do Container):**
-    ```bash
-    docker exec -it logicpaper python /data/mock_data/generate_seeds.py
-    ```
-    *Isso cria `mock_data.xlsx`, `assets.zip`, e templates de exemplo na pasta de dados.*
-
-2.  **Executar Teste:**
-    Faça o upload dos arquivos gerados no painel para verificar a saída.
 
 ---
 
