@@ -28,6 +28,9 @@ services:
       - ./app:/app/app
       - ./static:/app/static
 
+      # 3. Templates Storage:
+      - ./persistent_templates:/app/persistent_templates
+
     # Environment Variables
     environment:
       # Force stdout/stderr to be unbuffered (real-time logs)

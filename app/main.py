@@ -1,7 +1,6 @@
 import asyncio
 import io
 import json
-import logging
 import os
 import shutil
 import uuid
@@ -19,17 +18,39 @@ from openpyxl.styles import Alignment, Border, Font, PatternFill, Side
 from openpyxl.utils.dataframe import dataframe_to_rows
 from openpyxl.worksheet.table import Table, TableStyleInfo
 
+from app.core.config import BASE_DIR, TEMP_DIR, STATIC_DIR, logger
 from app.core.engine import DocumentEngine
-from app.utils import extract_zip, sanitize_filename, start_scheduler
 from app.core.validator import TemplateValidator
+from app.utils import extract_zip, sanitize_filename, start_scheduler
+from app.integration.router import router as integration_router
 
 
-# Setup
-logging.basicConfig(
-    level=logging.INFO, format="%(asctime)s [%(levelname)s] %(message)s"
+# --- App Initialization ---
+
+
+# This dictionary defines the sections (tags) visible in the Swagger UI
+tags_metadata = [
+    {
+        "name": "Integration (Headless)",
+        "description": "Endpoints for system-to-system integration (ERP, CRM) using JSON and API Keys.",
+    },
+    {
+        "name": "Web Dashboard API",
+        "description": "Endpoints used by the Frontend UI (index.html) for interactive upload and validation.",
+    },
+    {
+        "name": "Static Pages",
+        "description": "Routes that serve the static HTML content (UI).",
+    },
+]
+
+# Initialize FastAPI with metadata
+app = FastAPI(
+    title="LogicPaper API",
+    version="1.1",
+    description="Batch Processing Engine.",
+    openapi_tags=tags_metadata,
 )
-logger = logging.getLogger("LogicPaper")
-app = FastAPI(title="LogicPaper API", version="1.0")
 
 # Middleware
 app.add_middleware(
@@ -39,13 +60,16 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
-# Constants
-BASE_DIR = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
-TEMP_DIR = os.getenv("TEMP_DIR", "/data/temp")
-STATIC_DIR = os.path.join(BASE_DIR, "static")
-
-# Start Scheduler
+# Start Cleanup Scheduler
 start_scheduler(TEMP_DIR)
+
+
+# --- Register Routers ---
+
+
+app.include_router(
+    integration_router, prefix="/api/v1/integration", tags=["Integration (Headless)"]
+)
 
 
 # --- Real-time Logging (SSE) ---
@@ -329,20 +353,15 @@ def generate_styled_report(
     wb.save(path)
 
 
-# --- Routes ---
+# --- Web Dashboard Endpoints ---
 
 
-@app.get("/")
-async def read_root():
-    return FileResponse(os.path.join(STATIC_DIR, "index.html"))
-
-
-@app.get("/stream-logs/{session_id}")
+@app.get("/stream-logs/{session_id}", tags=["Web Dashboard API"])
 async def stream_logs(session_id: str):
     return StreamingResponse(log_generator(session_id), media_type="text/event-stream")
 
 
-@app.post("/api/preview")
+@app.post("/api/preview", tags=["Web Dashboard API"])
 async def preview_data(
     file_excel: UploadFile = File(None), file_json: UploadFile = File(None)
 ):
@@ -378,7 +397,7 @@ async def preview_data(
         return JSONResponse({"status": "error", "message": str(e)}, status_code=500)
 
 
-@app.post("/api/validate")
+@app.post("/api/validate", tags=["Web Dashboard API"])
 async def validate_compatibility(
     file_excel: UploadFile = File(None),
     file_json: UploadFile = File(None),
@@ -418,7 +437,7 @@ async def validate_compatibility(
             shutil.rmtree(session_path)
 
 
-@app.post("/api/sample")
+@app.post("/api/sample", tags=["Web Dashboard API"])
 async def generate_sample(
     session_id: str = Form(...),
     filename_col: str = Form(...),
@@ -648,7 +667,7 @@ async def generate_sample(
         return JSONResponse({"status": "error", "message": str(e)}, status_code=500)
 
 
-@app.post("/api/process")
+@app.post("/api/process", tags=["Web Dashboard API"])
 async def process_batch(
     session_id: str = Form(...),
     filename_col: str = Form(...),
@@ -871,7 +890,7 @@ async def process_batch(
         return JSONResponse({"status": "error", "message": str(e)}, status_code=500)
 
 
-@app.get("/api/download/{session_id}")
+@app.get("/api/download/{session_id}", tags=["Web Dashboard API"])
 async def download_result(session_id: str) -> Any:
     """
     Downloads the final ZIP file with a timestamped filename.
@@ -904,16 +923,25 @@ async def download_result(session_id: str) -> Any:
         )
 
 
-@app.get("/help")
+# --- Static Pages ---
+
+
+@app.get("/", tags=["Static Pages"])
+async def read_root():
+    """Serves the main application page."""
+    return FileResponse(os.path.join(STATIC_DIR, "index.html"))
+
+
+@app.get("/help", tags=["Static Pages"])
 async def read_help():
-    """
-    Serves the documentation page (How to Use).
-    """
+    """Serves the documentation page."""
     return FileResponse(os.path.join(STATIC_DIR, "help.html"))
 
 
 # --- STATIC FILES CONFIGURATION (SPA/Static Site Mode) ---
-# This mounts the 'static' folder to the root URL ("/").
-# It allows relative paths (e.g., "css/style.css") to work locally AND on GitHub Pages.
-# 'html=True' automatically serves 'index.html' when accessing root.
+
+
+# This mounts the 'static' folder to the root URL ("/")
+# It allows relative paths (e.g., "css/style.css") to work locally AND on GitHub Pages
+# 'html=True' automatically serves 'index.html' when accessing root
 app.mount("/", StaticFiles(directory=STATIC_DIR, html=True), name="site")
