@@ -47,7 +47,7 @@ tags_metadata = [
 
 # Initialize FastAPI with metadata
 app = FastAPI(
-    title=settings.PROJECT_NAME, 
+    title=settings.PROJECT_NAME,
     version=settings.VERSION,
     description="Batch Processing Engine.",
     openapi_tags=tags_metadata,
@@ -88,17 +88,27 @@ async def log_generator(session_id: str):
     """
     queue = asyncio.Queue()
     log_queues[session_id] = queue
+
     try:
         while True:
-            data = await queue.get()
-            yield f"data: {data}\n\n"
-            if "PROCESS_COMPLETE" in data or "PROCESS_ERROR" in data:
+            try:
+                # Add a timeout to prevent stale queues from hanging forever
+                data = await asyncio.wait_for(
+                    queue.get(), timeout=settings.LIBREOFFICE_TIMEOUT
+                )
+                yield f"data: {data}\n\n"
+
+                if "PROCESS_COMPLETE" in data or "PROCESS_ERROR" in data:
+                    break
+            except asyncio.TimeoutError:
+                yield f"data: HEARTBEAT_TIMEOUT\n\n"
                 break
-    except asyncio.CancelledError:
-        pass
+    except Exception as e:
+        logger.error(f"SSE Stream error for session {session_id}: {e}")
     finally:
-        if session_id in log_queues:
-            del log_queues[session_id]
+        # Crucial for preventing Memory Leaks
+        log_queues.pop(session_id, None)
+        logger.info(f"SSE Queue cleared for session: {session_id}")
 
 
 def send_log(session_id: str, message: str) -> None:
