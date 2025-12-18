@@ -15,14 +15,14 @@
 
 ## 📖 Overview
 
-**LogicPaper** is a tool designed to automate document creation workflows. It takes structured data from Excel files and populates Microsoft Office templates (`.docx`, `.pptx`) using a custom Jinja2-based templating system.
+**LogicPaper** is a tool designed to automate document creation workflows. It takes structured data from Excel files and populates Microsoft Office templates (`.docx`, `.pptx`) and (`.md`, `.txt`) using a custom Jinja2-based templating system.
 
 Developed with **FastAPI** and **Docker**, it provides a web-based dashboard for managing batch jobs and includes a headless LibreOffice integration for converting generated documents into PDF format. It is suitable for generating contracts, reports, certificates, and presentations at scale.
 
 ### 🌟 Key Features
 
 * **Batch Processing:** Efficiently processes multiple rows of data from Excel files.
-* **Format Support:** Compatible with standard Word (`.docx`) and PowerPoint (`.pptx`) templates.
+* **Format Support:** Compatible with standard Word (`.docx`), PowerPoint (`.pptx`), Markdown (`.md`) and Plain Text (`.txt`).
 * **Templating Logic:** Includes filters for text manipulation, date arithmetic, currency formatting, and conditional logic directly within the template.
 * **Asset Management:** Supports dynamic insertion and resizing of images (e.g., photos, signatures) from a ZIP archive.
 * **PDF Conversion:** Integrated LibreOffice for reliable conversion of Office files to PDF.

@@ -18,6 +18,7 @@ from openpyxl.styles import Alignment, Border, Font, PatternFill, Side
 from openpyxl.utils.dataframe import dataframe_to_rows
 from openpyxl.worksheet.table import Table, TableStyleInfo
 
+from app.core.batch import process_batch_core
 from app.core.config import BASE_DIR, TEMP_DIR, STATIC_DIR, logger
 from app.core.engine import DocumentEngine
 from app.core.validator import TemplateValidator
@@ -694,23 +695,20 @@ async def process_batch(
     try:
         send_log(session_id, "🟢 Initializing session structure...")
 
-        # 2. Load Data
+        # 1. Load Data
         df = await load_dataframe(file_excel, file_json)
         input_filename = file_excel.filename if file_excel else file_json.filename
 
+        # Save Source File
         source_upload = file_excel if file_excel else file_json
         if source_upload:
-            # Ensures the cursor is at the beginning (because the load_dataframe has already read the file)
             await source_upload.seek(0)
             source_path = os.path.join(dir_inputs, source_upload.filename)
-
-            # Saves the original file to the inputs folder
             async with await anyio.open_file(source_path, "wb") as f:
                 await f.write(await source_upload.read())
-
-            # Reset the cursor again
             await source_upload.seek(0)
 
+        # 2. Save Templates
         saved_template_paths = []
         template_names = []
         for tmpl in files_templates:
@@ -721,6 +719,7 @@ async def process_batch(
             template_names.append(tmpl.filename)
             send_log(session_id, f"   ↳ Loaded template: {tmpl.filename}")
 
+        # 3. Handle Assets
         assets_filename = "None"
         if file_assets:
             assets_filename = file_assets.filename
@@ -730,149 +729,58 @@ async def process_batch(
             extract_zip(zip_input_path, dir_assets_internal)
             send_log(session_id, "📦 Assets library prepared.")
 
+        total_rows = len(df)
+        send_log(session_id, f"🚀 Starting processing for {total_rows} rows.")
+
+        # 4. Execute Core batch logic
+
+        # Define callback wrapper for SSE
+        def sse_callback(msg: str):
+            send_log(session_id, msg)
+
+        batch_result = await process_batch_core(
+            session_id=session_id,
+            df=df,
+            template_paths=saved_template_paths,
+            session_path=session_path,
+            dir_outputs=dir_outputs,
+            dir_assets=dir_assets_internal,
+            to_pdf=output_pdf,
+            filename_col=filename_col,
+            group_folders=group_by_folders,
+            log_callback=sse_callback,
+        )
+
+        # 5. Cleanup & Report
+        if os.path.exists(dir_assets_internal):
+            shutil.rmtree(dir_assets_internal)
+
+        end_time = datetime.now()
+        duration = end_time - start_time
+
         input_manifest = {
             "excel": input_filename,
             "templates": template_names,
             "assets": assets_filename,
         }
 
-        # 2. Load Data (Standard Header=0)
-        engine = DocumentEngine(session_path)
-
-        # Read Excel using Pandas default (header is first row)
-        total_rows = len(df)
-        send_log(session_id, f"🚀 Starting processing for {total_rows} rows.")
-
-        report = []
-        total_files_generated_count = 0
-        success_rows_count = 0
-
-        # 3. Process Rows
-        for idx, row in df.iterrows():
-            row_num = idx + 2  # Excel Row 2 is data start
-            row_success = False
-
-            # Create Context (Raw Data)
-            context = row.to_dict()
-
-            # Handle NaN/Nat
-            cleaned_context = {}
-            for k, v in context.items():
-                if pd.isna(v):
-                    cleaned_context[k] = None
-                else:
-                    cleaned_context[k] = v
-
-            # Determine Identifier
-            row_identifier = f"Row_{row_num}"
-            if filename_col in cleaned_context and cleaned_context[filename_col]:
-                row_identifier = sanitize_filename(str(cleaned_context[filename_col]))
-
-            # Output Directory
-            if group_by_folders:
-                target_dir = os.path.join(dir_outputs, row_identifier)
-            else:
-                target_dir = dir_outputs
-            os.makedirs(target_dir, exist_ok=True)
-
-            # Template Loop
-            for tmpl_path in saved_template_paths:
-                tmpl_filename = os.path.basename(tmpl_path)
-                tmpl_name_base, tmpl_ext = os.path.splitext(tmpl_filename)
-                final_filename = f"{tmpl_name_base} - {row_identifier}{tmpl_ext}"
-                doc_output_path = os.path.join(target_dir, final_filename)
-
-                try:
-                    if tmpl_ext.lower() == ".docx":
-                        await engine.process_docx(
-                            tmpl_path,
-                            doc_output_path,
-                            cleaned_context,
-                            dir_assets_internal,
-                        )
-                    elif tmpl_ext.lower() in [".md", ".txt"]:
-                        await engine.process_text(
-                            tmpl_path, doc_output_path, cleaned_context
-                        )
-                    elif tmpl_ext.lower() == ".pptx":
-                        await engine.process_pptx(
-                            tmpl_path, doc_output_path, cleaned_context
-                        )
-
-                    report.append(
-                        {
-                            "Row": row_num,
-                            "Identifier": row_identifier,
-                            "Output File": final_filename,
-                            "Status": "Success",
-                            "Error Details": "",
-                        }
-                    )
-                    total_files_generated_count += 1
-                    row_success = True
-
-                except Exception as e:
-                    report.append(
-                        {
-                            "Row": row_num,
-                            "Identifier": row_identifier,
-                            "Output File": final_filename,
-                            "Status": "Error",
-                            "Error Details": str(e),
-                        }
-                    )
-                    logger.error(f"Error generating {final_filename}: {e}")
-
-                # PDF Conversion
-                if output_pdf and os.path.exists(doc_output_path):
-                    pdf_filename = f"{tmpl_name_base} - {row_identifier}.pdf"
-                    try:
-                        await engine.convert_to_pdf(doc_output_path, target_dir)
-                        report.append(
-                            {
-                                "Row": row_num,
-                                "Identifier": row_identifier,
-                                "Output File": pdf_filename,
-                                "Status": "Success",
-                                "Error Details": "",
-                            }
-                        )
-                        total_files_generated_count += 1
-                    except Exception as e:
-                        report.append(
-                            {
-                                "Row": row_num,
-                                "Identifier": row_identifier,
-                                "Output File": pdf_filename,
-                                "Status": "Error",
-                                "Error Details": f"PDF Conversion: {str(e)}",
-                            }
-                        )
-
-            if row_success:
-                success_rows_count += 1
-            send_log(session_id, f"✅ {row_identifier} processed.")
-
-        # Cleanup
-        if os.path.exists(dir_assets_internal):
-            shutil.rmtree(dir_assets_internal)
-
-        # Stats
-        end_time = datetime.now()
-        duration = end_time - start_time
         metadata = {
             "session_id": session_id,
             "start_time": start_time,
             "duration": duration,
-            "total_rows": total_rows,
-            "total_files": total_files_generated_count,
+            "total_rows": batch_result["total_rows"],
+            "total_files": batch_result["total_files"],
             "success_rate": (
-                (success_rows_count / total_rows * 100) if total_rows > 0 else 0
+                (batch_result["success_rows"] / batch_result["total_rows"] * 100)
+                if batch_result["total_rows"] > 0
+                else 0
             ),
         }
 
         report_path = os.path.join(session_path, "job_report.xlsx")
-        generate_styled_report(report_path, report, metadata, input_manifest)
+        generate_styled_report(
+            report_path, batch_result["report"], metadata, input_manifest
+        )
 
         zip_base_name = os.path.join(TEMP_DIR, f"{session_id}_result")
         shutil.make_archive(
