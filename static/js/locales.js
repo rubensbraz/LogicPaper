@@ -235,6 +235,12 @@ const TRANSLATIONS = {
             inputs_changed: "--- INPUTS CHANGED ---",
             files_selected_singular: "{{count}} file selected",
             files_selected_plural: "{{count}} files selected"
+        },
+        footer: {
+            copy: "LogicPaper © 2025. All rights reserved.",
+            repo: "Source Code",
+            made_by: "Built by",
+            author: "Rubens Braz"
         }
     },
     pt: {
@@ -469,6 +475,12 @@ const TRANSLATIONS = {
             inputs_changed: "--- ENTRADAS ALTERADAS ---",
             files_selected_singular: "{{count}} arquivo selecionado",
             files_selected_plural: "{{count}} arquivos selecionados"
+        },
+        footer: {
+            copy: "LogicPaper © 2025. Todos os direitos reservados.",
+            repo: "Código Fonte",
+            made_by: "Desenvolvido por",
+            author: "Rubens Braz"
         }
     }
 };
