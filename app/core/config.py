@@ -1,5 +1,6 @@
 import logging
 import os
+from pathlib import Path
 from typing import List, Union
 
 from pydantic import AnyHttpUrl, field_validator, Field
@@ -38,16 +39,12 @@ class Settings(BaseSettings):
         raise ValueError(v)
 
     # --- Filesystem ---
-    # Base dir is calculated relative to this file
-    BASE_DIR: str = os.path.dirname(
-        os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
-    )
-
+    BASE_DIR: Path = Path(__file__).resolve().parents[2]
     TEMP_DIR: str = "/data/temp"
     PERSISTENT_TEMPLATES_DIR: str = os.path.join(BASE_DIR, "persistent_templates")
     STATIC_DIR: str = os.path.join(BASE_DIR, "static")
 
-    # --- Woker / Jobs ---
+    # --- Worker / Jobs ---
     CLEANUP_INTERVAL_SECONDS: int = 3600
     LIBREOFFICE_TIMEOUT: int = 1800
 
