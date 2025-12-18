@@ -1,4 +1,6 @@
 import asyncio
+import io
+import json
 import logging
 import os
 import shutil
@@ -76,6 +78,57 @@ def send_log(session_id: str, message: str) -> None:
     """Push a log message to the specific session queue."""
     if session_id in log_queues:
         log_queues[session_id].put_nowait(message)
+
+
+# --- Helper: Data Loader ---
+
+
+async def load_dataframe(
+    file_excel: Optional[UploadFile] = None, file_json: Optional[UploadFile] = None
+) -> pd.DataFrame:
+    """
+    Loads data from either Excel or JSON into a Pandas DataFrame.
+    """
+    if not file_excel and not file_json:
+        raise ValueError("No data source provided. Please upload Excel or JSON.")
+
+    # 1. Handle Excel
+    if file_excel:
+        try:
+            contents = await file_excel.read()
+            await file_excel.seek(0)
+            return pd.read_excel(io.BytesIO(contents), header=0)
+        except Exception as e:
+            raise ValueError(f"Failed to read Excel file: {str(e)}")
+
+    # 2. Handle JSON
+    if file_json:
+        try:
+            contents = await file_json.read()
+            await file_json.seek(0)
+            data = json.loads(contents)
+
+            # Case A: Single Dictionary -> Wrap in list
+            if isinstance(data, dict):
+                data = [data]
+
+            # Case B: List of Dictionaries (Standard)
+            elif isinstance(data, list):
+                # Validation: Ensure all items are dicts
+                if not all(isinstance(i, dict) for i in data):
+                    raise ValueError(
+                        "JSON list must contain objects (key-value pairs)."
+                    )
+            else:
+                raise ValueError("JSON must be an Object or a List of Objects.")
+
+            # Normalize semi-structured JSON. This flattens simple nested keys if necessary
+            return pd.json_normalize(data)
+
+        except json.JSONDecodeError:
+            raise ValueError("Invalid JSON file format.")
+        except Exception as e:
+            raise ValueError(f"Error parsing JSON data: {str(e)}")
 
 
 # --- Reporting Engine ---
@@ -290,13 +343,15 @@ async def stream_logs(session_id: str):
 
 
 @app.post("/api/preview")
-async def preview_data(file_excel: UploadFile = File(...)):
+async def preview_data(
+    file_excel: UploadFile = File(None), file_json: UploadFile = File(None)
+):
     """
-    Parses the Excel file and returns the headers and first 5 RAW rows.
+    Parses the Excel OR JSON file and returns headers and first 5 rows.
     """
     try:
-        # Load Excel, Header is Row 1 (index 0)
-        df = pd.read_excel(file_excel.file, header=0)
+        # Load Data using Helper
+        df = await load_dataframe(file_excel, file_json)
 
         # Row 1: Headers
         headers = df.columns.tolist()
@@ -325,21 +380,21 @@ async def preview_data(file_excel: UploadFile = File(...)):
 
 @app.post("/api/validate")
 async def validate_compatibility(
-    file_excel: UploadFile = File(...),
+    file_excel: UploadFile = File(None),
+    file_json: UploadFile = File(None),
     files_templates: List[UploadFile] = File(...),
 ):
     """
-    Validates that template tags exist in Excel headers.
+    Validates that template tags exist in Excel/JSON headers.
     """
     session_id = f"val_{uuid.uuid4().hex[:8]}"
     session_path = os.path.join(TEMP_DIR, session_id)
     os.makedirs(session_path, exist_ok=True)
 
     try:
-        # Save Excel
-        excel_path = os.path.join(session_path, file_excel.filename)
-        async with await anyio.open_file(excel_path, "wb") as f:
-            await f.write(await file_excel.read())
+        # Load Data Headers (No need to save file to disk just for headers)
+        df = await load_dataframe(file_excel, file_json)
+        headers = [str(h) for h in df.columns.tolist()]
 
         # Save Templates
         templates_map = {}
@@ -348,11 +403,6 @@ async def validate_compatibility(
             async with await anyio.open_file(t_path, "wb") as f:
                 await f.write(await tmpl.read())
             templates_map[tmpl.filename] = t_path
-
-        # Read Headers
-        df = pd.read_excel(excel_path, header=0, nrows=0)
-        headers = df.columns.tolist()
-        headers = [str(h) for h in headers]
 
         # Validate
         validator = TemplateValidator()
@@ -373,12 +423,13 @@ async def generate_sample(
     session_id: str = Form(...),
     filename_col: str = Form(...),
     output_pdf: bool = Form(False),
-    file_excel: UploadFile = File(...),
+    file_excel: UploadFile = File(None),
+    file_json: UploadFile = File(None),
     files_templates: List[UploadFile] = File(...),
     file_assets: UploadFile = File(None),
 ):
     """
-    Dry Run Endpoint: Processes ONLY the first data row from the Excel file.
+    Dry Run Endpoint: Processes ONLY the first data row from the Excel/JSON file.
     Returns a ZIP file containing the generated documents for that specific row
     for immediate user verification.
     """
@@ -396,11 +447,22 @@ async def generate_sample(
         os.makedirs(p, exist_ok=True)
 
     try:
-        # 2. Save Inputs
-        # Save Excel
-        excel_path = os.path.join(dir_inputs, file_excel.filename)
-        async with await anyio.open_file(excel_path, "wb") as f:
-            await f.write(await file_excel.read())
+        # 2. Load and Save Input Data
+        df = await load_dataframe(file_excel, file_json)
+        input_filename = file_excel.filename if file_excel else file_json.filename
+
+        source_upload = file_excel if file_excel else file_json
+        if source_upload:
+            # Ensures the cursor is at the beginning (because the load_dataframe has already read the file)
+            await source_upload.seek(0)
+            source_path = os.path.join(dir_inputs, source_upload.filename)
+
+            # Saves the original file to the inputs folder
+            async with await anyio.open_file(source_path, "wb") as f:
+                await f.write(await source_upload.read())
+
+            # Reset the cursor again
+            await source_upload.seek(0)
 
         # Save Templates
         saved_template_paths = []
@@ -423,7 +485,7 @@ async def generate_sample(
 
         # Manifest for Report
         input_manifest = {
-            "excel": file_excel.filename,
+            "excel": input_filename,
             "templates": template_names,
             "assets": assets_filename,
         }
@@ -431,13 +493,8 @@ async def generate_sample(
         # 3. Initialize Engine & Parse Data
         engine = DocumentEngine(session_path)
 
-        # Read Excel: Row 1 is Header (header=0)
-        df = pd.read_excel(excel_path, header=0)
-
         if df.empty:
-            raise ValueError(
-                "Excel file must contain at least Header and one Data Row."
-            )
+            raise ValueError("Data source is empty.")
 
         # TARGET: Only the first data row (Index 0, which corresponds to Excel Row 2)
         target_row = df.iloc[0]
@@ -494,6 +551,10 @@ async def generate_sample(
                             doc_output_path,
                             cleaned_context,
                             dir_assets_internal,
+                        )
+                    elif tmpl_ext.lower() in [".md", ".txt"]:
+                        await engine.process_text(
+                            tmpl_path, doc_output_path, cleaned_context
                         )
                     elif tmpl_ext.lower() == ".pptx":
                         await engine.process_pptx(
@@ -593,7 +654,8 @@ async def process_batch(
     filename_col: str = Form(...),
     output_pdf: bool = Form(False),
     group_by_folders: bool = Form(True),
-    file_excel: UploadFile = File(...),
+    file_excel: UploadFile = File(None),
+    file_json: UploadFile = File(None),
     files_templates: List[UploadFile] = File(...),
     file_assets: UploadFile = File(None),
 ):
@@ -613,10 +675,22 @@ async def process_batch(
     try:
         send_log(session_id, "🟢 Initializing session structure...")
 
-        # 1. Save Inputs
-        excel_path = os.path.join(dir_inputs, file_excel.filename)
-        async with await anyio.open_file(excel_path, "wb") as f:
-            await f.write(await file_excel.read())
+        # 2. Load Data
+        df = await load_dataframe(file_excel, file_json)
+        input_filename = file_excel.filename if file_excel else file_json.filename
+
+        source_upload = file_excel if file_excel else file_json
+        if source_upload:
+            # Ensures the cursor is at the beginning (because the load_dataframe has already read the file)
+            await source_upload.seek(0)
+            source_path = os.path.join(dir_inputs, source_upload.filename)
+
+            # Saves the original file to the inputs folder
+            async with await anyio.open_file(source_path, "wb") as f:
+                await f.write(await source_upload.read())
+
+            # Reset the cursor again
+            await source_upload.seek(0)
 
         saved_template_paths = []
         template_names = []
@@ -638,7 +712,7 @@ async def process_batch(
             send_log(session_id, "📦 Assets library prepared.")
 
         input_manifest = {
-            "excel": file_excel.filename,
+            "excel": input_filename,
             "templates": template_names,
             "assets": assets_filename,
         }
@@ -647,7 +721,6 @@ async def process_batch(
         engine = DocumentEngine(session_path)
 
         # Read Excel using Pandas default (header is first row)
-        df = pd.read_excel(excel_path, header=0)
         total_rows = len(df)
         send_log(session_id, f"🚀 Starting processing for {total_rows} rows.")
 
@@ -697,6 +770,10 @@ async def process_batch(
                             doc_output_path,
                             cleaned_context,
                             dir_assets_internal,
+                        )
+                    elif tmpl_ext.lower() in [".md", ".txt"]:
+                        await engine.process_text(
+                            tmpl_path, doc_output_path, cleaned_context
                         )
                     elif tmpl_ext.lower() == ".pptx":
                         await engine.process_pptx(

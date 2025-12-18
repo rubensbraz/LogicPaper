@@ -25,18 +25,18 @@
                         <span class="text-xs text-gray-500" data-i18n="dashboard.ingestion.subtitle">Drag & Drop Enabled</span>
                     </div>
                     <div class="space-y-3 relative z-10">
-                        <label id="dropExcel" class="drop-zone block border border-dashed border-gray-600 rounded-xl p-4 cursor-pointer group bg-black/20 hover:bg-black/40">
-                            <input type="file" id="fileExcel" class="hidden" accept=".xlsx" onchange="updateUI(this)">
+                        <label id="dropData" class="drop-zone block border border-dashed border-gray-600 rounded-xl p-4 cursor-pointer group bg-black/20 hover:bg-black/40">
+                            <input type="file" id="fileData" class="hidden" accept=".xlsx,.json" onchange="updateUI(this)">
                             <div class="flex items-center gap-3">
                                 <div class="p-2 bg-green-500/20 text-green-400 rounded-lg">📊</div>
                                 <div class="flex-1">
-                                    <div class="text-sm font-medium text-gray-200" data-i18n="dashboard.ingestion.drop_excel.main">Data Source (.xlsx)</div>
-                                    <div id="lblExcel" class="text-xs text-gray-500" data-i18n="dashboard.ingestion.drop_excel.sub">Required</div>
+                                    <div class="text-sm font-medium text-gray-200" data-i18n="dashboard.ingestion.drop_data.main">Data Source</div>
+                                    <div id="lblData" class="text-xs text-gray-500" data-i18n="dashboard.ingestion.drop_data.sub">Required (.xlsx or .json)</div>
                                 </div>
                             </div>
                         </label>
                         <label id="dropTemplates" class="drop-zone block border border-dashed border-gray-600 rounded-xl p-4 cursor-pointer group bg-black/20 hover:bg-black/40">
-                            <input type="file" id="fileTemplates" class="hidden" accept=".docx,.pptx" multiple onchange="updateUI(this)">
+                            <input type="file" id="fileTemplates" class="hidden" accept=".docx,.pptx,.md,.txt" multiple onchange="updateUI(this)">
                             <div class="flex items-center gap-3">
                                 <div class="p-2 bg-blue-500/20 text-blue-400 rounded-lg">📄</div>
                                 <div class="flex-1">

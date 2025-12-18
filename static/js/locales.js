@@ -19,13 +19,13 @@ const TRANSLATIONS = {
             ingestion: {
                 title: "1. Ingestion",
                 subtitle: "Drag & Drop Enabled",
-                drop_excel: {
-                    main: "Data Source (.xlsx)",
-                    sub: "Required"
+                drop_data: {
+                    main: "Data Source",
+                    sub: "Required (.xlsx or .json)"
                 },
                 drop_templates: {
                     main: "Templates",
-                    sub: "Word or PowerPoint"
+                    sub: "Word, PPTX, Markdown or TXT"
                 },
                 drop_assets: {
                     main: "Assets Library",
@@ -37,7 +37,7 @@ const TRANSLATIONS = {
             config: {
                 title: "2. Configuration",
                 lbl_filename: "FILENAME IDENTIFIER",
-                placeholder_excel: "Awaiting Excel file...",
+                placeholder_excel: "Awaiting Excel or JSON file...",
                 opt_select_col: "-- Select Identifier Column --",
                 lbl_pdf: "Convert Output to PDF",
                 lbl_folders: "Group Files in Folders",
@@ -57,8 +57,8 @@ const TRANSLATIONS = {
             preview: {
                 title: "DATA_SOURCE_PREVIEW.JSON",
                 badge: "READ-ONLY",
-                waiting: "Awaiting Excel file...",
-                step1: "Step 1: Reading Excel Structure...",
+                waiting: "Awaiting Excel or JSON file...",
+                step1: "Step 1: Reading Data Structure...",
                 error: "Error: "
             },
             logs: {
@@ -70,7 +70,7 @@ const TRANSLATIONS = {
             toast: "Code copied to clipboard!",
             header: {
                 title: "Template Engine Reference",
-                desc: "Comprehensive documentation for the LogicPaper formatting engine. Learn how to transform raw Excel data using <strong>Jinja2 Pipes</strong> directly inside your Word and PowerPoint templates.",
+                desc: "Comprehensive documentation for the LogicPaper formatting engine. Learn how to transform raw Excel data using <strong>Jinja2 Pipes</strong> directly inside your Word, PowerPoint, Markdown or Plain Text templates.",
                 btn_back: "Back to Dashboard"
             },
             nav: {
@@ -203,7 +203,7 @@ const TRANSLATIONS = {
             },
             missing_excel: {
                 title: "Missing Input",
-                text: "Please upload an Excel file."
+                text: "Please upload an Excel or JSON file."
             },
             missing_templates: {
                 title: "Missing Input",
@@ -253,13 +253,13 @@ const TRANSLATIONS = {
             ingestion: {
                 title: "1. Ingestão",
                 subtitle: "Arrastar e Soltar Ativado",
-                drop_excel: {
-                    main: "Fonte de Dados (.xlsx)",
-                    sub: "Obrigatório"
+                drop_data: {
+                    main: "Fonte de Dados",
+                    sub: "Obrigatório (.xlsx or .json)"
                 },
                 drop_templates: {
                     main: "Modelos (Templates)",
-                    sub: "Word ou PowerPoint"
+                    sub: "Word, PPTX, Markdown ou TXT"
                 },
                 drop_assets: {
                     main: "Biblioteca de Imagens",
@@ -271,7 +271,7 @@ const TRANSLATIONS = {
             config: {
                 title: "2. Configuração",
                 lbl_filename: "IDENTIFICADOR DO ARQUIVO",
-                placeholder_excel: "Aguardando arquivo Excel...",
+                placeholder_excel: "Aguardando arquivo Excel ou JSON...",
                 opt_select_col: "-- Selecione a Coluna Identificadora --",
                 lbl_pdf: "Converter Saída para PDF",
                 lbl_folders: "Agrupar Arquivos em Pastas",
@@ -291,8 +291,8 @@ const TRANSLATIONS = {
             preview: {
                 title: "PRÉVIA_DADOS_EXCEL.JSON",
                 badge: "SOMENTE LEITURA",
-                waiting: "Aguardando arquivo Excel...",
-                step1: "Passo 1: Lendo Estrutura do Excel...",
+                waiting: "Aguardando arquivo Excel ou JSON...",
+                step1: "Passo 1: Lendo Estrutura dos Dados...",
                 error: "Erro: "
             },
             logs: {
@@ -304,7 +304,7 @@ const TRANSLATIONS = {
             toast: "Código copiado para a área de transferência!",
             header: {
                 title: "Referência do Motor de Modelos",
-                desc: "Documentação completa para o motor de formatação LogicPaper. Aprenda como transformar dados brutos do Excel usando <strong>Jinja2 Pipes</strong> diretamente dentro dos seus modelos Word e PowerPoint.",
+                desc: "Documentação completa para o motor de formatação LogicPaper. Aprenda como transformar dados brutos do Excel usando <strong>Jinja2 Pipes</strong> diretamente dentro dos seus modelos Word, PowerPoint, Markdown ou Plain Text (.txt).",
                 btn_back: "Voltar ao Painel"
             },
             nav: {
@@ -437,7 +437,7 @@ const TRANSLATIONS = {
             },
             missing_excel: {
                 title: "Entrada Ausente",
-                text: "Por favor, carregue um arquivo Excel."
+                text: "Por favor, carregue um arquivo Excel ou um JSON."
             },
             missing_templates: {
                 title: "Entrada Ausente",

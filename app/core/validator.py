@@ -91,6 +91,18 @@ class TemplateValidator:
             logger.error(f"Failed to parse DOCX {file_path}: {e}")
             return set()
 
+    def extract_tags_from_text_file(self, file_path: str) -> Set[str]:
+        """
+        Extracts tags from Plain Text or Markdown files.
+        """
+        try:
+            with open(file_path, "r", encoding="utf-8", errors="ignore") as f:
+                content = f.read()
+            return self._extract_from_text(content)
+        except Exception as e:
+            logger.error(f"Failed to parse Text File {file_path}: {e}")
+            return set()
+
     def extract_tags_from_pptx(self, file_path: str) -> Set[str]:
         """
         Extracts tags from a PowerPoint presentation.
@@ -142,6 +154,8 @@ class TemplateValidator:
 
             if ext == ".docx":
                 required_vars = self.extract_tags_from_docx(path)
+            elif ext in [".md", ".txt"]:
+                required_vars = self.extract_tags_from_text_file(path)
             elif ext == ".pptx":
                 required_vars = self.extract_tags_from_pptx(path)
 

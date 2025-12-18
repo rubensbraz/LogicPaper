@@ -9,7 +9,7 @@ let isProcessing = false;
 
 // --- Initialization ---
 document.addEventListener('DOMContentLoaded', () => {
-    initializeDragDrop(['dropExcel', 'dropTemplates', 'dropAssets']);
+    initializeDragDrop(['dropData', 'dropTemplates', 'dropAssets']);
 });
 
 // --- State Management ---
@@ -35,7 +35,7 @@ function resetStateOnInput(type) {
     document.getElementById('actionPanel').classList.remove('hidden');
 
     // 2. Specific logic for Excel changes
-    if (type === 'excel') {
+    if (type === 'data') {
         const previewEl = document.getElementById('jsonPreview');
         previewEl.innerText = i18n.t('dashboard.config.placeholder_excel');
         previewEl.className = "absolute inset-0 p-4 text-xs font-mono text-green-400 overflow-auto scrollbar-thin";
@@ -97,8 +97,8 @@ function initializeDragDrop(ids) {
  * @param {HTMLInputElement} input - The file input element.
  */
 function updateUI(input) {
-    const labelId = input.id.replace('file', 'lbl');
-    const label = document.getElementById(labelId);
+    const labelId = input.id.replace('file', 'lbl').replace('Excel', 'Data');
+    const label = document.getElementById(input.id === 'fileData' ? 'lblData' : labelId);
 
     if (input.files && input.files.length > 0) {
         if (input.files.length === 1) {
@@ -112,8 +112,21 @@ function updateUI(input) {
         label.classList.remove('text-gray-500');
 
         // Reset state (hide results, lock config) to force re-analysis
-        const type = input.id.includes('Excel') ? 'excel' : 'other';
+        const type = input.id === 'fileData' ? 'data' : 'other';
         resetStateOnInput(type);
+    }
+}
+
+// --- API Helpers ---
+
+/**
+ * Helper to append correct data file to FormData
+ */
+function appendDataFile(formData, file) {
+    if (file.name.toLowerCase().endsWith('.json')) {
+        formData.append('file_json', file);
+    } else {
+        formData.append('file_excel', file);
     }
 }
 
@@ -142,11 +155,11 @@ async function performAnalysisSequence() {
         return; // Halt execution immediately
     }
 
-    const fileExcel = document.getElementById('fileExcel').files[0];
+    const fileData = document.getElementById('fileData').files[0];
     const fileTemplates = document.getElementById('fileTemplates').files;
 
     // 1. Basic Input Validation
-    if (!fileExcel) return Swal.fire({ icon: 'warning', title: i18n.t('alerts.missing_excel.title'), text: i18n.t('alerts.missing_excel.text'), background: '#1e293b', color: '#fff' });
+    if (!fileData) return Swal.fire({ icon: 'warning', title: i18n.t('alerts.missing_excel.title'), text: i18n.t('alerts.missing_excel.text'), background: '#1e293b', color: '#fff' });
     if (fileTemplates.length === 0) return Swal.fire({ icon: 'warning', title: i18n.t('alerts.missing_excel.title'), text: i18n.t('alerts.missing_templates.text'), background: '#1e293b', color: '#fff' });
 
     // 2. UI Loading State
@@ -158,11 +171,11 @@ async function performAnalysisSequence() {
     try {
         // 3. Step 1: Preview Data (Excel Analysis)
         // We await the result. If false, we stop.
-        const previewSuccess = await previewData(fileExcel);
+        const previewSuccess = await previewData(fileData);
         if (!previewSuccess) throw new Error(i18n.t('alerts.analysis_failed'));
 
         // 4. Step 2: Validate Templates (Compatibility Check)
-        const validationSuccess = await validateTemplates(fileExcel, fileTemplates);
+        const validationSuccess = await validateTemplates(fileData, fileTemplates);
 
         // 5. Unlock Configuration Panel only if everything passed
         if (validationSuccess) {
@@ -181,12 +194,12 @@ async function performAnalysisSequence() {
 }
 /**
  * Analyzes the Excel file and populates the JSON preview.
- * @param {File} fileExcel - The Excel file object.
+ * @param {File} fileData - The Excel file object.
  * @returns {Promise<boolean>} True if successful.
  */
-async function previewData(fileExcel) {
+async function previewData(fileData) {
     const formData = new FormData();
-    formData.append('file_excel', fileExcel);
+    appendDataFile(formData, fileData);
 
     const prevEl = document.getElementById(CONFIG.dom.jsonPreview);
     prevEl.innerText = i18n.t('dashboard.preview.step1');
@@ -224,13 +237,13 @@ async function previewData(fileExcel) {
 
 /**
  * Validates that template variables match Excel headers.
- * @param {File} fileExcel - The Excel file.
+ * @param {File} fileData - The Excel file.
  * @param {FileList} fileTemplates - The list of templates.
  * @returns {Promise<boolean>} True if valid (or warning shown).
  */
-async function validateTemplates(fileExcel, fileTemplates) {
+async function validateTemplates(fileData, fileTemplates) {
     const formData = new FormData();
-    formData.append('file_excel', fileExcel);
+    appendDataFile(formData, fileData);
     for (let i = 0; i < fileTemplates.length; i++) {
         formData.append('files_templates', fileTemplates[i]);
     }
@@ -458,7 +471,7 @@ function startProcessing() {
  * @returns {Object|null} Parameters object or null if invalid.
  */
 function validateInputs() {
-    const fileExcel = document.getElementById('fileExcel').files[0];
+    const fileData = document.getElementById('fileData').files[0];
     const fileTemplates = document.getElementById('fileTemplates').files;
     const fileAssets = document.getElementById('fileAssets').files[0];
     const colName = document.getElementById('colSelect').value;
@@ -470,11 +483,11 @@ function validateInputs() {
         return null;
     }
     if (!colName || colName === "") {
-        Swal.fire({ icon: 'warning', title: i18n.t('alerts.missing_excel.title'), text: i18n.t('dashboard.ingestion.drop_excel.sub'), background: '#1e293b', color: '#fff' });
+        Swal.fire({ icon: 'warning', title: i18n.t('alerts.missing_excel.title'), text: i18n.t('dashboard.ingestion.drop_data.sub'), background: '#1e293b', color: '#fff' });
         return null;
     }
 
-    return { fileExcel, fileTemplates, fileAssets, colName, toPdf, groupFolders };
+    return { fileData, fileTemplates, fileAssets, colName, toPdf, groupFolders };
 }
 
 /**
@@ -486,7 +499,8 @@ function buildFormData(p) {
     fd.append('filename_col', p.colName);
     fd.append('output_pdf', p.toPdf);
     fd.append('group_by_folders', p.groupFolders);
-    fd.append('file_excel', p.fileExcel);
+    appendDataFile(fd, p.fileData);
+
     for (let i = 0; i < p.fileTemplates.length; i++) fd.append('files_templates', p.fileTemplates[i]);
     if (p.fileAssets) fd.append('file_assets', p.fileAssets);
     return fd;

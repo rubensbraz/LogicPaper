@@ -6,9 +6,10 @@ import subprocess
 import zipfile
 from typing import Any, Dict, List, Optional
 
+import anyio
 from docx.shared import Cm
 from docxtpl import DocxTemplate, InlineImage
-from jinja2 import Environment
+from jinja2 import Environment, BaseLoader
 from pptx import Presentation
 
 from app.core.formatter import DataFormatter
@@ -131,6 +132,57 @@ class DocumentEngine:
 
         except Exception as e:
             logger.error(f"DOCX Render Error: {e}")
+            raise e
+
+    async def process_text(
+        self,
+        template_path: str,
+        output_path: str,
+        context: Dict[str, Any],
+    ) -> bool:
+        """
+        Renders Text-based templates (MD, TXT) using Jinja2 context and Custom Filters.
+
+        Args:
+            template_path (str): Path to input template.
+            output_path (str): Path where rendered file will be saved.
+            context (Dict): Raw data dictionary.
+
+        Returns:
+            bool: True if successful.
+        """
+        try:
+            # 1. Read content asynchronously (Non-blocking I/O)
+            async with await anyio.open_file(template_path, "r", encoding="utf-8") as f:
+                content = await f.read()
+
+            # 2. Create a fresh Jinja2 Environment
+            # autoescape=False is standard for text/markdown generation to avoid escaping < > &
+            jinja_env = Environment(loader=BaseLoader(), autoescape=False)
+
+            # 3. Register Standard Filters (String, Date, Number, etc.)
+            filters = self.formatter.get_jinja_filters()
+            jinja_env.filters.update(filters)
+
+            # 4. Handle Image Filter for Text
+            # In text files, we return the filename string so the user can use it in Markdown tags:
+            # Example: ![Alt]({{ photo | format_image }}) -> ![Alt](photo.jpg)
+            jinja_env.filters["format_image"] = lambda val, *args: (
+                str(val) if val else ""
+            )
+
+            # 5. Render
+            template = jinja_env.from_string(content)
+            rendered_content = template.render(context)
+
+            # 6. Write Output asynchronously
+            async with await anyio.open_file(output_path, "w", encoding="utf-8") as f:
+                await f.write(rendered_content)
+
+            return True
+
+        except Exception as e:
+            logger.error(f"Text/MD Render Error: {e}")
             raise e
 
     def _parse_and_replace_pptx_text(self, text: str, context: Dict[str, Any]) -> str:
