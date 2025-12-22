@@ -21,7 +21,7 @@ A aplicação segue uma **Arquitetura Enterprise** (Arquitetura Hexagonal), util
 
 ### 🖼️ Prévia do Sistema
 
-### Interface do Painel
+### Interface da Dashboard
 
 ![Dashboard Interface](docs/images/dashboard_preview.png)
 *Interface Drag & Drop com logs de processo em tempo real.*
@@ -103,7 +103,7 @@ LogicPaper/
     ```
 
 4.  **Acesso**
-    * **Painel UI:** `http://localhost:8000`
+    * **Dashboard UI:** `http://localhost:8000`
     * **Documentação API:** `http://localhost:8000/docs`
 
 ## 💻 Integração via API

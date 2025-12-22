@@ -248,7 +248,7 @@ const TRANSLATIONS = {
             title_main: "Logic",
             title_sub: "Paper",
             subtitle: "Processamento em Lote v1.1",
-            link_dashboard: "Painel",
+            link_dashboard: "Dashboard",
             link_help: "Como Usar",
             badge_preview: "APENAS VISUALIZAÇÃO",
             badge_online: "SISTEMA ONLINE",
@@ -311,7 +311,7 @@ const TRANSLATIONS = {
             header: {
                 title: "Referência do Motor de Modelos",
                 desc: "Documentação completa para o motor de formatação LogicPaper. Aprenda como transformar dados brutos do Excel usando <strong>Jinja2 Pipes</strong> diretamente dentro dos seus modelos Word, PowerPoint, Markdown ou Plain Text (.txt).",
-                btn_back: "Voltar ao Painel"
+                btn_back: "Voltar para Dashboard"
             },
             nav: {
                 core: "Conceitos Básicos",
