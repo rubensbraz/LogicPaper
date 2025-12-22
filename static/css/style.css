@@ -21,6 +21,26 @@ body {
     filter: grayscale(100%);
 }
 
+/* Navbar Mobile Fixes */
+#navbar-mount {
+    width: 100%;
+    max-width: 100vw;
+    overflow-x: hidden;
+}
+
+@media (max-width: 768px) {
+    /* Ensures the glass panel or header doesn't exceed screen bounds */
+    header {
+        width: 100% !important;
+        padding-left: 1rem;
+        padding-right: 1rem;
+    }
+    
+    nav a, nav button {
+        min-height: 40px;
+    }
+}
+
 /* Glassmorphism Panels */
 .glass-panel {
     background: rgba(17, 25, 40, 0.75);

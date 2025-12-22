@@ -247,7 +247,7 @@ const TRANSLATIONS = {
         navbar: {
             title_main: "Logic",
             title_sub: "Paper",
-            subtitle: "Motor de Processamento em Lote v1.1",
+            subtitle: "Processamento em Lote v1.1",
             link_dashboard: "Painel",
             link_help: "Como Usar",
             badge_preview: "APENAS VISUALIZAÇÃO",
