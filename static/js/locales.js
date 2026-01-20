@@ -170,7 +170,7 @@ const TRANSLATIONS = {
                 },
                 bool: {
                     title: "Boolean Strategy",
-                    op_yesno: "Yes/No",
+                    op_yesno: "Yes / No",
                     op_check: "Visual Checkbox",
                     desc_yesno: "Arg 1 is True value, Arg 2 is False value.",
                     desc_check: "Outputs Wingdings-compatible checkbox characters."
@@ -410,7 +410,7 @@ const TRANSLATIONS = {
                 },
                 bool: {
                     title: "Estratégia Booleana",
-                    op_yesno: "Sim/Não",
+                    op_yesno: "Sim / Não",
                     op_check: "Checkbox Visual",
                     desc_yesno: "Arg 1 é valor Verdadeiro, Arg 2 é valor Falso.",
                     desc_check: "Gera caracteres de caixa de seleção compatíveis com Wingdings."

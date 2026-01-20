@@ -88,21 +88,23 @@ LogicPaper/
 
 ### Installation & Deployment
 
-1.  **Clone the Repository**
+1. **Clone the Repository**
+
     ```bash
     git clone https://github.com/rubensbraz/LogicPaper.git
     cd LogicPaper
     ```
 
-2.  **Configure Environment**
+2. **Configure Environment**
     Create a `.env` file based on the provided configuration (ensure `LOGICPAPER_API_KEY` is set).
 
-3.  **Start Services**
+3. **Start Services**
+
     ```bash
     docker-compose up --build
     ```
 
-4.  **Access**
+4. **Access**
     * **UI Dashboard:** `http://localhost:8000`
     * **API Documentation:** `http://localhost:8000/docs`
 
@@ -146,6 +148,7 @@ LogicPaper uses the pipe character (`|`) to apply formatting filters to variable
 ### 4. Conditional Logic
 
 Map status codes or values directly in the document:
+
 ```jinja2
 {{ status_code | format_logic(
     '10=Approved',
@@ -174,13 +177,15 @@ This project is licensed under the **Creative Commons Attribution-NonCommercial 
 
 [![CC BY-NC 4.0](https://licensebuttons.net/l/by-nc/4.0/88x31.png)](http://creativecommons.org/licenses/by-nc/4.0/)
 
-### You are free to:
+### You are free to
+
 * **Share:** Copy and redistribute the material in any medium or format.
 * **Adapt:** Remix, transform, and build upon the material.
 
-### Under the following terms:
-1.  **Attribution:** You must give appropriate credit to **Rubens Braz**, provide a link to the license, and indicate if changes were made.
-2.  **NonCommercial:** You may **NOT** use the material for commercial purposes (selling the software, using it for paid services, or integrating it into commercial products).
+### Under the following terms
+
+1. **Attribution:** You must give appropriate credit to **Rubens Braz**, provide a link to the license, and indicate if changes were made.
+2. **NonCommercial:** You may **NOT** use the material for commercial purposes (selling the software, using it for paid services, or integrating it into commercial products).
 
 *To view a copy of this license, visit [http://creativecommons.org/licenses/by-nc/4.0/](http://creativecommons.org/licenses/by-nc/4.0/)*
 

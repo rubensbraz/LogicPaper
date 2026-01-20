@@ -9,6 +9,7 @@ docxtpl
 python-docx
 python-pptx
 Jinja2
+xlsxwriter
 APScheduler
 babel
 Pillow

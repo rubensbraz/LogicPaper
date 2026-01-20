@@ -417,7 +417,7 @@ class SeedGenerator:
         doc.add_heading("SERVICE LEVEL AGREEMENT", 0)
 
         p = doc.add_paragraph("THIS AGREEMENT is dated ")
-        self._set_no_proof(p.add_run("{{ founded_date | format_date('long') }}"))
+        self._set_no_proof(p.add_run("{{ founded_date | format_date('iso') }}"))
         p.add_run(" and is made between:")
 
         # Parties
@@ -453,7 +453,7 @@ class SeedGenerator:
 
         p = doc.add_paragraph()
         p.add_run("Publicly Traded: ")
-        self._set_no_proof(p.add_run("{{ is_public | format_bool('yesno') }}"))
+        self._set_no_proof(p.add_run("{{ is_public | format_bool('bool', 'Yes', 'No') }}"))
 
         # Signatures
         doc.add_paragraph().add_run().add_break()
@@ -588,7 +588,7 @@ class SeedGenerator:
             "{{ ceo_name | format_logic('default', 'VACANT POSITION') }}",
         )
         add_test_row(
-            table, "Bool", "yesno", "None", "{{ is_public | format_bool('yesno') }}"
+            table, "Bool", "Yes / No", "None", "{{ is_public | format_bool('bool', 'Yes', 'No') }}"
         )
         add_test_row(
             table,
@@ -681,7 +681,7 @@ class SeedGenerator:
         tf = slide.placeholders[1].text_frame
 
         p = tf.add_paragraph()
-        p.text = "Is Public? {{ is_public | format_bool('truefalse') }}"
+        p.text = "Is Public? {{ is_public | format_bool('check') }}"
         p = tf.add_paragraph()
         p.text = "Compliance? [ {{ compliance_check | format_bool('check') }} ]"
 

@@ -88,21 +88,23 @@ LogicPaper/
 
 ### Instalação e Execução
 
-1.  **Clonar o Repositório**
+1. **Clonar o Repositório**
+
     ```bash
     git clone https://github.com/rubensbraz/LogicPaper.git
     cd LogicPaper
     ```
 
-2.  **Configurar Ambiente**
+2. **Configurar Ambiente**
     Crie um arquivo `.env` baseado nas configurações do projeto (certifique-se de definir a `LOGICPAPER_API_KEY`).
 
-3.  **Iniciar os Serviços**
+3. **Iniciar os Serviços**
+
     ```bash
     docker-compose up --build
     ```
 
-4.  **Acesso**
+4. **Acesso**
     * **Dashboard UI:** `http://localhost:8000`
     * **Documentação API:** `http://localhost:8000/docs`
 
@@ -146,6 +148,7 @@ LogicPaper usa o caractere pipe (`|`) para aplicar filtros de formatação às v
 ### 4. Lógica Condicional
 
 Mapeie códigos de status ou valores diretamente no documento:
+
 ```jinja2
 {{ status_code | format_logic(
     '10=Approved',
@@ -174,13 +177,15 @@ Este projeto está licenciado sob a **Licença Creative Commons Atribuição-Nã
 
 [![CC BY-NC 4.0](https://licensebuttons.net/l/by-nc/4.0/88x31.png)](http://creativecommons.org/licenses/by-nc/4.0/)
 
-### Você tem o direito de:
+### Você tem o direito de
+
 * **Compartilhar:** Copiar e redistribuir o material em qualquer suporte ou formato.
 * **Adaptar:** Remixar, transformar, e criar a partir do material.
 
-### De acordo com os seguintes termos:
-1.  **Atribuição:** Você deve dar o crédito apropriado a **Rubens Braz**, fornecer um link para a licença e indicar se mudanças foram feitas.
-2.  **NãoComercial:** Você **NÃO** pode usar o material para fins comerciais (vender o software, usá-lo para serviços pagos ou integrá-lo em produtos comerciais).
+### De acordo com os seguintes termos
+
+1. **Atribuição:** Você deve dar o crédito apropriado a **Rubens Braz**, fornecer um link para a licença e indicar se mudanças foram feitas.
+2. **NãoComercial:** Você **NÃO** pode usar o material para fins comerciais (vender o software, usá-lo para serviços pagos ou integrá-lo em produtos comerciais).
 
 *Para ver uma cópia desta licença, visite [http://creativecommons.org/licenses/by-nc/4.0/](http://creativecommons.org/licenses/by-nc/4.0/)*
 
