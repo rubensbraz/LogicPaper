@@ -43,6 +43,38 @@ A aplicação segue uma **Arquitetura Enterprise** (Arquitetura Hexagonal), util
 * **Gestão Dinâmica de Assets:** Extração, inserção e redimensionamento automático de imagens a partir de arquivos ZIP.
 * **Conversão PDF:** Motor LibreOffice integrado para conversão de alta fidelidade para PDF.
 
+---
+
+## ⚡ Exemplo
+
+Veja como o **LogicPaper** transforma dados brutos em documentos profissionais instantaneamente.
+
+### 1. Dados de Entrada (JSON)
+
+Estes são os dados simulados que alimentam o sistema:
+
+```json
+{
+    "id": "CORP-001",
+    "company": "Acme Solutions Inc.",
+    "founded_date": "1998-05-12",
+    "revenue_q4": "1500000.00",
+    "is_public": "TRUE",
+    "compliance_check": "FALSE",
+    "auth_sig": "sig_valid.png"
+}
+```
+
+### 2. Resultado Visual (Antes & Depois)
+
+| Template (Entrada) | Documento Gerado (Saída) |
+| :---: | :---: |
+| **Model with Jinja2 Tags** | **Rendered PDF with Data** |
+| <img src="docs/images/contract_template_preview.png" width="350" alt="Template Preview"> | <img src="docs/images/contract_result_preview.png" width="350" alt="Result Preview"> |
+| [📄 Ver Template PDF](docs/files/contract_template.pdf) | [📃 Ver Resultado PDF](docs/files/contract_acme_result.pdf) |
+
+---
+
 ## 🔄 System Architecture
 
 ```mermaid
@@ -55,6 +87,8 @@ graph TD
     Core -->|Conversão| LibreOffice[LibreOffice Headless]
     Worker -->|Saída| Storage[/Armazenamento Persistente/]
 ```
+
+---
 
 ## 🛠️ Estrutura do Projeto
 
@@ -78,6 +112,8 @@ LogicPaper/
 ├── Dockerfile                 # Definição da imagem
 └── docker-compose.yml         # Orquestração de Containers
 ```
+
+---
 
 ## 🚀 Início Rápido
 
@@ -107,6 +143,8 @@ LogicPaper/
 4. **Acesso**
     * **Dashboard UI:** `http://localhost:8000`
     * **Documentação API:** `http://localhost:8000/docs`
+
+---
 
 ## 💻 Integração via API
 
@@ -194,7 +232,5 @@ Este projeto está licenciado sob a **Licença Creative Commons Atribuição-Nã
 ## 👨‍💻 Autor
 
 **[Rubens Braz](https://rubensbraz.com/)**
-
----
 
 > *"Automação não é sobre preguiça; é sobre precisão."*

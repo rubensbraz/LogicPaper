@@ -43,6 +43,38 @@ The application follows an **Enterprise Architecture** (Hexagonal Architecture),
 * **Dynamic Asset Management:** Automatic extraction, insertion, and resizing of images from ZIP archives.
 * **PDF Engine:** Integrated LibreOffice for high-fidelity conversion of Office documents to PDF.
 
+---
+
+## ⚡ Example
+
+See how **LogicPaper** transforms raw data into professional documents instantly.
+
+### 1. Input Data (JSON)
+
+This is the mock data feeding the system:
+
+```json
+{
+    "id": "CORP-001",
+    "company": "Acme Solutions Inc.",
+    "founded_date": "1998-05-12",
+    "revenue_q4": "1500000.00",
+    "is_public": "TRUE",
+    "compliance_check": "FALSE",
+    "auth_sig": "sig_valid.png"
+}
+```
+
+### 2. Visual Result (Before & After)
+
+| Template (Input) | Generated Document (Output) |
+| :---: | :---: |
+| **Model with Jinja2 Tags** | **Rendered PDF with Data** |
+| <img src="docs/images/contract_template_preview.png" width="350" alt="Template Preview"> | <img src="docs/images/contract_result_preview.png" width="350" alt="Result Preview"> |
+| [📄 View Template PDF](docs/files/contract_template.pdf) | [📃 View Result PDF](docs/files/contract_acme_result.pdf) |
+
+---
+
 ## 🔄 System Architecture
 
 ```mermaid
@@ -55,6 +87,8 @@ graph TD
     Core -->|Conversion| LibreOffice[LibreOffice Headless]
     Worker -->|Output| Storage[/Persistent Storage/]
 ```
+
+---
 
 ## 🛠️ Project Structure
 
@@ -78,6 +112,8 @@ LogicPaper/
 ├── Dockerfile                 # Image definition
 └── docker-compose.yml         # Container orchestration
 ```
+
+---
 
 ## 🚀 Quick Start
 
@@ -107,6 +143,8 @@ LogicPaper/
 4. **Access**
     * **UI Dashboard:** `http://localhost:8000`
     * **API Documentation:** `http://localhost:8000/docs`
+
+---
 
 ## 💻 API Integration
 
@@ -194,7 +232,5 @@ This project is licensed under the **Creative Commons Attribution-NonCommercial 
 ## 👨‍💻 Author
 
 **[Rubens Braz](https://rubensbraz.com/)**
-
----
 
 > *"Automation is not about laziness; it's about precision."*

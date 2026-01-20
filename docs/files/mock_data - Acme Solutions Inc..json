@@ -1,0 +1,9 @@
+{
+    "id": "CORP-001",
+    "company": "Acme Solutions Inc.",
+    "founded_date": "1998-05-12",
+    "revenue_q4": "1500000.00",
+    "is_public": "TRUE",
+    "compliance_check": "FALSE",
+    "auth_sig": "sig_valid.png"
+}
