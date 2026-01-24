@@ -5,19 +5,20 @@ services:
     build:
       context: .
       dockerfile: Dockerfile
-    image: logicpaper:v1
+      target: production
+    image: logicpaper:v1.2
     container_name: logicpaper_core
+    restart: unless-stopped
 
-    # .env File
+    security_opt:
+      - no-new-privileges:true
+    
     env_file:
       - .env
-
-    # Network Configuration
-    # Maps localhost:8000 to container:8000
+    
     ports:
-      - "8000:8000"
+      - "127.0.0.1:8000:8000"
 
-    # Volume Mapping (Persistence & Hot-Reloading)
     volumes:
       # 1. Data Persistence:
       # Maps local './data' to container '/data'
@@ -33,18 +34,14 @@ services:
       # 3. Templates Storage:
       - ./persistent_templates:/app/persistent_templates
     
-    # Ensures the app only starts after Redis
+    networks:
+      - logicpaper_internal
+      - logicpaper_public
+    
     depends_on:
-      - redis
-
-    # Execution Command
-    # Uses Uvicorn with --reload for development agility
-    # In a pure production environment, remove '--reload'
-    command: uvicorn app.main:app --host 0.0.0.0 --port 8000 --reload
-
-    # Restart Policy
-    # Automatically restarts the container if it crashes (unless stopped manually)
-    restart: unless-stopped
+      # Ensures the app only starts after Redis
+      redis:
+        condition: service_healthy
 
     # Resource Limits (Stability Guardrails)
     # LibreOffice conversion is CPU/RAM intensive
@@ -52,22 +49,44 @@ services:
     deploy:
       resources:
         limits:
-          cpus: '2.0'       # Cap at 2 CPU cores
-          memory: 2G        # Cap at 2GB RAM
+          cpus: '2.0'   # Cap at 2 CPU cores
+          memory: 2G    # Cap at 2GB RAM
         reservations:
-          memory: 512M      # Reserve minimal 512MB RAM
+          memory: 512M  # Reserve minimal 512MB RAM
+    
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8000/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 10s
   
   # --- Redis ---
   redis:
     image: redis:7-alpine
     container_name: logicpaper_redis
-    ports:
-      - "6379:6379"
+    restart: always
+
+    networks:
+      - logicpaper_internal
+    
     volumes:
       - redis_data:/data
-    restart: always
-    # Optional configuration for persistence on disk (AOF)
-    command: redis-server --appendonly yes
+    
+    command: redis-server --appendonly yes --maxmemory 256mb --maxmemory-policy allkeys-lru
+    
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+# --- Networking ---
+networks:
+  logicpaper_internal:
+    internal: true
+  logicpaper_public:
+    driver: bridge
 
 # --- Volumes ---
 volumes:

@@ -75,6 +75,23 @@ app.include_router(
 )
 
 
+# --- System Status (Health Checks) ---
+
+
+@app.get("/health", tags=["System"])
+async def health_check():
+    """
+    Standard Health Check.
+    Returns 200 if the API is running.
+    """
+    return {
+        "status": "healthy",
+        "timestamp": datetime.now().isoformat(),
+        "version": settings.VERSION,
+        "engine": "LogicPaper v1.1",
+    }
+
+
 # --- Real-time Logging (SSE) ---
 
 

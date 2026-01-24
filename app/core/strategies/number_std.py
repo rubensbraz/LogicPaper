@@ -126,10 +126,21 @@ class NumberStrategy(BaseStrategy):
                 # --- Ordinal (1st, 2nd) ---
                 elif op == "ordinal":
                     try:
+                        # 1. Attempts to capture a specific language from the next argument (e.g., 'en')
+                        # If none exists, uses the class default (self.locale)
+                        target_lang = self.locale
+                        if (
+                            i + 1 < len(ops) and len(ops[i + 1]) <= 5
+                        ):  # Detect codes like 'en', 'pt_BR'
+                            target_lang = ops[i + 1].lower().strip()
+                            i += 1  # Consume argument
+
+                        # 2. Convert to int() to remove the ".0" and apply the correct language
                         formatted_result = num2words.num2words(
-                            num_val, to="ordinal_num", lang=self.locale
+                            int(num_val), to="ordinal_num", lang=target_lang
                         )
-                    except Exception:
+                    except Exception as e:
+                        logger.warning(f"Ordinal conversion failed: {e}")
                         formatted_result = f"{int(num_val)}th"
 
                 # --- Spell Out (ten, dez) ---

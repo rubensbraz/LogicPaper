@@ -1,23 +1,25 @@
-# Use Python on Alpine Linux for minimal footprint
-FROM python:3.11-alpine
+# ==========================================
+# STAGE 1: Base (Runtime Environment)
+# ==========================================
+FROM python:3.11-alpine AS base
 
-# Set environment variables
-# PYTHONDONTWRITEBYTECODE: Prevents Python from writing pyc files to disc
-# PYTHONUNBUFFERED: Ensures python output is sent straight to terminal (logs)
-ENV PYTHONDONTWRITEBYTECODE=1
-ENV PYTHONUNBUFFERED=1
-ENV APP_HOME=/app
+# Prevent Python from writing .pyc files and enable unbuffered logging
+ENV PYTHONDONTWRITEBYTECODE=1 \
+    PYTHONUNBUFFERED=1 \
+    APP_HOME=/app \
+    PYTHONUSERBASE=/home/logicuser/.local
 
-# Create directory for the application
+# Add the local bin directory to PATH
+ENV PATH=/home/logicuser/.local/bin:$PATH
+
 WORKDIR $APP_HOME
 
-# Install System Dependencies
-# 1. libreoffice: The core engine for PDF conversion
-# 2. openjdk11-jre: Java Runtime is REQUIRED for LibreOffice to run properly
-# 3. ttf-dejavu, ttf-liberation, ttf-freefont: Essential fonts to prevent rendering glitches
-# 4. tzdata: Timezone support
-# 5. build-base, libffi-dev, musl-dev: Compilers for Python C-extensions (Pandas/Numpy)
-# 6. jpeg-dev, zlib-dev: For Pillow (Image processing)
+# Install essential runtime dependencies:
+# - libreoffice & openjdk11-jre: Core engine for Office-to-PDF conversion
+# - fonts: Critical for correct character rendering in documents (Boolean/Mask strategies)
+# - tzdata: Required for date arithmetic in DateStrategy
+# - curl: Required for container health checks
+# - shadow: Required for secure user management
 RUN apk add --no-cache \
     libreoffice \
     openjdk11-jre \
@@ -26,6 +28,20 @@ RUN apk add --no-cache \
     ttf-liberation \
     ttf-freefont \
     tzdata \
+    curl \
+    shadow \
+    libxml2 \
+    libxslt \
+    jpeg \
+    zlib
+
+# ==========================================
+# STAGE 2: Builder (Compile Dependencies)
+# ==========================================
+FROM base AS builder
+
+# Install build-time dependencies (compilers) to install Python extensions (Pillow, Pandas, etc)
+RUN apk add --no-cache --virtual .build-deps \
     build-base \
     libffi-dev \
     musl-dev \
@@ -34,22 +50,37 @@ RUN apk add --no-cache \
     libxml2-dev \
     libxslt-dev
 
-# Upgrade pip
-RUN pip install --upgrade pip
+RUN pip install --no-cache-dir --upgrade pip
 
-# Install Python Dependencies
-# We copy requirements first to leverage Docker cache layers
+# Copy and install requirements into a local user directory for easy transfer
 COPY requirements.txt .
-RUN pip install --no-cache-dir -r requirements.txt
+RUN pip install --no-cache-dir --user -r requirements.txt
 
-# Create necessary directories for data handling
-RUN mkdir -p /data/temp
+# ==========================================
+# STAGE 3: Production (Final Image)
+# ==========================================
+FROM base AS production
 
-# Copy the Application Code
-COPY . .
+# Security: Create a non-root user to run the application
+RUN useradd -m logicuser && \
+    mkdir -p /data/temp /app/persistent_templates && \
+    chown -R logicuser:logicuser /app /data
 
-# Expose the port FastAPI will run on
+# Copy compiled Python packages from the builder stage
+COPY --from=builder --chown=logicuser:logicuser /home/logicuser/.local /home/logicuser/.local
+
+# Copy application source code
+COPY --chown=logicuser:logicuser . .
+
+# Switch to the non-root user
+USER logicuser
+
+# Expose FastAPI default port
 EXPOSE 8000
 
-# Command to run the application using Uvicorn
+# Healthcheck to ensure FastAPI and LibreOffice are responsive
+HEALTHCHECK --interval=30s --timeout=10s --start-period=5s --retries=3 \
+  CMD curl -f http://localhost:8000/health || exit 1
+
+# Start the application using Uvicorn
 CMD ["uvicorn", "app.main:app", "--host", "0.0.0.0", "--port", "8000"]
