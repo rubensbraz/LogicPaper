@@ -246,9 +246,6 @@ class DocumentEngine:
                 if f_name == "format_currency":
                     strat_key = "number"
                     final_args = ["currency"] + args
-                elif f_name == "format_int":
-                    strat_key = "number"
-                    final_args = ["int"] + args
 
                 if strat_key:
                     return str(

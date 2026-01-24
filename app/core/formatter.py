@@ -23,12 +23,12 @@ class DataFormatter:
     that accept variable arguments for multi-step processing.
     """
 
-    def __init__(self, locale: str = "pt_BR"):
+    def __init__(self, locale: str = "pt"):
         """
         Initialize the strategies with the given locale.
 
         Args:
-            locale (str): Locale string (e.g., 'pt_BR', 'en_US').
+            locale (str): Locale string (e.g., 'pt', 'en').
         """
         self.locale = locale or settings.DEFAULT_LOCALE
 
@@ -84,9 +84,6 @@ class DataFormatter:
             # Aliases for convenience
             "format_currency": lambda val, *args: self._apply_strategy(
                 "number", val, "currency", *args
-            ),
-            "format_int": lambda val, *args: self._apply_strategy(
-                "number", val, "int", *args
             ),
             "format_date": lambda val, *args: self._apply_strategy("date", val, *args),
             "format_bool": lambda val, *args: self._apply_strategy("bool", val, *args),

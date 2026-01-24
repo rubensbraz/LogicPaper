@@ -14,25 +14,14 @@ logger = logging.getLogger(__name__)
 class DateStrategy(BaseStrategy):
     """
     Handles Date and Time transformations with arithmetic support.
-
-    Supported Operations:
-    - iso: Returns YYYY-MM-DD.
-    - long: Full localized text (e.g., "12 de Dezembro de 2025").
-    - short: Short localized format (e.g., "12/12/25").
-    - full: Complete format (e.g., "Sexta-feira, 12 de Dezembro...").
-    - fmt: Custom strftime pattern (Arg: pattern like "%d/%m/%Y").
-    - year: Extract year.
-    - month_name: Extract full month name.
-    - add_days: Adds/Subtracts days (Arg: int).
-    - add_years: Adds/Subtracts years (Arg: int).
     """
 
-    def __init__(self, locale: str = "pt_BR"):
+    def __init__(self, locale: str = "pt"):
         """
         Initialize the strategies with the given locale.
 
         Args:
-            locale (str): Locale string (e.g., 'pt_BR', 'en_US').
+            locale (str): Default locale string (e.g., 'pt', 'en').
         """
         self.locale = locale
 
@@ -77,18 +66,35 @@ class DateStrategy(BaseStrategy):
                 op = ops[i].lower().strip()
                 next_token = ops[i + 1] if i + 1 < total_ops else None
 
-                # --- Standard Formats ---
+                # --- ISO Format (No Arguments) ---
                 if op == "iso":
                     if isinstance(formatted_result, datetime):
                         formatted_result = formatted_result.isoformat().split("T")[0]
                         format_applied = True
 
-                elif op in ("long", "short", "full", "medium"):
-                    if isinstance(formatted_result, datetime):
-                        formatted_result = babel.dates.format_date(
-                            formatted_result, format=op, locale=self.locale
+                # --- Localized Formats (Require Locale Argument) ---
+                # Usage example: {{ date | format_date('short', 'pt') }}
+                elif op in ("short", "medium", "long", "full"):
+                    if next_token and isinstance(formatted_result, datetime):
+                        try:
+                            # Clean quotes if passed from template
+                            target_locale = (
+                                next_token.replace('"', "").replace("'", "").strip()
+                            )
+
+                            formatted_result = babel.dates.format_date(
+                                formatted_result, format=op, locale=target_locale
+                            )
+                            format_applied = True
+                            i += 1  # Consume the locale argument
+                        except Exception as e:
+                            logger.warning(
+                                f"DateStrategy [{op}] error with locale '{next_token}': {e}"
+                            )
+                    else:
+                        logger.warning(
+                            f"DateStrategy: '{op}' requires a locale argument (e.g., 'pt')."
                         )
-                        format_applied = True
 
                 # --- Custom Format (fmt;%d/%m/%Y) ---
                 elif op == "fmt":
@@ -109,9 +115,26 @@ class DateStrategy(BaseStrategy):
                         format_applied = True
 
                 elif op == "month_name":
-                    if isinstance(formatted_result, datetime):
-                        formatted_result = formatted_result.strftime("%B")
-                        format_applied = True
+                    # Usage example: {{ date | format_date('month_name', 'pt') }}
+                    if next_token and isinstance(formatted_result, datetime):
+                        try:
+                            target_locale = (
+                                next_token.replace('"', "").replace("'", "").strip()
+                            )
+                            # 'MMMM' in Babel means full month name
+                            formatted_result = babel.dates.format_date(
+                                formatted_result, format="MMMM", locale=target_locale
+                            ).title()
+                            format_applied = True
+                            i += 1  # Consume the locale argument
+                        except Exception as e:
+                            logger.warning(
+                                f"DateStrategy [month_name] error with locale '{next_token}': {e}"
+                            )
+                    else:
+                        logger.warning(
+                            "DateStrategy: 'month_name' requires a locale argument (e.g., 'pt')."
+                        )
 
                 # --- Arithmetic (Calculations) ---
                 # These operations keep the result as a datetime object for further chaining
@@ -124,7 +147,7 @@ class DateStrategy(BaseStrategy):
                     ):
                         days = int(next_token)
                         formatted_result = formatted_result + timedelta(days=days)
-                        i += 1
+                        i += 1  # Consume argument
 
                 elif op == "add_years":
                     if (
@@ -132,7 +155,6 @@ class DateStrategy(BaseStrategy):
                         and self._is_int(next_token)
                         and isinstance(formatted_result, datetime)
                     ):
-                        # Approximate year addition logic
                         years = int(next_token)
                         try:
                             formatted_result = formatted_result.replace(
@@ -143,7 +165,7 @@ class DateStrategy(BaseStrategy):
                             formatted_result = formatted_result + (
                                 timedelta(days=365 * years)
                             )
-                        i += 1
+                        i += 1  # Consume argument
 
                 # Advance loop
                 i += 1
@@ -155,7 +177,7 @@ class DateStrategy(BaseStrategy):
         # 3. Final Clean-up
         # If result is still a datetime object and NO format was explicitly requested
         # (e.g. user just did 'add_days' without 'iso'), return strictly the Date part
-        # This prevents "2025-01-08 00:00:00" in contracts.
+        # This prevents "2025-01-08 00:00:00" in documents
         if isinstance(formatted_result, datetime) and not format_applied:
             return formatted_result.date().isoformat()
 

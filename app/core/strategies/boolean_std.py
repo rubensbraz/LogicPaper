@@ -11,14 +11,6 @@ logger = logging.getLogger(__name__)
 class BooleanStrategy(BaseStrategy):
     """
     Handles Boolean logic transformations.
-
-    Supported Operations:
-    - bool: Converts value to boolean.
-    - Custom Mapping: If args provided, maps True/False to strings.
-      Syntax: bool;[TrueValue];[FalseValue]
-      Example: bool;Yes;No
-    - check: Maps to Wingdings Checkbox symbols (☑/☐).
-    - on_off: Maps to On/Off.
     """
 
     def process(self, value: Any, ops: List[str]) -> str:
@@ -60,12 +52,6 @@ class BooleanStrategy(BaseStrategy):
                 elif op == "check":
                     # Checkbox symbols
                     return "☑" if bool_val else "☐"
-
-                elif op == "on_off":
-                    return "On" if bool_val else "Off"
-
-                elif op == "active":
-                    return "Active" if bool_val else "Inactive"
 
         except Exception as e:
             logger.error(f"BooleanStrategy Error for '{value}': {e}")

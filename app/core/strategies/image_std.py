@@ -11,9 +11,6 @@ logger = logging.getLogger(__name__)
 class ImageStrategy(BaseStrategy):
     """
     Handles Image Metadata formatting.
-
-    Protocol Syntax: image;[width];[height]
-    Example: image;5;3  (Width=5cm, Height=3cm)
     """
 
     def process(self, value: Any, ops: List[str]) -> Dict[str, Any]:

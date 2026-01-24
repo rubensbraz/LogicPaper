@@ -1,6 +1,4 @@
 import logging
-import re
-from decimal import Decimal, InvalidOperation
 from typing import Any, List, Union
 
 import babel.numbers
@@ -17,21 +15,9 @@ class NumberStrategy(BaseStrategy):
     """
     Handles Numerical formatting: Integers, Floats, Currency, and Scientific notation.
     Uses an index-based traversal to support optional arguments intelligently.
-
-    Supported Operations:
-    - int: Converts to integer. Optional Arg: Padding/Format (e.g., '04d').
-    - float: Converts to float. Optional Arg: Precision (e.g., '2').
-    - round: Explicit rounding. Arg: Precision (int).
-    - separator: Custom separators. Arg: style (e.g., '.,' for EU, ',.' for US).
-    - currency: Formats money. Arg: Currency Code (e.g., 'USD').
-    - percent: Formats as percentage.
-    - scientific: Scientific notation (1.00E+04).
-    - humanize: Human readable format (1.2M, 10K).
-    - ordinal: Ordinal numbers (1st, 2nd).
-    - spell_out: Textual representation. Arg: Language (e.g., 'en', 'pt').
     """
 
-    def __init__(self, locale: str = "pt_BR"):
+    def __init__(self, locale: str = "pt"):
         self.locale = locale
 
     def process(self, value: Any, ops: List[str]) -> str:
@@ -79,16 +65,6 @@ class NumberStrategy(BaseStrategy):
                             i += 1  # Consume argument
                     except Exception as e:
                         logger.error(f"NumberStrategy [int]: {e}")
-
-                # --- Explicit Formatting ---
-                elif op in ("fmt", "pad"):
-                    if next_token:
-                        try:
-                            # Apply python format string to current numeric value
-                            formatted_result = format(num_val, next_token)
-                            i += 1
-                        except Exception as e:
-                            logger.warning(f"NumberStrategy [fmt]: {e}")
 
                 # --- Float Logic ---
                 elif op == "float":
@@ -201,21 +177,25 @@ class NumberStrategy(BaseStrategy):
     def _normalize_to_float(self, value: Any) -> float:
         """
         Smart conversion of string inputs to float.
-        Handles comma vs dot based on heuristics.
+        Prioritizes Babel parsing based on locale, falls back to heuristics.
         """
         if isinstance(value, (int, float)):
             return float(value)
 
         str_val = str(value).strip()
 
-        # Heuristic: If comma exists but no dot, replace comma with dot
-        # Example: "1200,50" -> "1200.50"
+        # 1. Try safe parsing with Babel using the strategy's locale
+        try:
+            # parse_decimal returns a Decimal, convert to float for consistency
+            return float(babel.numbers.parse_decimal(str_val, locale=self.locale))
+        except (ValueError, babel.numbers.NumberFormatError):
+            pass  # Fallback to manual heuristic
+
+        # 2. Heuristic: If comma exists but no dot, replace comma with dot (EU/BR -> ISO)
         if "," in str_val and "." not in str_val:
             str_val = str_val.replace(",", ".")
 
-        # Heuristic: If both exist (e.g. 1.200,50 or 1,200.50), remove the first one occurrence
-        # This is risky but covers 90% of cases.
-        # Ideally, we assume standard python format or simple comma decimal.
+        # 3. Heuristic: If both exist, determine which is the thousands separator
         elif "," in str_val and "." in str_val:
             if str_val.find(",") < str_val.find("."):
                 # "1,200.50" -> remove comma

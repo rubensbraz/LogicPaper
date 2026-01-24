@@ -11,12 +11,6 @@ logger = logging.getLogger(__name__)
 class LogicStrategy(BaseStrategy):
     """
     Handles Logical operations, Defaults, and Strict Value Mapping (Switch Case).
-
-    Supported Operations:
-    - default;[value]: Returns [value] if input is None or Empty. Also acts as a fallback "Else" value if used in a mapping chain.
-    - empty_if;[value]: Returns "" if input matches [value].
-    - Mapping: "key=value". Example: "10=Approved". Returns "Approved" if input is "10".
-    - Fallback: Any argument without "=" and not a keyword acts as a fallback return value.
     """
 
     def process(self, value: Any, ops: List[str]) -> Any:
@@ -98,7 +92,6 @@ class LogicStrategy(BaseStrategy):
             return current_val
 
         # --- Final Resolution ---
-
         # If the input was NOT empty, and we found NO mapping match,
         # but we DO have a fallback (from 'default' or implicit), return it
         if not is_empty and mapping_fallback is not None:

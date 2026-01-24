@@ -1,5 +1,4 @@
 import logging
-import re
 from typing import Any, List
 
 from app.core.strategies.base import BaseStrategy
@@ -12,13 +11,6 @@ logger = logging.getLogger(__name__)
 class MaskStrategy(BaseStrategy):
     """
     Handles Data Masking for Privacy (GDPR/LGPD) and Format compliance.
-
-    Supported Operations:
-    - mask;[pattern]: Generic mask where '#' is replaced by digits/chars.
-      Example: mask;###.###.###-##
-    - email: Obfuscates email (j***@domain.com).
-    - credit_card: PCI masking (**** **** **** 1234).
-    - name: Name obfuscation (J*** D**).
     """
 
     def process(self, value: Any, ops: List[str]) -> str:
@@ -83,13 +75,16 @@ class MaskStrategy(BaseStrategy):
         if "@" not in email:
             return email
 
-        user, domain = email.split("@", 1)
-        if len(user) > 1:
-            # First char + ***
-            masked_user = f"{user[0]}{'*' * 3}"
-        else:
-            masked_user = user
+        parts = email.split("@", 1)
+        user = parts[0]
+        domain = parts[1]
 
+        # Guard clause for very short users
+        if len(user) <= 1:
+            return email
+
+        # First char + ***
+        masked_user = f"{user[0]}{'*' * 3}"
         return f"{masked_user}@{domain}"
 
     def _mask_credit_card(self, cc: str) -> str:
@@ -102,6 +97,9 @@ class MaskStrategy(BaseStrategy):
 
     def _mask_name(self, name: str) -> str:
         """John Doe -> J*** D***"""
+        if not name:
+            return ""
+
         parts = name.split()
         masked_parts = []
         for p in parts:

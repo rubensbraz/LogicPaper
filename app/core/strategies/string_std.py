@@ -12,13 +12,6 @@ logger = logging.getLogger(__name__)
 class StringStrategy(BaseStrategy):
     """
     Handles Advanced String Manipulation with chaining support.
-
-    Supported Operations:
-    - Case: upper, lower, title, capitalize, swapcase
-    - Format: snake, kebab, slug
-    - Modification: trim, reverse
-    - Injection (Takes Arg): prefix, suffix
-    - Sizing (Takes Arg): truncate
     """
 
     def process(self, value: Any, ops: List[str]) -> str:
