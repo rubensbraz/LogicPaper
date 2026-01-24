@@ -88,7 +88,7 @@ async def health_check():
         "status": "healthy",
         "timestamp": datetime.now().isoformat(),
         "version": settings.VERSION,
-        "engine": "LogicPaper v1.1",
+        "engine": "LogicPaper v1.2",
     }
 
 
