@@ -164,23 +164,23 @@ LogicPaper usa o caractere pipe (`|`) para aplicar filtros de formatação às v
 ### 1. Formatação de Texto
 
 ```jinja2
-{{ client_name | format_string('upper') }}            -> "ACME CORP"
-{{ client_id | format_string('prefix', 'ID: ') }}     -> "ID: 12345"
+{{ client_name | format_string('upper') }}         -> "ACME CORP"
+{{ client_id | format_string('prefix', 'ID: ') }}  -> "ID: 12345"
 ```
 
 ### 2. Números & Moeda
 
 ```jinja2
-{{ contract_value | format_currency('USD') }}         -> "$ 1,500.00"
-{{ tax_rate | format_number('percent', '2') }}        -> "12.50%"
-{{ total | format_number('spell_out', 'en') }}        -> "one thousand five hundred"
+{{ contract_value | format_number('currency', 'USD') }}  -> "$ 1,500.00"
+{{ tax_rate | format_number('percent') }}                -> "12.50%"
+{{ total | format_number('spell_out', 'en') }}           -> "one thousand five hundred"
 ```
 
 ### 3. Operações com Datas
 
 ```jinja2
-{{ start_date | format_date('long') }}                -> "January 12, 2024"
-{{ start_date | format_date('add_days', '30') }}      -> "2024-02-11"
+{{ start_date | format_date('long', 'en') }}      -> "January 12, 2024"
+{{ start_date | format_date('add_days', '30') }}  -> "2024-02-11"
 ```
 
 ### 4. Lógica Condicional
