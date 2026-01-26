@@ -5,10 +5,13 @@
 ![FastAPI](https://img.shields.io/badge/FastAPI-0.100+-009688?style=for-the-badge&logo=fastapi&logoColor=white)
 ![Redis](https://img.shields.io/badge/Redis-Enabled-DC382D?style=for-the-badge&logo=redis&logoColor=white)
 ![Docker](https://img.shields.io/badge/Docker-Enabled-2496ED?style=for-the-badge&logo=docker&logoColor=white)
+![Contributions Welcome](https://img.shields.io/badge/contributions-welcome-orange.svg?style=for-the-badge)
 ![License](https://img.shields.io/badge/License-CC%20BY--NC%204.0-lightgrey.svg?style=for-the-badge)
 
 <div align="center">
   <a href="README.md"><strong>Read in English</strong></a>
+  <br><br>
+  <a href="CONTRIBUTING.md"><strong>Guia para Contribuir (Apenas em inglês)</strong></a>
 </div>
 
 ---
@@ -206,6 +209,14 @@ Mapeie códigos de status ou valores diretamente no documento:
 ```jinja2
 {{ photo_filename | format_image('3', '4') }}         -> (Redimensiona imagem para 3x4cm)
 ```
+
+---
+
+## 🤝 Contribuição
+
+O **LogicPaper** é um projeto de código aberto e adoramos receber contribuições da comunidade!
+
+Caso você deseje implementar uma nova funcionalidade do **Roadmap**, corrigir um bug, ou aprimorar a documentação, por favor, consulte o [Guia para Contribuir (Apenas em inglês)](CONTRIBUTING.md) antes de começar.
 
 ---
 

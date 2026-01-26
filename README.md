@@ -5,10 +5,13 @@
 ![FastAPI](https://img.shields.io/badge/FastAPI-0.100+-009688?style=for-the-badge&logo=fastapi&logoColor=white)
 ![Redis](https://img.shields.io/badge/Redis-Enabled-DC382D?style=for-the-badge&logo=redis&logoColor=white)
 ![Docker](https://img.shields.io/badge/Docker-Enabled-2496ED?style=for-the-badge&logo=docker&logoColor=white)
+![Contributions Welcome](https://img.shields.io/badge/contributions-welcome-orange.svg?style=for-the-badge)
 ![License](https://img.shields.io/badge/License-CC%20BY--NC%204.0-lightgrey.svg?style=for-the-badge)
 
 <div align="center">
   <a href="README_pt.md"><strong>Leia em Português</strong></a>
+  <br><br>
+  <a href="CONTRIBUTING.md"><strong>Contributing Guide</strong></a>
 </div>
 
 ---
@@ -206,6 +209,14 @@ Map status codes or values directly in the document:
 ```jinja2
 {{ photo_filename | format_image('3', '4') }}         -> (Resizes image to 3x4cm)
 ```
+
+---
+
+## 🤝 Contributing
+
+**LogicPaper** is an open-source project and we love community contributions!
+
+Whether you want to implement a new feature from our **Roadmap**, fix a bug, or improve documentation, please check our [Contributing Guidelines](CONTRIBUTING.md) before getting started.
 
 ---
 
