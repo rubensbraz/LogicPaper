@@ -88,7 +88,7 @@ async def health_check():
         "status": "healthy",
         "timestamp": datetime.now().isoformat(),
         "version": settings.VERSION,
-        "engine": "LogicPaper v1.2",
+        "engine": "LogicPaper v1.2.5",
     }
 
 
@@ -118,13 +118,14 @@ async def log_generator(session_id: str):
                 if "PROCESS_COMPLETE" in data or "PROCESS_ERROR" in data:
                     break
             except asyncio.TimeoutError:
-                yield f"data: HEARTBEAT_TIMEOUT\n\n"
+                yield "data: HEARTBEAT_TIMEOUT\n\n"
                 break
     except Exception as e:
         logger.error(f"SSE Stream error for session {session_id}: {e}")
     finally:
         # Crucial for preventing Memory Leaks
-        log_queues.pop(session_id, None)
+        if session_id in log_queues:
+            del log_queues[session_id]
         logger.info(f"SSE Queue cleared for session: {session_id}")
 
 
@@ -502,15 +503,13 @@ async def generate_sample(
 
         source_upload = file_excel if file_excel else file_json
         if source_upload:
-            # Ensures the cursor is at the beginning (because the load_dataframe has already read the file)
+            # Reset cursor before processing
             await source_upload.seek(0)
             source_path = os.path.join(dir_inputs, source_upload.filename)
 
-            # Saves the original file to the inputs folder
             async with await anyio.open_file(source_path, "wb") as f:
                 await f.write(await source_upload.read())
 
-            # Reset the cursor again
             await source_upload.seek(0)
 
         # Save Templates
@@ -545,7 +544,7 @@ async def generate_sample(
         if df.empty:
             raise ValueError("Data source is empty.")
 
-        # TARGET: Only the first data row (Index 0, which corresponds to Excel Row 2)
+        # TARGET: Only the first data row (Index 0)
         target_row = df.iloc[0]
 
         # 4. Process Single Row
@@ -558,29 +557,12 @@ async def generate_sample(
         # Parse Context (Raw Data)
         context = target_row.to_dict()
 
-        # Sanitize Context (Handle NaN and NaT)
-        cleaned_context = {}
-        try:
-            for k, v in context.items():
-                if pd.isna(v):
-                    cleaned_context[k] = None
-                else:
-                    cleaned_context[k] = v
+        # Sanitize Context (Handle NaN)
+        cleaned_context = {k: (None if pd.isna(v) else v) for k, v in context.items()}
 
-            # Determine Identifier
-            if filename_col in cleaned_context and cleaned_context[filename_col]:
-                row_identifier = sanitize_filename(str(cleaned_context[filename_col]))
-
-        except Exception as e:
-            report.append(
-                {
-                    "Row": 1,
-                    "Identifier": "SAMPLE",
-                    "Output File": "N/A",
-                    "Status": "Error",
-                    "Error Details": f"Data Parsing Error: {str(e)}",
-                }
-            )
+        # Determine Identifier
+        if filename_col in cleaned_context and cleaned_context[filename_col]:
+            row_identifier = sanitize_filename(str(cleaned_context[filename_col]))
 
         # Generate Files (if no parsing error)
         if not report:

@@ -4,7 +4,7 @@ import os
 import re
 import subprocess
 import zipfile
-from typing import Any, Dict, List, Optional
+from typing import Any, Dict, List
 
 import anyio
 from docx.shared import Cm
@@ -45,10 +45,9 @@ class DocumentEngine:
     ) -> Any:
         """
         Custom helper to generate InlineImage objects within Jinja2 templates.
-        This allows: {{ my_image_filename | format_image('5', '5') }}
+        Usage: {{ my_image_filename | format_image('width_cm', 'height_cm') }}
         """
-        # Use existing strategy to parse dimensions from args
-        # value is the filename (string)
+        # Resolve dimensions and filename from strategy
         img_data = self.formatter._apply_strategy("image", value, *args)
         filename = img_data.get("filename")
 
@@ -57,6 +56,14 @@ class DocumentEngine:
 
         try:
             img_path = os.path.join(assets_path, filename)
+
+            # Security: Basic check to prevent path traversal (though assets_path is managed)
+            if not os.path.abspath(img_path).startswith(os.path.abspath(assets_path)):
+                logger.warning(
+                    f"Security: Attempted path traversal for image: {filename}"
+                )
+                return "[Invalid Image Path]"
+
             if not os.path.exists(img_path):
                 logger.warning(f"Image not found: {img_path}")
                 return "[IMAGE NOT FOUND]"
@@ -67,7 +74,7 @@ class DocumentEngine:
             return InlineImage(tpl, img_path, width=width, height=height)
         except Exception as e:
             logger.error(f"Error loading image '{filename}': {e}")
-            return "[IMAGE ERROR]"
+            return f"[IMAGE ERROR: {str(e)}]"
 
     def _remove_office_thumbnail(self, file_path: str) -> None:
         """
@@ -266,6 +273,10 @@ class DocumentEngine:
     ) -> bool:
         """
         Renders a PPTX by consolidating paragraph runs to prevent broken tags.
+
+        LIMITATION: Deeply nested groups or complex text box formattings might split
+        Jinja tags {{ ... }} across XML nodes, which this basic consolidator might miss.
+        Recommended to keep placeholders simple in PPTX.
         """
         try:
             prs = Presentation(template_path)

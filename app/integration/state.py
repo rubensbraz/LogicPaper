@@ -1,5 +1,6 @@
 import json
 import logging
+import time
 from typing import Any, Dict, Optional
 
 import redis
@@ -10,22 +11,33 @@ from app.core.config import settings
 # Configure Logging
 logger = logging.getLogger(__name__)
 
-# Redis Connection
-try:
-    pool = redis.ConnectionPool(
-        host=settings.REDIS_HOST,
-        port=settings.REDIS_PORT,
-        db=0,
-        decode_responses=True,  # Automatically decodes bytes to strings
-    )
-    redis_client = redis.Redis(connection_pool=pool)
-    # Test connection immediately
-    redis_client.ping()
-    logger.info("[REDIS] Connected successfully.")
-except Exception as e:
-    logger.error(f"[REDIS] Failed to connect: {e}")
-    # Fallback could be implemented here, but we want to fail fast
-    raise e
+# Redis Connection with Retry Logic
+
+MAX_RETRIES = 5
+RETRY_DELAY = 2
+
+for attempt in range(MAX_RETRIES):
+    try:
+        pool = redis.ConnectionPool(
+            host=settings.REDIS_HOST,
+            port=settings.REDIS_PORT,
+            db=0,
+            decode_responses=True,
+        )
+        redis_client = redis.Redis(connection_pool=pool)
+        redis_client.ping()
+        logger.info("[REDIS] Connected successfully.")
+        break
+    except Exception as e:
+        if attempt < MAX_RETRIES - 1:
+            logger.warning(
+                f"[REDIS] Connection failed. Retrying in {RETRY_DELAY}s... ({attempt + 1}/{MAX_RETRIES})"
+            )
+            time.sleep(RETRY_DELAY)
+        else:
+            logger.error(f"[REDIS] Failed to connect after {MAX_RETRIES} attempts: {e}")
+
+            raise e
 
 
 class JobRepository:
