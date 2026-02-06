@@ -33,6 +33,12 @@ Send the following JSON payload to `POST /api/v1/integration/generate`:
 }
 ```
 
+## 🧪 Testing the API
+
+You can interactively test the API using the built-in Swagger UI:
+
+* **Documentation:** `http://localhost:8000/docs`
+
 ## 🐳 Docker Volume Info
 
 This directory is mapped as a volume in `docker-compose.yml`. Any file you add, remove, or modify here on your host machine is immediately available inside the running container without needing to restart or rebuild the service.

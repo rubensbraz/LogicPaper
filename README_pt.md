@@ -145,7 +145,6 @@ LogicPaper/
 
 4. **Acesso**
     * **Dashboard UI:** `http://localhost:8000`
-    * **Documentação API:** `http://localhost:8000/docs`
 
 ---
 
@@ -153,7 +152,7 @@ LogicPaper/
 
 O LogicPaper fornece uma camada de integração dedicada para sistemas externos.
 
-* **Endpoint:** `POST /api/v1/integration/generate`
+* **Documentação:** `http://localhost:8000/docs` (Interface Interativa Swagger)
 * **Autenticação:** Header `X-API-Key`.
 * **Fluxo:** Envie o payload JSON com os dados e o caminho do template; receba um `job_id` para consultar o status e baixar o resultado final.
 

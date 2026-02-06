@@ -10,6 +10,7 @@ const TRANSLATIONS = {
             subtitle: "Batch Processing Engine v1.2",
             link_dashboard: "Dashboard",
             link_help: "How to Use",
+            link_api: "API Docs",
             badge_preview: "PREVIEW ONLY",
             badge_online: "SYSTEM ONLINE",
             lang_en: "🇺🇸 EN",
@@ -276,6 +277,7 @@ const TRANSLATIONS = {
         footer: {
             copy: "LogicPaper © 2025-2026",
             repo: "Source Code",
+            api: "API Docs",
             made_by: "Built by",
             author: "Rubens Braz"
         }
@@ -287,6 +289,7 @@ const TRANSLATIONS = {
             subtitle: "Processamento em Lote v1.2",
             link_dashboard: "Dashboard",
             link_help: "Como Usar",
+            link_api: "Docs API",
             badge_preview: "APENAS VISUALIZAÇÃO",
             badge_online: "SISTEMA ONLINE",
             lang_en: "🇺🇸 EN",
@@ -553,6 +556,7 @@ const TRANSLATIONS = {
         footer: {
             copy: "LogicPaper © 2025-2026",
             repo: "Código Fonte",
+            api: "Docs API",
             made_by: "Desenvolvido por",
             author: "Rubens Braz"
         }
