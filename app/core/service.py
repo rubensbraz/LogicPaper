@@ -1,3 +1,4 @@
+import json
 import logging
 import os
 import shutil
@@ -161,7 +162,20 @@ class BatchService:
 
             if row_success:
                 success_rows_count += 1
-                send_log(f"✅ {row_identifier} processed.")
+                percent = int(((idx + 1) / len(df)) * 100)
+                send_log(
+                    json.dumps(
+                        {
+                            "code": "row_processed",
+                            "params": {
+                                "identifier": row_identifier,
+                                "current": idx + 1,
+                                "total": len(df),
+                                "percent": percent,
+                            },
+                        }
+                    )
+                )
 
         return {
             "report": report,

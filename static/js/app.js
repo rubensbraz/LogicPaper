@@ -48,7 +48,7 @@ function resetStateOnInput(type) {
     // 3. Add visual separator in logs to indicate new context
     const term = document.getElementById('terminal');
     if (term.innerText.trim() !== i18n.t('dashboard.logs.ready')) {
-        logToTerminal(i18n.t('alerts.inputs_changed'), 'info');
+        logToTerminal(i18n.t('logs.inputs_changed'), 'info');
     }
 }
 
@@ -181,7 +181,7 @@ async function performAnalysisSequence() {
         if (validationSuccess) {
             document.getElementById('configPanel').classList.remove('opacity-50', 'pointer-events-none');
             // Log success to terminal
-            logToTerminal(i18n.t('alerts.validation_success'), "success");
+            logToTerminal(i18n.t('logs.validation_success'), "success");
         }
 
     } catch (e) {
@@ -375,7 +375,7 @@ async function generateSample() {
     btnProcess.disabled = true;
     btnProcess.classList.add('opacity-50', 'cursor-not-allowed');
 
-    logToTerminal(i18n.t('alerts.sample_start'), 'info');
+    logToTerminal(i18n.t('logs.sample_start'), 'info');
 
     try {
         const formData = buildFormData(params);
@@ -383,7 +383,7 @@ async function generateSample() {
 
         if (response.ok) {
             downloadBlob(await response.blob(), "LogicPaper_Sample.zip");
-            logToTerminal('✅ Sample generated successfully.', 'success');
+            logToTerminal(i18n.t('logs.sample_success'), 'success');
             Swal.fire({
                 icon: 'success',
                 title: i18n.t('alerts.sample_ready_title'),
@@ -398,7 +398,7 @@ async function generateSample() {
             throw new Error(err.message || i18n.t('alerts.server_error'));
         }
     } catch (e) {
-        logToTerminal(i18n.t('alerts.sample_error', { error: e.message }), 'error');
+        logToTerminal(i18n.t('logs.sample_error', { error: e.message }), 'error');
         Swal.fire({ icon: 'error', title: i18n.t('alerts.sample_failed_title'), text: e.message, background: '#1e293b', color: '#fff' });
     } finally {
         // UI Unlocking
@@ -418,7 +418,7 @@ function startProcessing() {
 
     // Reset Terminal visually
     document.getElementById(CONFIG.dom.terminal).innerHTML = '';
-    logToTerminal(i18n.t('alerts.batch_init'), 'info');
+    logToTerminal(i18n.t('logs.batch_init'), 'info');
 
     // UI Locking
     toggleLoadingState(true, 'btnProcess');
@@ -431,43 +431,82 @@ function startProcessing() {
     // Connect to SSE
     const evtSource = new EventSource(`/stream-logs/${sessionId}`);
 
-    evtSource.onmessage = (event) => {
-        logToTerminal(event.data);
+    evtSource.onopen = () => {
+        // Only trigger backend processing once the connection is established
+        // to ensure we don't miss early logs (session_init, etc.)
+        logToTerminal(i18n.t('logs.connection_established'), 'info'); // Optional: Feedback
 
-        if (event.data.includes("PROCESS_COMPLETE")) {
+        const formData = buildFormData(params);
+        fetch(CONFIG.endpoints.process, { method: 'POST', body: formData })
+            .then(res => res.json())
+            .then(data => {
+                if (data.status === 'processing' || data.status === 'success') {
+                    logToTerminal(i18n.t('logs.job_accepted'), 'info');
+                    // We do NOT stop here. We wait for SSE "PROCESS_COMPLETE".
+                    // Pre-configure the download button logic (it will be shown by finishBatch)
+                    document.getElementById('mainDownloadBtn').href = `/api/download/${sessionId}`;
+                } else {
+                    throw new Error(data.message || i18n.t('alerts.server_error'));
+                }
+            })
+            .catch(e => {
+            // If the initial request failed, we won't get SSE updates
+                logToTerminal(i18n.t('logs.request_error', { error: e.message }), 'error');
+                finishBatch(false);
+                evtSource.close();
+            });
+    };
+
+    evtSource.onmessage = (event) => {
+        let message = event.data;
+        let isComplete = false;
+
+        try {
+            // Try parsing as structured JSON log
+            const logData = JSON.parse(event.data);
+            if (logData.code) {
+                // Sanitize parameters to prevent XSS when using innerHTML in logs
+                const safeParams = logData.params || {};
+                Object.keys(safeParams).forEach(k => {
+                    if (typeof safeParams[k] === 'string') safeParams[k] = escapeHtml(safeParams[k]);
+                });
+
+                message = i18n.t(`logs.${logData.code}`, safeParams);
+
+                // Check for signals in the code itself
+                if (logData.code === 'process_complete') isComplete = true;
+                // If the message came back unchanged (key missing) or empty, show raw code as fallback
+                if (!message) message = event.data;
+            } else if (logData.message) {
+                // Fallback for simple JSON {"message": "..."}
+                message = logData.message;
+            }
+        } catch (e) {
+            // Not JSON, treat as raw string
+            message = event.data;
+        }
+
+        // Check for legacy string signals
+        if (message.includes("PROCESS_COMPLETE") || isComplete) {
             evtSource.close();
+            if (!isComplete) logToTerminal(i18n.t('logs.process_complete'), 'success');
+            else logToTerminal(message, 'success');
+
             finishBatch(true);
-        } else if (event.data.includes("PROCESS_ERROR")) {
+        } else if (message.includes("PROCESS_ERROR")) {
             evtSource.close();
+            logToTerminal(message, 'error');
             finishBatch(false);
+        } else {
+            logToTerminal(message);
         }
     };
 
     evtSource.onerror = () => {
         evtSource.close();
-        logToTerminal(i18n.t('alerts.connection_lost'), 'error');
+        logToTerminal(i18n.t('logs.connection_lost'), 'error');
         finishBatch(false);
     };
-
-    // Trigger Backend
-    const formData = buildFormData(params);
-    fetch(CONFIG.endpoints.process, { method: 'POST', body: formData })
-        .then(res => res.json())
-        .then(data => {
-            if (data.status === 'processing' || data.status === 'success') {
-                logToTerminal(i18n.t('alerts.job_accepted'), 'info');
-                // We do NOT stop here. We wait for SSE "PROCESS_COMPLETE".
-                // Pre-configure the download button logic (it will be shown by finishBatch)
-                document.getElementById('mainDownloadBtn').href = `/api/download/${sessionId}`;
-            } else {
-                throw new Error(data.message || i18n.t('alerts.server_error'));
-            }
-        })
-        .catch(e => {
-            // If the initial request failed, we won't get SSE updates
-            logToTerminal(i18n.t('alerts.request_error', { error: e.message }), 'error');
-            finishBatch(false);
-        });
 }
 
 // --- Helpers ---
@@ -544,19 +583,31 @@ function logToTerminal(msg, type = 'normal') {
     // Clean message
     const cleanMsg = msg.replace('data:', '').trim();
 
-    if (msg.includes("ERROR") || msg.includes("❌") || type === 'error') {
-        p.classList.add('text-red-400', 'border-red-500', 'bg-red-900/10');
-    } else if (msg.includes("✅") || type === 'success') {
-        p.classList.add('text-green-400', 'border-green-500');
-    } else if (msg.includes("---")) {
-        p.classList.add('text-blue-400', 'font-bold', 'mt-2');
-    } else {
-        p.classList.add('text-gray-300');
+    // Default base style
+    p.classList.add('text-gray-300');
+
+    // If type is explicitly 'error', we adds a red tint fallback, 
+    // but primarily we rely on the message content (from locales) to carry the style
+    if (type === 'error') {
+        p.classList.add('text-red-400', 'bg-red-900/10');
     }
 
-    p.innerText = cleanMsg;
+    p.innerHTML = cleanMsg;
     term.appendChild(p);
     term.scrollTop = term.scrollHeight;
+}
+
+/**
+ * Escapes HTML characters to prevent XSS.
+ */
+function escapeHtml(text) {
+    if (!text) return text;
+    return text
+        .replace(/&/g, "&amp;")
+        .replace(/</g, "&lt;")
+        .replace(/>/g, "&gt;")
+        .replace(/"/g, "&quot;")
+        .replace(/'/g, "&#039;");
 }
 
 /**
@@ -573,8 +624,6 @@ function finishBatch(success) {
 
         resultPanel.classList.add('animate-pulse');
         setTimeout(() => resultPanel.classList.remove('animate-pulse'), 500);
-
-        logToTerminal(i18n.t('alerts.batch_success'), 'success');
     } else {
         // On failure, re-enable the sample button so user can fix and retry
         const btnSample = document.getElementById('btnSample');

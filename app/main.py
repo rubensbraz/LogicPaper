@@ -146,6 +146,16 @@ def send_log(session_id: str, message: str) -> None:
         log_queues[session_id].put_nowait(message)
 
 
+def send_log_event(
+    session_id: str, code: str, params: Optional[Dict[str, Any]] = None
+) -> None:
+    """Helper to send a structured JSON log event."""
+    payload = {"code": code}
+    if params:
+        payload["params"] = params
+    send_log(session_id, json.dumps(payload))
+
+
 # --- Helper: Data Loader ---
 
 
@@ -763,7 +773,7 @@ async def background_batch_processor(
     """
     try:
         start_time = datetime.now()
-        send_log(session_id, f"🚀 Background task started for {len(df)} rows.")
+        send_log_event(session_id, "task_started", {"count": len(df)})
 
         # Define callback wrapper for SSE
         def sse_callback(msg: str):
@@ -817,11 +827,11 @@ async def background_batch_processor(
         zip_base_name = os.path.join(settings.TEMP_DIR, f"{session_id}_result")
         BatchService.create_zip_archive(session_path, zip_base_name)
 
-        send_log(session_id, "PROCESS_COMPLETE")
+        send_log_event(session_id, "process_complete")
 
     except Exception as e:
         logger.error(f"Critical Batch Background Error: {e}")
-        send_log(session_id, f"PROCESS_ERROR: {str(e)}")
+        send_log_event(session_id, "process_error", {"error": str(e)})
 
 
 @app.post("/api/process", tags=["Web Dashboard API"])
@@ -864,7 +874,7 @@ async def process_batch(
         os.makedirs(p, exist_ok=True)
 
     try:
-        send_log(session_id, "🟢 Initializing session structure...")
+        send_log_event(session_id, "session_init")
 
         # 1. Load Data
         df = await load_dataframe(file_excel, file_json)
@@ -888,7 +898,7 @@ async def process_batch(
                 await f.write(await tmpl.read())
             saved_template_paths.append(t_path)
             template_names.append(tmpl.filename)
-            send_log(session_id, f"   ↳ Loaded template: {tmpl.filename}")
+            send_log_event(session_id, "template_loaded", {"name": tmpl.filename})
 
         # 3. Handle Assets
         assets_filename = "None"
@@ -898,10 +908,10 @@ async def process_batch(
             async with await anyio.open_file(zip_input_path, "wb") as f:
                 await f.write(await file_assets.read())
             extract_zip(zip_input_path, dir_assets_internal)
-            send_log(session_id, "📦 Assets library prepared.")
+            send_log_event(session_id, "assets_prepared")
 
         total_rows = len(df)
-        send_log(session_id, f"⏳ JOB QUEUED: {total_rows} rows to process.")
+        send_log_event(session_id, "job_queued", {"count": total_rows})
 
         input_manifest = {
             "excel": input_filename,
@@ -934,7 +944,7 @@ async def process_batch(
 
     except Exception as e:
         logger.error(f"Error initiating batch {session_id}: {e}")
-        send_log(session_id, f"PROCESS_ERROR: {str(e)}")
+        send_log_event(session_id, "process_error", {"error": str(e)})
         return JSONResponse({"status": "error", "message": str(e)}, status_code=500)
 
 
