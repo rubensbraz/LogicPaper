@@ -78,7 +78,7 @@ Estes são os dados simulados que alimentam o sistema:
 
 ---
 
-## 🔄 System Architecture
+## 🔄 Arquitetura do Sistema
 
 ```mermaid
 graph TD
