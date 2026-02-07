@@ -99,12 +99,16 @@ graph TD
 LogicPaper/
 ├── app/
 │   ├── core/                  # Lógica de Negócio Central
+│   │   ├── config.py          # Configuração da Aplicação
 │   │   ├── engine.py          # Motor de Renderização de Documentos
 │   │   ├── formatter.py       # Despachante de Estratégias
-│   │   ├── batch.py           # Lógica de Execução em Lote
+│   │   ├── service.py         # Serviço de Execução em Lote
+│   │   ├── validator.py       # Verificação de Compatibilidade
 │   │   └── strategies/        # Lógica de Formatação (Data, Número, String, etc.)
 │   ├── integration/           # Camada de API Headless
 │   │   ├── router.py          # Endpoints da API
+│   │   ├── schemas.py         # Modelos Pydantic
+│   │   ├── security.py        # Autenticação via API Key
 │   │   ├── state.py           # Camada de Persistência Redis
 │   │   └── worker.py          # Execução de Jobs em Background
 │   ├── main.py                # Aplicação Principal e Rotas da UI
