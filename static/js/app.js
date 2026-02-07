@@ -150,7 +150,7 @@ async function performAnalysisSequence() {
             background: '#1e293b',
             color: '#fff',
             confirmButtonColor: '#3b82f6',
-            confirmButtonText: 'Understood'
+            confirmButtonText: i18n.t('alerts.btn_understood')
         });
         return; // Halt execution immediately
     }
@@ -261,7 +261,7 @@ async function validateTemplates(fileData, fileTemplates) {
             throw new Error(data.message);
         }
     } catch (e) {
-        Swal.fire({ icon: 'error', title: 'Validation Failed', text: e.message, background: '#1e293b', color: '#fff' });
+        Swal.fire({ icon: 'error', title: i18n.t('alerts.validation_failed_title'), text: e.message, background: '#1e293b', color: '#fff' });
         return false;
     }
 }
@@ -395,11 +395,11 @@ async function generateSample() {
             });
         } else {
             const err = await response.json();
-            throw new Error(err.message || "Server Error");
+            throw new Error(err.message || i18n.t('alerts.server_error'));
         }
     } catch (e) {
         logToTerminal(i18n.t('alerts.sample_error', { error: e.message }), 'error');
-        Swal.fire({ icon: 'error', title: 'Sample Failed', text: e.message, background: '#1e293b', color: '#fff' });
+        Swal.fire({ icon: 'error', title: i18n.t('alerts.sample_failed_title'), text: e.message, background: '#1e293b', color: '#fff' });
     } finally {
         // UI Unlocking
         toggleLoadingState(false, 'btnSample');
@@ -445,7 +445,7 @@ function startProcessing() {
 
     evtSource.onerror = () => {
         evtSource.close();
-        logToTerminal("❌ Connection lost with server.", 'error');
+        logToTerminal(i18n.t('alerts.connection_lost'), 'error');
         finishBatch(false);
     };
 
@@ -455,17 +455,17 @@ function startProcessing() {
         .then(res => res.json())
         .then(data => {
             if (data.status === 'processing' || data.status === 'success') {
-                logToTerminal("✅ Job accepted. Processing in background...", 'info');
+                logToTerminal(i18n.t('alerts.job_accepted'), 'info');
                 // We do NOT stop here. We wait for SSE "PROCESS_COMPLETE".
                 // Pre-configure the download button logic (it will be shown by finishBatch)
                 document.getElementById('mainDownloadBtn').href = `/api/download/${sessionId}`;
             } else {
-                throw new Error(data.message || "Unknown Error");
+                throw new Error(data.message || i18n.t('alerts.server_error'));
             }
         })
         .catch(e => {
             // If the initial request failed, we won't get SSE updates
-            logToTerminal(`❌ Request Error: ${e.message}`, 'error');
+            logToTerminal(i18n.t('alerts.request_error', { error: e.message }), 'error');
             finishBatch(false);
         });
 }

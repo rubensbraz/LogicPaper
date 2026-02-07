@@ -100,6 +100,21 @@ class I18nHandler {
             const key = el.getAttribute('data-i18n-placeholder');
             el.placeholder = this.t(key);
         });
+
+        // Handle generic attributes (Syntax: data-i18n-attr="attr:key")
+        document.querySelectorAll('[data-i18n-attr]').forEach(el => {
+            const raw = el.getAttribute('data-i18n-attr');
+            const pairs = raw.split(',');
+
+            pairs.forEach(pair => {
+                const parts = pair.split(':');
+                if (parts.length >= 2) {
+                    const attr = parts[0].trim();
+                    const key = parts.slice(1).join(':').trim(); // Handle keys that might have colons
+                    el.setAttribute(attr, this.t(key));
+                }
+            });
+        });
     }
 }
 

@@ -67,6 +67,8 @@ class Settings(BaseSettings):
     REDIS_HOST: str = "redis"
     REDIS_PORT: int = 6379
     REDIS_JOB_TTL: int = 86400
+    REDIS_MAX_RETRIES: int = 5
+    REDIS_RETRY_DELAY: int = 2
 
     # Pydantic Config
     model_config = SettingsConfigDict(

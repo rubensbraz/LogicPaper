@@ -5,7 +5,7 @@ import zipfile
 
 from apscheduler.schedulers.background import BackgroundScheduler
 
-from app.core.config import logger
+from app.core.config import logger, settings
 
 
 def sanitize_filename(filename: str) -> str:
@@ -33,12 +33,14 @@ def extract_zip(zip_path: str, extract_to: str):
         zip_ref.extractall(extract_to)
 
 
-def cleanup_job(temp_dir: str, max_age_seconds: int = 3600):
+def cleanup_job(
+    temp_dir: str, max_age_seconds: int = settings.CLEANUP_INTERVAL_SECONDS
+):
     """Deletes folders older than max_age_seconds.
 
     Args:
         temp_dir (str): The temporary directory path.
-        max_age_seconds (int): The max age in seconds. Defaults to 3600.
+        max_age_seconds (int): The max age in seconds. Defaults to configured interval.
     """
     logger.info("Running Cleanup Job...")
     now = time.time()
@@ -51,12 +53,14 @@ def cleanup_job(temp_dir: str, max_age_seconds: int = 3600):
                 logger.info(f"Deleted old session: {filename}")
 
 
-def start_scheduler(temp_dir: str, interval_seconds: int = 3600):
+def start_scheduler(
+    temp_dir: str, interval_seconds: int = settings.CLEANUP_INTERVAL_SECONDS
+):
     """Start scheduler for cleaning old files.
 
     Args:
         temp_dir (str): The temporary directory path.
-        interval_seconds (int): Cleanup interval in seconds. Defaults to 3600.
+        interval_seconds (int): Cleanup interval in seconds. Defaults to configured interval.
     """
     scheduler = BackgroundScheduler()
     scheduler.add_job(

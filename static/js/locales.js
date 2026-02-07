@@ -4,6 +4,13 @@
  */
 const TRANSLATIONS = {
     en: {
+        meta: {
+            title_home: "LogicPaper | Document Generation Engine",
+            title_help: "LogicPaper | Documentation",
+            description: "LogicPaper: A powerful batch processing engine for generating DOCX, PPTX, and PDF documents from Excel/JSON data with advanced logic integration.",
+            description_help: "Complete documentation for LogicPaper. Master Jinja2 templating strategies, format data and apply conditional logic.",
+            keywords: "batch processing, document generation, excel to pdf, excel to word, json to docx, automation, logicpaper"
+        },
         navbar: {
             title_main: "Logic",
             title_sub: "Paper",
@@ -272,7 +279,13 @@ const TRANSLATIONS = {
             connection_lost: "❌ Connection lost with server.",
             inputs_changed: "--- INPUTS CHANGED ---",
             files_selected_singular: "{{count}} file selected",
-            files_selected_plural: "{{count}} files selected"
+            files_selected_plural: "{{count}} files selected",
+            job_accepted: "✅ Job accepted. Processing in background...",
+            request_error: "❌ Request Error: {{error}}",
+            server_error: "Server Error",
+            sample_failed_title: "Sample Failed",
+            validation_failed_title: "Validation Failed",
+            btn_understood: "Understood"
         },
         footer: {
             copy: "LogicPaper © 2025-2026",
@@ -283,6 +296,13 @@ const TRANSLATIONS = {
         }
     },
     pt: {
+        meta: {
+            title_home: "LogicPaper | Motor de Geração de Documentos",
+            title_help: "LogicPaper | Documentação",
+            description: "LogicPaper: Um poderoso motor de processamento em lote para gerar documentos DOCX, PPTX e PDF a partir de dados Excel/JSON com lógica avançada.",
+            description_help: "Documentação completa do LogicPaper. Domine estratégias de modelo Jinja2, formatação de dados e lógica condicional.",
+            keywords: "processamento em lote, geração de documentos, excel para pdf, excel para word, json para docx, automação, logicpaper"
+        },
         navbar: {
             title_main: "Logic",
             title_sub: "Paper",
@@ -551,7 +571,13 @@ const TRANSLATIONS = {
             connection_lost: "❌ Conexão perdida com o servidor.",
             inputs_changed: "--- ENTRADAS ALTERADAS ---",
             files_selected_singular: "{{count}} arquivo selecionado",
-            files_selected_plural: "{{count}} arquivos selecionados"
+            files_selected_plural: "{{count}} arquivos selecionados",
+            job_accepted: "✅ Trabalho aceito. Processando em segundo plano...",
+            request_error: "❌ Erro na Requisição: {{error}}",
+            server_error: "Erro no Servidor",
+            sample_failed_title: "Falha na Amostra",
+            validation_failed_title: "Falha na Validação",
+            btn_understood: "Entendido"
         },
         footer: {
             copy: "LogicPaper © 2025-2026",

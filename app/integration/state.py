@@ -12,11 +12,7 @@ from app.core.config import settings
 logger = logging.getLogger(__name__)
 
 # Redis Connection with Retry Logic
-
-MAX_RETRIES = 5
-RETRY_DELAY = 2
-
-for attempt in range(MAX_RETRIES):
+for attempt in range(settings.REDIS_MAX_RETRIES):
     try:
         pool = redis.ConnectionPool(
             host=settings.REDIS_HOST,
@@ -29,13 +25,16 @@ for attempt in range(MAX_RETRIES):
         logger.info("[REDIS] Connected successfully.")
         break
     except Exception as e:
-        if attempt < MAX_RETRIES - 1:
+        if attempt < settings.REDIS_MAX_RETRIES - 1:
             logger.warning(
-                f"[REDIS] Connection failed. Retrying in {RETRY_DELAY}s... ({attempt + 1}/{MAX_RETRIES})"
+                f"[REDIS] Connection failed. Retrying in {settings.REDIS_RETRY_DELAY}s... "
+                f"({attempt + 1}/{settings.REDIS_MAX_RETRIES})"
             )
-            time.sleep(RETRY_DELAY)
+            time.sleep(settings.REDIS_RETRY_DELAY)
         else:
-            logger.error(f"[REDIS] Failed to connect after {MAX_RETRIES} attempts: {e}")
+            logger.error(
+                f"[REDIS] Failed to connect after {settings.REDIS_MAX_RETRIES} attempts: {e}"
+            )
 
             raise e
 

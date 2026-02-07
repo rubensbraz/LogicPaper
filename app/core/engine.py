@@ -1,6 +1,7 @@
 import asyncio
 import logging
 import os
+import re
 import subprocess
 import zipfile
 from typing import Any, Dict, List
@@ -83,6 +84,86 @@ class DocumentEngine:
         except Exception as e:
             logger.error(f"Error loading image '{filename}': {e}")
             return f"[IMAGE ERROR: {str(e)}]"
+
+    def _parse_and_replace_pptx_text(self, text: str, context: Dict[str, Any]) -> str:
+        """Parses PPTX text for pseudo-Jinja tags and applies formatting manually.
+
+        Args:
+            text (str): The raw text containing Jinja2 variables.
+            context (Dict[str, Any]): The data context.
+
+        Returns:
+            str: The processed text with variables replaced and filters applied.
+        """
+        # Regex to capture: {{ variable | filter('arg1', 'arg2') }}
+        # Group 1: Variable Name
+        # Group 2: Full Filter String (optional)
+        pattern = re.compile(r"\{\{\s*([a-zA-Z0-9_]+)(\s*\|.*?)?\s*\}\}")
+
+        def replace_match(match):
+            var_name = match.group(1)
+            filter_part = match.group(2)  # e.g., " | format_string('upper')"
+
+            # Get Raw Value
+            value = context.get(var_name, "")
+
+            if not filter_part:
+                return str(value)
+
+            # Parse Filter Logic
+            # Expected format: | filter_name('arg1', 'arg2')
+            try:
+                # Remove pipe and whitespace
+                content = filter_part.strip().lstrip("|").strip()
+                # Split filter name from args: "format_string('upper')" -> "format_string", "'upper'"
+                if "(" in content and content.endswith(")"):
+                    f_name, args_raw = content.split("(", 1)
+                    args_raw = args_raw[:-1]  # Remove trailing )
+                else:
+                    f_name = content
+                    args_raw = ""
+
+                # Parse Args (Naive split by comma, respecting basic quotes)
+                # Note: This is a basic parser. Complex nested quotes in PPTX args are limited
+                args = []
+                if args_raw:
+                    # Remove quotes and split
+                    parts = args_raw.split(",")
+                    args = [p.strip().strip("'").strip('"') for p in parts]
+
+                # Map filter name to Strategy Name
+                # "format_date" -> "date"
+                strategy_map = {
+                    "format_string": "string",
+                    "format_number": "number",
+                    "format_currency": "number",
+                    "format_date": "date",
+                    "format_bool": "bool",
+                    "format_mask": "mask",
+                    "format_logic": "logic",
+                }
+
+                # Special handling for aliases
+                strat_key = strategy_map.get(f_name)
+                final_args = args
+
+                if f_name == "format_currency":
+                    strat_key = "number"
+                    final_args = ["currency"] + args
+
+                if strat_key:
+                    return str(
+                        self.formatter._apply_strategy(strat_key, value, *final_args)
+                    )
+                else:
+                    # Fallback if unknown filter
+                    return str(value)
+
+            except Exception as e:
+                logger.error(f"PPTX Filter Error parsing '{filter_part}': {e}")
+                return str(value)
+
+        return pattern.sub(replace_match, text)
 
     def _remove_office_thumbnail(self, file_path: str) -> None:
         """Removes the 'docProps/thumbnail.jpeg' from the Office file to fix icon issues.
