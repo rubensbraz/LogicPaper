@@ -14,6 +14,7 @@ function renderNavbar() {
     const path = window.location.pathname;
     // Enhanced detection for GitHub Pages subfolder routing
     const isDashboard = path.endsWith("/") || path.endsWith("/index.html");
+    const isHistory = path.endsWith("/history.html");
     const isHelp = path.endsWith("/help.html");
 
     // CSS Classes for states
@@ -65,6 +66,10 @@ function renderNavbar() {
                     <a href="index.html" class="${isDashboard ? activeClass : inactiveClass} flex items-center justify-center gap-2">
                         <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect width="7" height="9" x="3" y="3" rx="1"/><rect width="7" height="5" x="14" y="3" rx="1"/><rect width="7" height="9" x="14" y="12" rx="1"/><rect width="7" height="5" x="3" y="16" rx="1"/></svg>
                         <span>${i18n.t('navbar.link_dashboard')}</span>
+                    </a>
+                    <a href="history.html" class="${isHistory ? activeClass : inactiveClass} flex items-center justify-center gap-2">
+                        <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 8v4l3 3m6-3a9 9 0 1 1-18 0 9 9 0 0 1 18 0z"/></svg>
+                        <span>${i18n.t('navbar.link_history')}</span>
                     </a>
                     <a href="help.html" class="${isHelp ? activeClass : inactiveClass} flex items-center justify-center gap-2">
                         <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><path d="M9.09 9a3 3 0 0 1 5.83 1c0 2-3 3-3 3"/><path d="M12 17h.01"/></svg>

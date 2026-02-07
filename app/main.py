@@ -23,6 +23,7 @@ from app.core.engine import DocumentEngine
 from app.core.service import BatchService
 from app.core.validator import TemplateValidator
 from app.integration.router import router as integration_router
+from app.integration.state import JobRepository
 from app.utils import extract_zip, sanitize_filename, start_scheduler
 
 
@@ -829,9 +830,21 @@ async def background_batch_processor(
 
         send_log_event(session_id, "process_complete")
 
+        # --- Persistence: Update State (Completed) ---
+        JobRepository.update_status(
+            session_id,
+            status="completed",
+            duration=str(duration),
+            files_generated=batch_result["total_files"],
+            download_url=f"/api/download/{session_id}",
+        )
+
     except Exception as e:
         logger.error(f"Critical Batch Background Error: {e}")
         send_log_event(session_id, "process_error", {"error": str(e)})
+
+        # --- Persistence: Update State (Failed) ---
+        JobRepository.update_status(session_id, status="failed", error=str(e))
 
 
 @app.post("/api/process", tags=["Web Dashboard API"])
@@ -913,6 +926,18 @@ async def process_batch(
         total_rows = len(df)
         send_log_event(session_id, "job_queued", {"count": total_rows})
 
+        # --- Persistence: Save Initial Job State ---
+        JobRepository.save(
+            session_id,
+            {
+                "status": "processing",
+                "start_time": datetime.now(),
+                "total_rows": total_rows,
+                "input_file": input_filename,
+            },
+        )
+        JobRepository.add_to_history(session_id)
+
         input_manifest = {
             "excel": input_filename,
             "templates": template_names,
@@ -984,6 +1009,24 @@ async def download_result(session_id: str) -> Any:
             {"status": "error", "message": "Internal Server Error during download"},
             status_code=500,
         )
+
+
+# --- History API ---
+
+
+@app.get("/api/history", tags=["Web Dashboard API"])
+async def get_job_history():
+    """Retrieves the list of recent jobs from Redis.
+
+    Returns:
+        JSONResponse: List of job objects with status and metadata.
+    """
+    try:
+        jobs = JobRepository.get_recent_jobs(limit=50)
+        return JSONResponse({"status": "success", "jobs": jobs})
+    except Exception as e:
+        logger.error(f"History Error: {e}")
+        return JSONResponse({"status": "error", "message": str(e)}, status_code=500)
 
 
 # --- Static Pages ---

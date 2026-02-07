@@ -101,3 +101,46 @@ class JobRepository:
         current_data["status"] = status
         current_data.update(kwargs)
         JobRepository.save(job_id, current_data)
+
+    @staticmethod
+    def add_to_history(job_id: str) -> None:
+        """Adds a job_id to the global history list.
+
+        Args:
+            job_id (str): The job identifier.
+        """
+        try:
+            # LPUSH adds to the head of the list (newest first)
+            redis_client.lpush("jobs:history", job_id)
+            # Trim list to keep only last 50 jobs
+            redis_client.ltrim("jobs:history", 0, 49)
+        except Exception as e:
+            logger.error(f"Redis History Add Error: {e}")
+
+    @staticmethod
+    def get_recent_jobs(limit: int = 10) -> list:
+        """Retrieves the most recent jobs with their statuses.
+
+        Args:
+            limit (int): Number of jobs to return.
+
+        Returns:
+            list: List of dicts containing job details.
+        """
+        try:
+            # Get job IDs
+            job_ids = redis_client.lrange("jobs:history", 0, limit - 1)
+            results = []
+
+            for jid in job_ids:
+                data = JobRepository.get(jid)
+                if data:
+                    # Enrich with ID if missing
+                    if "job_id" not in data:
+                        data["job_id"] = jid
+                    results.append(data)
+
+            return results
+        except Exception as e:
+            logger.error(f"Redis History List Error: {e}")
+            return []

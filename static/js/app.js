@@ -450,7 +450,7 @@ function startProcessing() {
                 }
             })
             .catch(e => {
-            // If the initial request failed, we won't get SSE updates
+                // If the initial request failed, we won't get SSE updates
                 logToTerminal(i18n.t('logs.request_error', { error: e.message }), 'error');
                 finishBatch(false);
                 evtSource.close();
@@ -595,19 +595,6 @@ function logToTerminal(msg, type = 'normal') {
     p.innerHTML = cleanMsg;
     term.appendChild(p);
     term.scrollTop = term.scrollHeight;
-}
-
-/**
- * Escapes HTML characters to prevent XSS.
- */
-function escapeHtml(text) {
-    if (!text) return text;
-    return text
-        .replace(/&/g, "&amp;")
-        .replace(/</g, "&lt;")
-        .replace(/>/g, "&gt;")
-        .replace(/"/g, "&quot;")
-        .replace(/'/g, "&#039;");
 }
 
 /**

@@ -7,15 +7,18 @@ const TRANSLATIONS = {
         meta: {
             title_home: "LogicPaper | Document Generation Engine",
             title_help: "LogicPaper | Documentation",
+            title_history: "LogicPaper | Execution History",
             description: "LogicPaper: A powerful batch processing engine for generating DOCX, PPTX, and PDF documents from Excel/JSON data with advanced logic integration.",
             description_help: "Complete documentation for LogicPaper. Master Jinja2 templating strategies, format data and apply conditional logic.",
+            description_history: "View your LogicPaper job execution history, check status, and re-download completed files.",
             keywords: "batch processing, document generation, excel to pdf, excel to word, json to docx, automation, logicpaper"
         },
         navbar: {
             title_main: "Logic",
             title_sub: "Paper",
-            subtitle: "Batch Processing Engine v1.2.5",
+            subtitle: "Batch Processing Engine v1.3.0",
             link_dashboard: "Dashboard",
+            link_history: "History",
             link_help: "How to Use",
             link_api: "API Docs",
             badge_preview: "PREVIEW ONLY",
@@ -70,9 +73,25 @@ const TRANSLATIONS = {
                 error: "Error: "
             },
             logs: {
-                title: "EXECUTION_LOGS",
-                ready: "System ready. Waiting for command..."
+                title: "Execution Logs",
+                ready: "System ready. Waiting for command...",
+                log_message: "Message",
             }
+        },
+        history: {
+            title: "Execution History",
+            btn_refresh: "Refresh",
+            col_date: "Date",
+            col_input: "Input File",
+            col_status: "Status",
+            col_stats: "Files",
+            col_action: "Action",
+            loading: "Loading history...",
+            empty: "No jobs found.",
+            status_processing: "Processing",
+            status_completed: "Completed",
+            status_failed: "Failed",
+            btn_download: "Download",
         },
         help: {
             toast: "Code copied to clipboard!",
@@ -308,15 +327,18 @@ const TRANSLATIONS = {
         meta: {
             title_home: "LogicPaper | Motor de Geração de Documentos",
             title_help: "LogicPaper | Documentação",
-            description: "LogicPaper: Um poderoso motor de processamento em lote para gerar documentos DOCX, PPTX e PDF a partir de dados Excel/JSON com lógica avançada.",
-            description_help: "Documentação completa do LogicPaper. Domine estratégias de modelo Jinja2, formatação de dados e lógica condicional.",
+            title_history: "LogicPaper | Histórico de Execuções",
+            description: "LogicPaper: Um poderoso motor de processamento em lote para gerar documentos DOCX, PPTX e PDF a partir de dados Excel/JSON com integração de lógica avançada.",
+            description_help: "Documentação completa do LogicPaper. Domine estratégias de template Jinja2, formate dados e aplique lógica condicional.",
+            description_history: "Visualize o histórico de execuções do LogicPaper, verifique o status e baixe novamente arquivos concluídos.",
             keywords: "processamento em lote, geração de documentos, excel para pdf, excel para word, json para docx, automação, logicpaper"
         },
         navbar: {
             title_main: "Logic",
             title_sub: "Paper",
-            subtitle: "Processamento em Lote v1.2.5",
+            subtitle: "Processamento em Lote v1.3.0",
             link_dashboard: "Dashboard",
+            link_history: "Histórico",
             link_help: "Como Usar",
             link_api: "Docs API",
             badge_preview: "APENAS VISUALIZAÇÃO",
@@ -371,9 +393,25 @@ const TRANSLATIONS = {
                 error: "Erro: "
             },
             logs: {
-                title: "LOGS_EXECUÇÃO",
-                ready: "Sistema pronto. Aguardando comando..."
+                title: "Logs de Execução",
+                ready: "Sistema pronto. Aguardando comando...",
+                log_message: "Mensagem",
             }
+        },
+        history: {
+            title: "Histórico de Execuções",
+            btn_refresh: "Atualizar",
+            col_date: "Data",
+            col_input: "Arquivo de Entrada",
+            col_status: "Status",
+            col_stats: "Arquivos",
+            col_action: "Ação",
+            loading: "Carregando histórico...",
+            empty: "Nenhum job encontrado.",
+            status_processing: "Processando",
+            status_completed: "Concluído",
+            status_failed: "Falhou",
+            btn_download: "Baixar",
         },
         help: {
             toast: "Código copiado para a área de transferência!",
