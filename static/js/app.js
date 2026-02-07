@@ -160,7 +160,7 @@ async function performAnalysisSequence() {
 
     // 1. Basic Input Validation
     if (!fileData) return Swal.fire({ icon: 'warning', title: i18n.t('alerts.missing_excel.title'), text: i18n.t('alerts.missing_excel.text'), background: '#1e293b', color: '#fff' });
-    if (fileTemplates.length === 0) return Swal.fire({ icon: 'warning', title: i18n.t('alerts.missing_excel.title'), text: i18n.t('alerts.missing_templates.text'), background: '#1e293b', color: '#fff' });
+    if (fileTemplates.length === 0) return Swal.fire({ icon: 'warning', title: i18n.t('alerts.missing_templates.title'), text: i18n.t('alerts.missing_templates.text'), background: '#1e293b', color: '#fff' });
 
     // 2. UI Loading State
     const btn = document.getElementById('btnValidate');
@@ -454,11 +454,17 @@ function startProcessing() {
     fetch(CONFIG.endpoints.process, { method: 'POST', body: formData })
         .then(res => res.json())
         .then(data => {
-            if (data.status === 'success') {
-                document.getElementById('mainDownloadBtn').href = data.download_url;
+            if (data.status === 'processing' || data.status === 'success') {
+                logToTerminal("✅ Job accepted. Processing in background...", 'info');
+                // We do NOT stop here. We wait for SSE "PROCESS_COMPLETE".
+                // Pre-configure the download button logic (it will be shown by finishBatch)
+                document.getElementById('mainDownloadBtn').href = `/api/download/${sessionId}`;
+            } else {
+                throw new Error(data.message || "Unknown Error");
             }
         })
         .catch(e => {
+            // If the initial request failed, we won't get SSE updates
             logToTerminal(`❌ Request Error: ${e.message}`, 'error');
             finishBatch(false);
         });

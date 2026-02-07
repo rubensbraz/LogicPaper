@@ -9,7 +9,7 @@ from typing import Any, Dict, List, Optional
 
 import anyio
 import pandas as pd
-from fastapi import FastAPI, File, Form, UploadFile
+from fastapi import BackgroundTasks, FastAPI, File, Form, UploadFile
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import FileResponse, JSONResponse, StreamingResponse
 from fastapi.staticfiles import StaticFiles
@@ -18,12 +18,12 @@ from openpyxl.styles import Alignment, Border, Font, PatternFill, Side
 from openpyxl.utils.dataframe import dataframe_to_rows
 from openpyxl.worksheet.table import Table, TableStyleInfo
 
-from app.core.batch import process_batch_core
-from app.core.config import settings, logger
+from app.core.config import logger, settings
 from app.core.engine import DocumentEngine
+from app.core.service import BatchService
 from app.core.validator import TemplateValidator
-from app.utils import extract_zip, sanitize_filename, start_scheduler
 from app.integration.router import router as integration_router
+from app.utils import extract_zip, sanitize_filename, start_scheduler
 
 
 # --- App Initialization ---
@@ -80,9 +80,10 @@ app.include_router(
 
 @app.get("/health", tags=["System"])
 async def health_check():
-    """
-    Standard Health Check.
-    Returns 200 if the API is running.
+    """Standard Health Check.
+
+    Returns:
+        dict: Status information including timestamp and version.
     """
     return {
         "status": "healthy",
@@ -100,8 +101,13 @@ log_queues = {}
 
 
 async def log_generator(session_id: str):
-    """
-    Async generator for Server-Sent Events (SSE).
+    """Async generator for Server-Sent Events (SSE).
+
+    Args:
+        session_id (str): The session ID to stream logs for.
+
+    Yields:
+        str: Server-sent event data.
     """
     queue = asyncio.Queue()
     log_queues[session_id] = queue
@@ -130,7 +136,12 @@ async def log_generator(session_id: str):
 
 
 def send_log(session_id: str, message: str) -> None:
-    """Push a log message to the specific session queue."""
+    """Push a log message to the specific session queue.
+
+    Args:
+        session_id (str): The session identifier.
+        message (str): The message to send.
+    """
     if session_id in log_queues:
         log_queues[session_id].put_nowait(message)
 
@@ -141,8 +152,19 @@ def send_log(session_id: str, message: str) -> None:
 async def load_dataframe(
     file_excel: Optional[UploadFile] = None, file_json: Optional[UploadFile] = None
 ) -> pd.DataFrame:
-    """
-    Loads data from either Excel or JSON into a Pandas DataFrame.
+    """Loads data from either Excel or JSON into a Pandas DataFrame.
+
+    Runs blocking Pandas operations in a separate thread.
+
+    Args:
+        file_excel (Optional[UploadFile]): The uploaded Excel file. Defaults to None.
+        file_json (Optional[UploadFile]): The uploaded JSON file. Defaults to None.
+
+    Returns:
+        pd.DataFrame: The loaded data as a DataFrame.
+
+    Raises:
+        ValueError: If no file is provided or if parsing fails.
     """
     if not file_excel and not file_json:
         raise ValueError("No data source provided. Please upload Excel or JSON.")
@@ -152,7 +174,11 @@ async def load_dataframe(
         try:
             contents = await file_excel.read()
             await file_excel.seek(0)
-            return pd.read_excel(io.BytesIO(contents), header=0)
+
+            # Offload blocking pandas.read_excel
+            return await anyio.to_thread.run_sync(
+                lambda: pd.read_excel(io.BytesIO(contents), header=0)
+            )
         except Exception as e:
             raise ValueError(f"Failed to read Excel file: {str(e)}")
 
@@ -161,24 +187,25 @@ async def load_dataframe(
         try:
             contents = await file_json.read()
             await file_json.seek(0)
-            data = json.loads(contents)
 
-            # Case A: Single Dictionary -> Wrap in list
-            if isinstance(data, dict):
-                data = [data]
+            def _parse_json(c):
+                data = json.loads(c)
+                # Case A: Single Dictionary -> Wrap in list
+                if isinstance(data, dict):
+                    data = [data]
+                # Case B: List of Dictionaries (Standard)
+                elif isinstance(data, list):
+                    if not all(isinstance(i, dict) for i in data):
+                        raise ValueError(
+                            "JSON list must contain objects (key-value pairs)."
+                        )
+                else:
+                    raise ValueError("JSON must be an Object or a List of Objects.")
 
-            # Case B: List of Dictionaries (Standard)
-            elif isinstance(data, list):
-                # Validation: Ensure all items are dicts
-                if not all(isinstance(i, dict) for i in data):
-                    raise ValueError(
-                        "JSON list must contain objects (key-value pairs)."
-                    )
-            else:
-                raise ValueError("JSON must be an Object or a List of Objects.")
+                return pd.json_normalize(data)
 
-            # Normalize semi-structured JSON. This flattens simple nested keys if necessary
-            return pd.json_normalize(data)
+            # Offload blocking JSON parsing and normalization
+            return await anyio.to_thread.run_sync(_parse_json, contents)
 
         except json.JSONDecodeError:
             raise ValueError("Invalid JSON file format.")
@@ -195,14 +222,13 @@ def generate_styled_report(
     metadata: Dict[str, Any],
     input_manifest: Dict[str, Any],
 ) -> None:
-    """
-    Generates a high-fidelity, styled Excel report with two sheets.
+    """Generates a high-fidelity, styled Excel report with two sheets.
 
     Args:
         path (str): Output path for the .xlsx file.
-        report_data (List[Dict]): The list of row results (one per file).
-        metadata (Dict): Statistics like start_time, duration, file_counts.
-        input_manifest (Dict): Dictionary listing input filenames.
+        report_data (List[Dict[str, Any]]): The list of row results (one per file).
+        metadata (Dict[str, Any]): Statistics like start_time, duration, file_counts.
+        input_manifest (Dict[str, Any]): Dictionary listing input filenames.
     """
     wb = Workbook()
 
@@ -285,9 +311,9 @@ def generate_styled_report(
 
     # Input Manifest
     row_idx += 2
-    ws_dash.cell(row=row_idx, column=2, value="Input Files Manifest").font = (
-        subtitle_font
-    )
+    ws_dash.cell(
+        row=row_idx, column=2, value="Input Files Manifest"
+    ).font = subtitle_font
     row_idx += 1
 
     inputs = [
@@ -370,7 +396,7 @@ def generate_styled_report(
         ws_log.column_dimensions["E"].width = 60  # Error Details
 
         # Table
-        tab = Table(displayName="LogTable", ref=f"A1:E{len(df)+1}")
+        tab = Table(displayName="LogTable", ref=f"A1:E{len(df) + 1}")
         style = TableStyleInfo(
             name="TableStyleMedium9",
             showFirstColumn=False,
@@ -389,6 +415,14 @@ def generate_styled_report(
 
 @app.get("/stream-logs/{session_id}", tags=["Web Dashboard API"])
 async def stream_logs(session_id: str):
+    """Streams real-time logs for a specific session.
+
+    Args:
+        session_id (str): The session ID.
+
+    Returns:
+        StreamingResponse: SSE stream of log messages.
+    """
     return StreamingResponse(log_generator(session_id), media_type="text/event-stream")
 
 
@@ -396,8 +430,14 @@ async def stream_logs(session_id: str):
 async def preview_data(
     file_excel: UploadFile = File(None), file_json: UploadFile = File(None)
 ):
-    """
-    Parses the Excel OR JSON file and returns headers and first 5 rows.
+    """Parses the Excel OR JSON file and returns headers and first 5 rows.
+
+    Args:
+        file_excel (UploadFile, optional): Excel file. Defaults to None.
+        file_json (UploadFile, optional): JSON file. Defaults to None.
+
+    Returns:
+        JSONResponse: Headers and preview data.
     """
     try:
         # Load Data using Helper
@@ -434,8 +474,15 @@ async def validate_compatibility(
     file_json: UploadFile = File(None),
     files_templates: List[UploadFile] = File(...),
 ):
-    """
-    Validates that template tags exist in Excel/JSON headers.
+    """Validates that template tags exist in Excel/JSON headers.
+
+    Args:
+        file_excel (UploadFile, optional): Excel file. Defaults to None.
+        file_json (UploadFile, optional): JSON file. Defaults to None.
+        files_templates (List[UploadFile]): List of template files.
+
+    Returns:
+        JSONResponse: Validation report.
     """
     session_id = f"val_{uuid.uuid4().hex[:8]}"
     session_path = os.path.join(settings.TEMP_DIR, session_id)
@@ -456,7 +503,7 @@ async def validate_compatibility(
 
         # Validate
         validator = TemplateValidator()
-        result = validator.compare(headers, templates_map)
+        result = await validator.compare(headers, templates_map)
 
         return JSONResponse({"status": "success", "report": result})
 
@@ -478,10 +525,19 @@ async def generate_sample(
     files_templates: List[UploadFile] = File(...),
     file_assets: UploadFile = File(None),
 ):
-    """
-    Dry Run Endpoint: Processes ONLY the first data row from the Excel/JSON file.
-    Returns a ZIP file containing the generated documents for that specific row
-    for immediate user verification.
+    """Processes ONLY the first data row (Dry Run) for verification.
+
+    Args:
+        session_id (str): The session ID.
+        filename_col (str): The column to use for filenames.
+        output_pdf (bool): Whether to convert to PDF. Defaults to False.
+        file_excel (UploadFile, optional): Excel file.
+        file_json (UploadFile, optional): JSON file.
+        files_templates (List[UploadFile]): List of template files.
+        file_assets (UploadFile, optional): Assets ZIP file.
+
+    Returns:
+        FileResponse: A ZIP file containing the generated documents.
     """
     start_time = datetime.now()
 
@@ -679,8 +735,98 @@ async def generate_sample(
         return JSONResponse({"status": "error", "message": str(e)}, status_code=500)
 
 
+async def background_batch_processor(
+    session_id: str,
+    df: pd.DataFrame,
+    saved_template_paths: List[str],
+    session_path: str,
+    dir_outputs: str,
+    dir_assets_internal: str,
+    output_pdf: bool,
+    filename_col: str,
+    group_by_folders: bool,
+    input_manifest: Dict[str, Any],
+):
+    """Background task to process the batch, generate report, and zip.
+
+    Args:
+        session_id (str): The session ID.
+        df (pd.DataFrame): The DataFrame containing data.
+        saved_template_paths (List[str]): List of paths to saved templates.
+        session_path (str): The session directory path.
+        dir_outputs (str): The output directory path.
+        dir_assets_internal (str): The internal assets directory path.
+        output_pdf (bool): Whether to convert to PDF.
+        filename_col (str): The column used for filenames.
+        group_by_folders (bool): Whether to group by folders.
+        input_manifest (Dict[str, Any]): The input manifest.
+    """
+    try:
+        start_time = datetime.now()
+        send_log(session_id, f"🚀 Background task started for {len(df)} rows.")
+
+        # Define callback wrapper for SSE
+        def sse_callback(msg: str):
+            send_log(session_id, msg)
+
+        # 4. Execute Core batch logic via Service
+        batch_result = await BatchService.process_batch(
+            session_id=session_id,
+            df=df,
+            template_paths=saved_template_paths,
+            session_path=session_path,
+            dir_outputs=dir_outputs,
+            dir_assets=dir_assets_internal,
+            to_pdf=output_pdf,
+            filename_col=filename_col,
+            group_folders=group_by_folders,
+            log_callback=sse_callback,
+        )
+
+        # 5. Cleanup & Report
+        if os.path.exists(dir_assets_internal):
+            shutil.rmtree(dir_assets_internal)
+
+        end_time = datetime.now()
+        duration = end_time - start_time
+
+        metadata = {
+            "session_id": session_id,
+            "start_time": start_time,
+            "duration": duration,
+            "total_rows": batch_result["total_rows"],
+            "total_files": batch_result["total_files"],
+            "success_rate": (
+                (batch_result["success_rows"] / batch_result["total_rows"] * 100)
+                if batch_result["total_rows"] > 0
+                else 0
+            ),
+        }
+
+        report_path = os.path.join(session_path, "job_report.xlsx")
+
+        # Offload blocking Excel generation
+        await anyio.to_thread.run_sync(
+            generate_styled_report,
+            report_path,
+            batch_result["report"],
+            metadata,
+            input_manifest,
+        )
+
+        zip_base_name = os.path.join(settings.TEMP_DIR, f"{session_id}_result")
+        BatchService.create_zip_archive(session_path, zip_base_name)
+
+        send_log(session_id, "PROCESS_COMPLETE")
+
+    except Exception as e:
+        logger.error(f"Critical Batch Background Error: {e}")
+        send_log(session_id, f"PROCESS_ERROR: {str(e)}")
+
+
 @app.post("/api/process", tags=["Web Dashboard API"])
 async def process_batch(
+    background_tasks: BackgroundTasks,
     session_id: str = Form(...),
     filename_col: str = Form(...),
     output_pdf: bool = Form(False),
@@ -690,10 +836,24 @@ async def process_batch(
     files_templates: List[UploadFile] = File(...),
     file_assets: UploadFile = File(None),
 ):
+    """Main batch processing endpoint.
+
+    Asynchronous (Fire-and-Forget) with SSE updates.
+
+    Args:
+        background_tasks (BackgroundTasks): FastAPI background tasks handler.
+        session_id (str): The session ID.
+        filename_col (str): The column to use for filenames.
+        output_pdf (bool): Whether to convert to PDF. Defaults to False.
+        group_by_folders (bool): Whether to group output by folders. Defaults to True.
+        file_excel (UploadFile, optional): Excel file.
+        file_json (UploadFile, optional): JSON file.
+        files_templates (List[UploadFile]): List of template files.
+        file_assets (UploadFile, optional): Assets ZIP file.
+
+    Returns:
+        JSONResponse: Status message indicating job queuing.
     """
-    Main batch processing endpoint.
-    """
-    start_time = datetime.now()
     session_path = os.path.join(settings.TEMP_DIR, session_id)
 
     dir_inputs = os.path.join(session_path, "1 Input documents")
@@ -741,33 +901,7 @@ async def process_batch(
             send_log(session_id, "📦 Assets library prepared.")
 
         total_rows = len(df)
-        send_log(session_id, f"🚀 Starting processing for {total_rows} rows.")
-
-        # 4. Execute Core batch logic
-
-        # Define callback wrapper for SSE
-        def sse_callback(msg: str):
-            send_log(session_id, msg)
-
-        batch_result = await process_batch_core(
-            session_id=session_id,
-            df=df,
-            template_paths=saved_template_paths,
-            session_path=session_path,
-            dir_outputs=dir_outputs,
-            dir_assets=dir_assets_internal,
-            to_pdf=output_pdf,
-            filename_col=filename_col,
-            group_folders=group_by_folders,
-            log_callback=sse_callback,
-        )
-
-        # 5. Cleanup & Report
-        if os.path.exists(dir_assets_internal):
-            shutil.rmtree(dir_assets_internal)
-
-        end_time = datetime.now()
-        duration = end_time - start_time
+        send_log(session_id, f"⏳ JOB QUEUED: {total_rows} rows to process.")
 
         input_manifest = {
             "excel": input_filename,
@@ -775,46 +909,46 @@ async def process_batch(
             "assets": assets_filename,
         }
 
-        metadata = {
-            "session_id": session_id,
-            "start_time": start_time,
-            "duration": duration,
-            "total_rows": batch_result["total_rows"],
-            "total_files": batch_result["total_files"],
-            "success_rate": (
-                (batch_result["success_rows"] / batch_result["total_rows"] * 100)
-                if batch_result["total_rows"] > 0
-                else 0
-            ),
-        }
-
-        report_path = os.path.join(session_path, "job_report.xlsx")
-        generate_styled_report(
-            report_path, batch_result["report"], metadata, input_manifest
+        # 4. Dispatch Background Task
+        background_tasks.add_task(
+            background_batch_processor,
+            session_id,
+            df,
+            saved_template_paths,
+            session_path,
+            dir_outputs,
+            dir_assets_internal,
+            output_pdf,
+            filename_col,
+            group_by_folders,
+            input_manifest,
         )
 
-        zip_base_name = os.path.join(settings.TEMP_DIR, f"{session_id}_result")
-        shutil.make_archive(
-            base_name=zip_base_name, format="zip", root_dir=session_path
-        )
-
-        send_log(session_id, "PROCESS_COMPLETE")
         return JSONResponse(
-            {"status": "success", "download_url": f"/api/download/{session_id}"}
+            {
+                "status": "processing",
+                "message": "Job queued for background processing.",
+            },
+            status_code=202,
         )
 
     except Exception as e:
-        logger.error(f"Critical Batch Error: {e}")
+        logger.error(f"Error initiating batch {session_id}: {e}")
         send_log(session_id, f"PROCESS_ERROR: {str(e)}")
         return JSONResponse({"status": "error", "message": str(e)}, status_code=500)
 
 
 @app.get("/api/download/{session_id}", tags=["Web Dashboard API"])
 async def download_result(session_id: str) -> Any:
-    """
-    Downloads the final ZIP file with a timestamped filename.
+    """Downloads the final ZIP file with a timestamped filename.
 
     Format: LogicPaper_YYYY-MM-DD_HH-MM.zip
+
+    Args:
+        session_id (str): The session ID.
+
+    Returns:
+        FileResponse: The ZIP file.
     """
     try:
         file_path = os.path.join(settings.TEMP_DIR, f"{session_id}_result.zip")
@@ -847,13 +981,21 @@ async def download_result(session_id: str) -> Any:
 
 @app.get("/", tags=["Static Pages"])
 async def read_root():
-    """Serves the main application page."""
+    """Serves the main application page.
+
+    Returns:
+        FileResponse: The index.html file.
+    """
     return FileResponse(os.path.join(settings.STATIC_DIR, "index.html"))
 
 
 @app.get("/help", tags=["Static Pages"])
 async def read_help():
-    """Serves the documentation page."""
+    """Serves the documentation page.
+
+    Returns:
+        FileResponse: The help.html file.
+    """
     return FileResponse(os.path.join(settings.STATIC_DIR, "help.html"))
 
 

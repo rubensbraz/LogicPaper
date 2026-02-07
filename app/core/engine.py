@@ -1,7 +1,6 @@
 import asyncio
 import logging
 import os
-import re
 import subprocess
 import zipfile
 from typing import Any, Dict, List
@@ -21,14 +20,13 @@ logger = logging.getLogger(__name__)
 
 
 class DocumentEngine:
-    """
-    Core engine to manipulate DOCX/PPTX and convert to PDF.
+    """Core engine to manipulate DOCX/PPTX and convert to PDF.
+
     Template-based formatting via Jinja2 filters and custom PPTX regex parsing.
     """
 
     def __init__(self, temp_dir: str):
-        """
-        Initialize the Engine.
+        """Initialize the Engine.
 
         Args:
             temp_dir (str): Base directory for temporary files.
@@ -43,9 +41,19 @@ class DocumentEngine:
         args: List[str],
         assets_path: str,
     ) -> Any:
-        """
-        Custom helper to generate InlineImage objects within Jinja2 templates.
-        Usage: {{ my_image_filename | format_image('width_cm', 'height_cm') }}
+        """Custom helper to generate InlineImage objects within Jinja2 templates.
+
+        Usage:
+            {{ my_image_filename | format_image('width_cm', 'height_cm') }}
+
+        Args:
+            tpl (DocxTemplate): The DocxTemplate instance.
+            value (Any): The image filename or value.
+            args (List[str]): Additional arguments (width, height).
+            assets_path (str): Path to the assets directory.
+
+        Returns:
+            Any: InlineImage object or error string.
         """
         # Resolve dimensions and filename from strategy
         img_data = self.formatter._apply_strategy("image", value, *args)
@@ -77,8 +85,10 @@ class DocumentEngine:
             return f"[IMAGE ERROR: {str(e)}]"
 
     def _remove_office_thumbnail(self, file_path: str) -> None:
-        """
-        Removes the 'docProps/thumbnail.jpeg' from the Office file to fix icon issues.
+        """Removes the 'docProps/thumbnail.jpeg' from the Office file to fix icon issues.
+
+        Args:
+            file_path (str): Path to the office file.
         """
         try:
             temp_path = f"{file_path}.tmp"
@@ -100,47 +110,56 @@ class DocumentEngine:
         context: Dict[str, Any],
         assets_path: str = None,
     ) -> bool:
-        """
-        Renders a DOCX template using Jinja2 context and Custom Filters.
+        """Renders a DOCX template using Jinja2 context and Custom Filters.
+
+        Runs in a separate thread to prevent blocking the Event Loop.
 
         Args:
-            template_path (str): Path to input template.
-            output_path (str): Path where rendered file will be saved.
-            context (Dict): Raw data dictionary.
-            assets_path (str): Directory containing images.
+            template_path (str): Path to the template file.
+            output_path (str): Path to save the rendered file.
+            context (Dict[str, Any]): Data context for rendering.
+            assets_path (str, optional): Path to assets directory. Defaults to None.
 
         Returns:
-            bool: True if successful.
+            bool: True if successful, False otherwise.
+
+        Raises:
+            Exception: If rendering fails.
         """
-        try:
-            tpl = DocxTemplate(template_path)
 
-            # 1. Create a fresh Jinja2 Environment
-            # This fixes the 'NoneType' object has no attribute 'render_context' error
-            jinja_env = Environment(autoescape=True)
+        def _blocking_docx_render():
+            try:
+                tpl = DocxTemplate(template_path)
 
-            # 2. Register Standard Filters (String, Date, Number, etc.)
-            filters = self.formatter.get_jinja_filters()
-            jinja_env.filters.update(filters)
+                # 1. Create a fresh Jinja2 Environment
+                # This fixes the 'NoneType' object has no attribute 'render_context' error
+                jinja_env = Environment(autoescape=True)
 
-            # 3. Register Special Image Filter (Requires closure for 'tpl' and 'assets_path')
-            # Usage in DOCX: {{ image_var | format_image(width, height) }}
-            def format_image_wrapper(val, *args):
-                if not assets_path:
-                    return "[NO ASSETS PATH]"
-                return self._get_image_object(tpl, val, list(args), assets_path)
+                # 2. Register Standard Filters
+                filters = self.formatter.get_jinja_filters()
+                jinja_env.filters.update(filters)
 
-            jinja_env.filters["format_image"] = format_image_wrapper
+                # 3. Register Special Image Filter (Requires closure for 'tpl' and 'assets_path')
+                # Usage in DOCX: {{ image_var | format_image(width, height) }}
+                def format_image_wrapper(val, *args):
+                    if not assets_path:
+                        return "[NO ASSETS PATH]"
+                    return self._get_image_object(tpl, val, list(args), assets_path)
 
-            # 4. Render and Save (Pass the custom env here)
-            tpl.render(context, jinja_env=jinja_env)
-            tpl.save(output_path)
-            self._remove_office_thumbnail(output_path)
-            return True
+                jinja_env.filters["format_image"] = format_image_wrapper
 
-        except Exception as e:
-            logger.error(f"DOCX Render Error: {e}")
-            raise e
+                # 4. Render and Save
+                tpl.render(context, jinja_env=jinja_env)
+                tpl.save(output_path)
+                self._remove_office_thumbnail(output_path)
+                return True
+
+            except Exception as e:
+                logger.error(f"DOCX Render Error: {e}")
+                raise e
+
+        # Offload to thread
+        return await anyio.to_thread.run_sync(_blocking_docx_render)
 
     async def process_text(
         self,
@@ -148,19 +167,23 @@ class DocumentEngine:
         output_path: str,
         context: Dict[str, Any],
     ) -> bool:
-        """
-        Renders Text-based templates (MD, TXT) using Jinja2 context and Custom Filters.
+        """Renders Text-based templates (MD, TXT).
+
+        Uses non-blocking I/O for file operations.
 
         Args:
-            template_path (str): Path to input template.
-            output_path (str): Path where rendered file will be saved.
-            context (Dict): Raw data dictionary.
+            template_path (str): Path to the template file.
+            output_path (str): Path to save the rendered file.
+            context (Dict[str, Any]): Data context for rendering.
 
         Returns:
-            bool: True if successful.
+            bool: True if successful, False otherwise.
+
+        Raises:
+            Exception: If rendering fails.
         """
         try:
-            # 1. Read content asynchronously (Non-blocking I/O)
+            # 1. Read content (Async)
             async with await anyio.open_file(template_path, "r", encoding="utf-8") as f:
                 content = await f.read()
 
@@ -183,7 +206,7 @@ class DocumentEngine:
             template = jinja_env.from_string(content)
             rendered_content = template.render(context)
 
-            # 6. Write Output asynchronously
+            # 6. Write Output (Async)
             async with await anyio.open_file(output_path, "w", encoding="utf-8") as f:
                 await f.write(rendered_content)
 
@@ -193,144 +216,88 @@ class DocumentEngine:
             logger.error(f"Text/MD Render Error: {e}")
             raise e
 
-    def _parse_and_replace_pptx_text(self, text: str, context: Dict[str, Any]) -> str:
-        """
-        Parses PPTX text for pseudo-Jinja tags: {{ var | filter('arg') }}
-        and applies the formatting strategies manually.
-        """
-        # Regex to capture: {{ variable | filter('arg1', 'arg2') }}
-        # Group 1: Variable Name
-        # Group 2: Full Filter String (optional)
-        pattern = re.compile(r"\{\{\s*([a-zA-Z0-9_]+)(\s*\|.*?)?\s*\}\}")
-
-        def replace_match(match):
-            var_name = match.group(1)
-            filter_part = match.group(2)  # e.g., " | format_string('upper')"
-
-            # Get Raw Value
-            value = context.get(var_name, "")
-
-            if not filter_part:
-                return str(value)
-
-            # Parse Filter Logic
-            # Expected format: | filter_name('arg1', 'arg2')
-            try:
-                # Remove pipe and whitespace
-                content = filter_part.strip().lstrip("|").strip()
-                # Split filter name from args: "format_string('upper')" -> "format_string", "'upper'"
-                if "(" in content and content.endswith(")"):
-                    f_name, args_raw = content.split("(", 1)
-                    args_raw = args_raw[:-1]  # Remove trailing )
-                else:
-                    f_name = content
-                    args_raw = ""
-
-                # Parse Args (Naive split by comma, respecting basic quotes)
-                # Note: This is a basic parser. Complex nested quotes in PPTX args are limited
-                args = []
-                if args_raw:
-                    # Remove quotes and split
-                    parts = args_raw.split(",")
-                    args = [p.strip().strip("'").strip('"') for p in parts]
-
-                # Map filter name to Strategy Name
-                # "format_date" -> "date"
-                strategy_map = {
-                    "format_string": "string",
-                    "format_number": "number",
-                    "format_currency": "number",
-                    "format_date": "date",
-                    "format_bool": "bool",
-                    "format_mask": "mask",
-                    "format_logic": "logic",
-                }
-
-                # Special handling for aliases
-                strat_key = strategy_map.get(f_name)
-                final_args = args
-
-                if f_name == "format_currency":
-                    strat_key = "number"
-                    final_args = ["currency"] + args
-
-                if strat_key:
-                    return str(
-                        self.formatter._apply_strategy(strat_key, value, *final_args)
-                    )
-                else:
-                    # Fallback if unknown filter
-                    return str(value)
-
-            except Exception as e:
-                logger.error(f"PPTX Filter Error parsing '{filter_part}': {e}")
-                return str(value)
-
-        return pattern.sub(replace_match, text)
-
     async def process_pptx(
         self, template_path: str, output_path: str, context: Dict[str, Any]
     ) -> bool:
+        """Renders a PPTX using python-pptx.
+
+        Runs in a separate thread to prevent blocking the Event Loop.
+
+        Args:
+            template_path (str): Path to the template file.
+            output_path (str): Path to save the rendered file.
+            context (Dict[str, Any]): Data context for rendering.
+
+        Returns:
+            bool: True if successful, False otherwise.
+
+        Raises:
+            Exception: If rendering fails.
         """
-        Renders a PPTX by consolidating paragraph runs to prevent broken tags.
 
-        LIMITATION: Deeply nested groups or complex text box formattings might split
-        Jinja tags {{ ... }} across XML nodes, which this basic consolidator might miss.
-        Recommended to keep placeholders simple in PPTX.
-        """
-        try:
-            prs = Presentation(template_path)
+        def _blocking_pptx_render():
+            try:
+                prs = Presentation(template_path)
 
-            for slide in prs.slides:
-                for shape in slide.shapes:
-                    if not shape.has_text_frame:
-                        continue
-
-                    for paragraph in shape.text_frame.paragraphs:
-                        # 1. Consolidate all text from runs
-                        full_text = "".join(run.text for run in paragraph.runs)
-
-                        if "{{" in full_text:
-                            # 2. Process the consolidated text
-                            new_text = self._parse_and_replace_pptx_text(
-                                full_text, context
-                            )
-
-                            # 3. Clear runs and update the first one to preserve minimal styling
-                            if paragraph.runs:
-                                paragraph.runs[0].text = new_text
-                                for i in range(1, len(paragraph.runs)):
-                                    paragraph.runs[i].text = ""
-
-                    # Handle Tables
-                    if shape.has_table:
-                        for row in shape.table.rows:
-                            for cell in row.cells:
-                                for paragraph in cell.text_frame.paragraphs:
-                                    full_cell_text = "".join(
-                                        run.text for run in paragraph.runs
+                for slide in prs.slides:
+                    for shape in slide.shapes:
+                        # Text Frames
+                        if shape.has_text_frame:
+                            for paragraph in shape.text_frame.paragraphs:
+                                full_text = "".join(run.text for run in paragraph.runs)
+                                if "{{" in full_text:
+                                    new_text = self._parse_and_replace_pptx_text(
+                                        full_text, context
                                     )
-                                    if "{{" in full_cell_text:
-                                        new_cell_text = (
-                                            self._parse_and_replace_pptx_text(
-                                                full_cell_text, context
-                                            )
-                                        )
-                                        if paragraph.runs:
-                                            paragraph.runs[0].text = new_cell_text
-                                            for i in range(1, len(paragraph.runs)):
-                                                paragraph.runs[i].text = ""
+                                    if paragraph.runs:
+                                        paragraph.runs[0].text = new_text
+                                        for i in range(1, len(paragraph.runs)):
+                                            paragraph.runs[i].text = ""
 
-            prs.save(output_path)
-            self._remove_office_thumbnail(output_path)
-            return True
-        except Exception as e:
-            logger.error(f"PPTX Render Error: {e}")
-            raise e
+                        # Tables
+                        if shape.has_table:
+                            for row in shape.table.rows:
+                                for cell in row.cells:
+                                    if cell.text_frame:
+                                        for paragraph in cell.text_frame.paragraphs:
+                                            full_cell_text = "".join(
+                                                run.text for run in paragraph.runs
+                                            )
+                                            if "{{" in full_cell_text:
+                                                new_text = (
+                                                    self._parse_and_replace_pptx_text(
+                                                        full_cell_text, context
+                                                    )
+                                                )
+                                                if paragraph.runs:
+                                                    paragraph.runs[0].text = new_text
+                                                    for i in range(
+                                                        1, len(paragraph.runs)
+                                                    ):
+                                                        paragraph.runs[i].text = ""
+
+                prs.save(output_path)
+                self._remove_office_thumbnail(output_path)
+                return True
+            except Exception as e:
+                logger.error(f"PPTX Render Error: {e}")
+                raise e
+
+        # Offload to thread
+        return await anyio.to_thread.run_sync(_blocking_pptx_render)
 
     async def convert_to_pdf(self, input_path: str, output_dir: str) -> bool:
-        """
-        Converts Office files to PDF using LibreOffice Headless via subprocess.
+        """Converts Office files to PDF using LibreOffice Headless via subprocess.
+
+        Args:
+            input_path (str): Path to the input file.
+            output_dir (str): Directory for the output PDF.
+
+        Returns:
+            bool: True if successful.
+
+        Raises:
+            Exception: If conversion fails or times out.
         """
         try:
             cmd = [

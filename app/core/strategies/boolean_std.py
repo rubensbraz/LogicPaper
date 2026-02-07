@@ -9,13 +9,17 @@ logger = logging.getLogger(__name__)
 
 
 class BooleanStrategy(BaseStrategy):
-    """
-    Handles Boolean logic transformations.
-    """
+    """Handles Boolean logic transformations."""
 
     def process(self, value: Any, ops: List[str]) -> str:
-        """
-        Converts input to boolean and maps to specific string representation.
+        """Converts input to boolean and maps to specific string representation.
+
+        Args:
+            value (Any): The input value.
+            ops (List[str]): List of operations.
+
+        Returns:
+            str: The formatted boolean string.
         """
         # 1. Normalize Input to Boolean
         bool_val = False

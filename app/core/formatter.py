@@ -1,5 +1,5 @@
 import logging
-from typing import Any, Callable, Dict, List, Tuple
+from typing import Any, Callable, Dict
 
 from app.core.config import settings
 from app.core.strategies.base import BaseStrategy
@@ -17,18 +17,17 @@ logger = logging.getLogger(__name__)
 
 
 class DataFormatter:
-    """
-    Central Registry that acts as a bridge between Template Filters and Strategies.
+    """Central Registry that acts as a bridge between Template Filters and Strategies.
+
     Instead of parsing Excel protocols, it now exposes strategies as callable functions
     that accept variable arguments for multi-step processing.
     """
 
     def __init__(self, locale: str = "pt"):
-        """
-        Initialize the strategies with the given locale.
+        """Initialize the strategies with the given locale.
 
         Args:
-            locale (str): Locale string (e.g., 'pt', 'en').
+            locale (str): Locale string (e.g., 'pt', 'en'). Defaults to 'pt'.
         """
         self.locale = locale or settings.DEFAULT_LOCALE
 
@@ -44,8 +43,7 @@ class DataFormatter:
         }
 
     def _apply_strategy(self, strategy_name: str, value: Any, *args: str) -> Any:
-        """
-        Internal helper to execute a specific strategy with variable arguments.
+        """Internal helper to execute a specific strategy with variable arguments.
 
         Args:
             strategy_name (str): The key of the strategy to use.
@@ -67,8 +65,8 @@ class DataFormatter:
         return strategy.process(value, ops_list)
 
     def get_jinja_filters(self) -> Dict[str, Callable]:
-        """
-        Returns a dictionary of filters ready to be registered in the Jinja2 environment.
+        """Returns a dictionary of filters ready to be registered in the Jinja2 environment.
+
         This enables syntax like: {{ value | format_string('upper', 'trim') }}
 
         Returns:

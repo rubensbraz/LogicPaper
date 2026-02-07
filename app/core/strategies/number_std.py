@@ -12,17 +12,21 @@ logger = logging.getLogger(__name__)
 
 
 class NumberStrategy(BaseStrategy):
-    """
-    Handles Numerical formatting: Integers, Floats, Currency, and Scientific notation.
+    """Handles Numerical formatting: Integers, Floats, Currency, and Scientific notation.
+
     Uses an index-based traversal to support optional arguments intelligently.
     """
 
     def __init__(self, locale: str = "pt"):
+        """Initialize the strategy.
+
+        Args:
+            locale (str): The locale to use. Defaults to "pt".
+        """
         self.locale = locale
 
     def process(self, value: Any, ops: List[str]) -> str:
-        """
-        Applies numerical transformations based on the operations list.
+        """Applies numerical transformations based on the operations list.
 
         Args:
             value (Any): The raw input value.
@@ -186,9 +190,18 @@ class NumberStrategy(BaseStrategy):
         return str(formatted_result)
 
     def _normalize_to_float(self, value: Any) -> float:
-        """
-        Smart conversion of string inputs to float.
+        """Smart conversion of string inputs to float.
+
         Prioritizes Babel parsing based on locale, falls back to heuristics.
+
+        Args:
+            value (Any): The value to normalize.
+
+        Returns:
+            float: The normalized float value.
+
+        Raises:
+            ValueError: If conversion fails.
         """
         if isinstance(value, (int, float)):
             return float(value)
@@ -218,8 +231,13 @@ class NumberStrategy(BaseStrategy):
         return float(str_val)
 
     def _is_format_spec(self, token: str) -> bool:
-        """
-        Checks if a string looks like a Python format specifier (e.g., '04d', '.2f').
+        """Checks if a string looks like a Python format specifier (e.g., '04d', '.2f').
+
+        Args:
+            token (str): The token to check.
+
+        Returns:
+            bool: True if it looks like a format specifier.
         """
         # Simple heuristic: starts with digit, dot, or aligns
         if not token:
@@ -227,8 +245,13 @@ class NumberStrategy(BaseStrategy):
         return token[0].isdigit() or token.startswith(".") or token in [">", "<", "^"]
 
     def _humanize_number(self, value: float) -> str:
-        """
-        Converts 1200 to 1.2K, 1000000 to 1M.
+        """Converts 1200 to 1.2K, 1000000 to 1M.
+
+        Args:
+            value (float): The value to humanize.
+
+        Returns:
+            str: The humanized string.
         """
         try:
             value = float(value)
@@ -243,5 +266,5 @@ class NumberStrategy(BaseStrategy):
             if res.endswith(".0"):
                 res = res[:-2]
             return f"{res}{labels[label_idx]}"
-        except:
+        except Exception:
             return str(value)

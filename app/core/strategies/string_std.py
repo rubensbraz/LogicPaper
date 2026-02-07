@@ -10,13 +10,17 @@ logger = logging.getLogger(__name__)
 
 
 class StringStrategy(BaseStrategy):
-    """
-    Handles Advanced String Manipulation with chaining support.
-    """
+    """Handles Advanced String Manipulation with chaining support."""
 
     def process(self, value: Any, ops: List[str]) -> str:
-        """
-        Applies string transformations based on the operations list.
+        """Applies string transformations based on the operations list.
+
+        Args:
+            value (Any): The input value to transform.
+            ops (List[str]): List of operations to apply.
+
+        Returns:
+            str: The transformed string.
         """
         # 1. Convert to string safely
         if value is None:

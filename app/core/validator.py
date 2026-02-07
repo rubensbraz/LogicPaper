@@ -3,6 +3,7 @@ import os
 import re
 from typing import Any, Dict, List, Set
 
+import anyio
 from docx import Document
 from pptx import Presentation
 
@@ -12,13 +13,14 @@ logger = logging.getLogger(__name__)
 
 
 class TemplateValidator:
-    """
-    Analyzes template files (DOCX/PPTX) using Regex to extract expected Jinja2 variables.
-    This approach is robust against custom filters (pipes) that typically crash
-    standard template introspection tools.
+    """Analyzes template files (DOCX/PPTX) using Regex to extract expected Jinja2 variables.
+
+    This approach is robust against custom filters (pipes) that typically crash standard
+    template introspection tools.
     """
 
     def __init__(self):
+        """Initialize the TemplateValidator with regex patterns."""
         # Regex Explanation:
         # \{\{\s* -> Match opening braces '{{' and optional whitespace
         # ([a-zA-Z0-9_]+) -> Capture Group 1: The Variable Name (alphanumeric + underscore)
@@ -27,14 +29,26 @@ class TemplateValidator:
         self.tag_pattern = re.compile(r"\{\{\s*([a-zA-Z0-9_]+).*?\}\}")
 
     def _extract_from_text(self, text: str) -> Set[str]:
-        """Helper to run regex on a string and return found variables."""
+        """Helper to run regex on a string and return found variables.
+
+        Args:
+            text (str): The text to search.
+
+        Returns:
+            Set[str]: A set of found variable names.
+        """
         if not text:
             return set()
         return set(self.tag_pattern.findall(text))
 
     def extract_tags_from_docx(self, file_path: str) -> Set[str]:
-        """
-        Extracts tags from a Word document by scanning paragraphs and tables.
+        """Extracts tags from a Word document by scanning paragraphs and tables.
+
+        Args:
+            file_path (str): Path to the DOCX file.
+
+        Returns:
+            Set[str]: A set of extracted tags.
         """
         tags = set()
         try:
@@ -92,8 +106,13 @@ class TemplateValidator:
             return set()
 
     def extract_tags_from_text_file(self, file_path: str) -> Set[str]:
-        """
-        Extracts tags from Plain Text or Markdown files.
+        """Extracts tags from Plain Text or Markdown files.
+
+        Args:
+            file_path (str): Path to the text/markdown file.
+
+        Returns:
+            Set[str]: A set of extracted tags.
         """
         try:
             with open(file_path, "r", encoding="utf-8", errors="ignore") as f:
@@ -104,8 +123,13 @@ class TemplateValidator:
             return set()
 
     def extract_tags_from_pptx(self, file_path: str) -> Set[str]:
-        """
-        Extracts tags from a PowerPoint presentation.
+        """Extracts tags from a PowerPoint presentation.
+
+        Args:
+            file_path (str): Path to the PPTX file.
+
+        Returns:
+            Set[str]: A set of extracted tags.
         """
         tags = set()
         try:
@@ -137,43 +161,58 @@ class TemplateValidator:
             logger.error(f"Failed to parse PPTX {file_path}: {e}")
             return set()
 
-    def compare(
+    async def compare(
         self, excel_headers: List[str], templates_map: Dict[str, str]
     ) -> Dict[str, Any]:
+        """Compares Excel headers against variables required by templates.
+
+        Run in a separate thread to avoid blocking.
+
+        Args:
+            excel_headers (List[str]): List of headers from the Excel file.
+            templates_map (Dict[str, str]): Map of filename to file path for templates.
+
+        Returns:
+            Dict[str, Any]: Validation report.
         """
-        Compares Excel headers against variables required by templates.
-        """
-        # Normalize headers (strip whitespace just in case)
-        available_vars = set(str(h).strip() for h in excel_headers)
-        validation_report = []
-        all_valid = True
 
-        for filename, path in templates_map.items():
-            ext = os.path.splitext(filename)[1].lower()
-            required_vars = set()
+        def _blocking_compare():
+            # Normalize headers (strip whitespace just in case)
+            available_vars = set(str(h).strip() for h in excel_headers)
+            validation_report = []
+            all_valid = True
 
-            if ext == ".docx":
-                required_vars = self.extract_tags_from_docx(path)
-            elif ext in [".md", ".txt"]:
-                required_vars = self.extract_tags_from_text_file(path)
-            elif ext == ".pptx":
-                required_vars = self.extract_tags_from_pptx(path)
+            for filename, path in templates_map.items():
+                ext = os.path.splitext(filename)[1].lower()
+                required_vars = set()
 
-            # Find mismatches: Variables in Template that are NOT in Excel
-            missing_in_excel = required_vars - available_vars
+                if ext == ".docx":
+                    required_vars = self.extract_tags_from_docx(path)
+                elif ext in [".md", ".txt"]:
+                    required_vars = self.extract_tags_from_text_file(path)
+                elif ext == ".pptx":
+                    required_vars = self.extract_tags_from_pptx(path)
 
-            status = "OK"
-            if missing_in_excel:
-                status = "Missing Data"
-                all_valid = False
+                # Find mismatches: Variables in Template that are NOT in Excel
+                missing_in_excel = required_vars - available_vars
 
-            validation_report.append(
-                {
-                    "template": filename,
-                    "status": status,
-                    "missing_vars": list(missing_in_excel),
-                    "matched_vars": list(required_vars.intersection(available_vars)),
-                }
-            )
+                status = "OK"
+                if missing_in_excel:
+                    status = "Missing Data"
+                    all_valid = False
 
-        return {"overall_valid": all_valid, "details": validation_report}
+                validation_report.append(
+                    {
+                        "template": filename,
+                        "status": status,
+                        "missing_vars": list(missing_in_excel),
+                        "matched_vars": list(
+                            required_vars.intersection(available_vars)
+                        ),
+                    }
+                )
+
+            return {"overall_valid": all_valid, "details": validation_report}
+
+        # Offload to thread
+        return await anyio.to_thread.run_sync(_blocking_compare)

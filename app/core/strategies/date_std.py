@@ -12,22 +12,18 @@ logger = logging.getLogger(__name__)
 
 
 class DateStrategy(BaseStrategy):
-    """
-    Handles Date and Time transformations with arithmetic support.
-    """
+    """Handles Date and Time transformations with arithmetic support."""
 
     def __init__(self, locale: str = "pt"):
-        """
-        Initialize the strategies with the given locale.
+        """Initialize the strategies with the given locale.
 
         Args:
-            locale (str): Default locale string (e.g., 'pt', 'en').
+            locale (str): Default locale string (e.g., 'pt', 'en'). Defaults to 'pt'.
         """
         self.locale = locale
 
     def process(self, value: Any, ops: List[str]) -> str:
-        """
-        Applies date transformations based on the operations list.
+        """Applies date transformations based on the operations list.
 
         Args:
             value (Any): The raw input value.
@@ -185,7 +181,14 @@ class DateStrategy(BaseStrategy):
         return str(formatted_result)
 
     def _is_int(self, val: str) -> bool:
-        """Helper to check if a string is a valid integer."""
+        """Helper to check if a string is a valid integer.
+
+        Args:
+            val (str): The value to check.
+
+        Returns:
+            bool: True if integer, False otherwise.
+        """
         try:
             int(val)
             return True

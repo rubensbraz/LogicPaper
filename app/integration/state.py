@@ -41,8 +41,8 @@ for attempt in range(MAX_RETRIES):
 
 
 class JobRepository:
-    """
-    Persistence Layer for Job Status using Redis.
+    """Persistence Layer for Job Status using Redis.
+
     Replaces in-memory dictionary to ensure data survival across restarts.
     """
 
@@ -51,8 +51,11 @@ class JobRepository:
 
     @staticmethod
     def save(job_id: str, data: Dict[str, Any]) -> None:
-        """
-        Saves or updates job data in Redis.
+        """Saves or updates job data in Redis.
+
+        Args:
+            job_id (str): The job identifier.
+            data (Dict[str, Any]): The job data to save.
         """
         try:
             # Serialize Dict to JSON String
@@ -67,8 +70,13 @@ class JobRepository:
 
     @staticmethod
     def get(job_id: str) -> Optional[Dict[str, Any]]:
-        """
-        Retrieves job data from Redis.
+        """Retrieves job data from Redis.
+
+        Args:
+            job_id (str): The job identifier.
+
+        Returns:
+            Optional[Dict[str, Any]]: The job data or None if not found.
         """
         try:
             payload = redis_client.get(job_id)
@@ -81,9 +89,14 @@ class JobRepository:
 
     @staticmethod
     def update_status(job_id: str, status: str, **kwargs) -> None:
-        """
-        Helper to fetch, update a specific field, and save back.
+        """Helper to fetch, update a specific field, and save back.
+
         Note: This is not atomic, but sufficient for this architecture.
+
+        Args:
+            job_id (str): The job identifier.
+            status (str): The new status.
+            **kwargs: Additional key-value pairs to update.
         """
         current_data = JobRepository.get(job_id) or {}
         current_data["status"] = status

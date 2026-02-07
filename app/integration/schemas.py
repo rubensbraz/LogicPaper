@@ -4,9 +4,7 @@ from pydantic import BaseModel, Field, field_validator
 
 
 class GenerationRequest(BaseModel):
-    """
-    Schema for the document generation request body.
-    """
+    """Schema for the document generation request body."""
 
     template_path: str = Field(
         ...,
@@ -36,9 +34,7 @@ class GenerationRequest(BaseModel):
 
 
 class JobStatusResponse(BaseModel):
-    """
-    Schema for the async job status response.
-    """
+    """Schema for the async job status response."""
 
     job_id: str = Field(..., description="Unique identifier for the processing job.")
     status: str = Field(

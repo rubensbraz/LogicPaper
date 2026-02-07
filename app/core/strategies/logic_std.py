@@ -9,13 +9,10 @@ logger = logging.getLogger(__name__)
 
 
 class LogicStrategy(BaseStrategy):
-    """
-    Handles Logical operations, Defaults, and Strict Value Mapping (Switch Case).
-    """
+    """Handles Logical operations, Defaults, and Strict Value Mapping (Switch Case)."""
 
     def process(self, value: Any, ops: List[str]) -> Any:
-        """
-        Process the value through a list of logical operations.
+        """Process the value through a list of logical operations.
 
         Args:
             value (Any): The raw data.

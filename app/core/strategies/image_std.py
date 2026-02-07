@@ -9,14 +9,17 @@ logger = logging.getLogger(__name__)
 
 
 class ImageStrategy(BaseStrategy):
-    """
-    Handles Image Metadata formatting.
-    """
+    """Handles Image Metadata formatting."""
 
     def process(self, value: Any, ops: List[str]) -> Dict[str, Any]:
-        """
-        Parses image dimensions from operations and returns the
-        structure expected by the DocumentEngine.
+        """Parses image dimensions from operations and returns the structure expected by DocumentEngine.
+
+        Args:
+            value (Any): The image filename or path.
+            ops (List[str]): List of operations (width, height).
+
+        Returns:
+            Dict[str, Any]: Dictionary with type, filename, width, and height.
         """
         filename = str(value) if value else ""
 

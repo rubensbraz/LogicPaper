@@ -1,4 +1,3 @@
-import logging
 import os
 import shutil
 import time
@@ -10,21 +9,36 @@ from app.core.config import logger
 
 
 def sanitize_filename(filename: str) -> str:
-    """Removes risky characters from filenames."""
+    """Removes risky characters from filenames.
+
+    Args:
+        filename (str): The filename to sanitize.
+
+    Returns:
+        str: The sanitized filename.
+    """
     return "".join(
         [c for c in filename if c.isalpha() or c.isdigit() or c in (" ", ".", "_", "-")]
     ).rstrip()
 
 
 def extract_zip(zip_path: str, extract_to: str):
-    """Extract ZIP files."""
+    """Extract ZIP files.
+
+    Args:
+        zip_path (str): Path to the zip file.
+        extract_to (str): Directory to extract to.
+    """
     with zipfile.ZipFile(zip_path, "r") as zip_ref:
         zip_ref.extractall(extract_to)
 
 
 def cleanup_job(temp_dir: str, max_age_seconds: int = 3600):
-    """
-    Deletes folders older than max_age_seconds.
+    """Deletes folders older than max_age_seconds.
+
+    Args:
+        temp_dir (str): The temporary directory path.
+        max_age_seconds (int): The max age in seconds. Defaults to 3600.
     """
     logger.info("Running Cleanup Job...")
     now = time.time()
@@ -38,7 +52,12 @@ def cleanup_job(temp_dir: str, max_age_seconds: int = 3600):
 
 
 def start_scheduler(temp_dir: str, interval_seconds: int = 3600):
-    """Start scheduler for cleaning old files."""
+    """Start scheduler for cleaning old files.
+
+    Args:
+        temp_dir (str): The temporary directory path.
+        interval_seconds (int): Cleanup interval in seconds. Defaults to 3600.
+    """
     scheduler = BackgroundScheduler()
     scheduler.add_job(
         cleanup_job,

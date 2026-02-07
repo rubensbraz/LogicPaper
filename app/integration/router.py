@@ -4,14 +4,14 @@ import uuid
 from datetime import datetime
 
 import pandas as pd
-from fastapi import APIRouter, BackgroundTasks, Security, HTTPException
+from fastapi import APIRouter, BackgroundTasks, HTTPException, Security
 from fastapi.responses import FileResponse
 
-from app.core.config import settings, logger
+from app.core.config import logger, settings
 from app.integration.schemas import GenerationRequest, JobStatusResponse
 from app.integration.security import get_api_key
-from app.integration.worker import run_headless_generation
 from app.integration.state import JobRepository
+from app.integration.worker import run_headless_generation
 
 
 router = APIRouter()
@@ -28,8 +28,18 @@ async def trigger_generation(
     background_tasks: BackgroundTasks,
     api_key: str = Security(get_api_key),
 ):
-    """
-    Endpoint for system-to-system integration.
+    """Endpoint for system-to-system integration.
+
+    Args:
+        request (GenerationRequest): The generation request payload.
+        background_tasks (BackgroundTasks): Background tasks handler.
+        api_key (str): The API key for authentication.
+
+    Returns:
+        JobStatusResponse: The initial job status.
+
+    Raises:
+        HTTPException: If path traversal is detected or template not found.
     """
     # 1. Security & Validation: Path Traversal Prevention
 
@@ -121,8 +131,17 @@ async def trigger_generation(
     "/status/{job_id}", response_model=JobStatusResponse, summary="Check Job Status"
 )
 async def check_job_status(job_id: str, api_key: str = Security(get_api_key)):
-    """
-    Polls the status of a specific generation job.
+    """Polls the status of a specific generation job.
+
+    Args:
+        job_id (str): The job identifier.
+        api_key (str): The API key for validation.
+
+    Returns:
+        JobStatusResponse: The current job status.
+
+    Raises:
+        HTTPException: If the job ID is not found.
     """
     job = JobRepository.get(job_id)
     if not job:
@@ -145,8 +164,17 @@ async def check_job_status(job_id: str, api_key: str = Security(get_api_key)):
 async def download_integration_result(
     job_id: str, api_key: str = Security(get_api_key)
 ):
-    """
-    Downloads the final ZIP file. Requires authentication.
+    """Downloads the final ZIP file. Requires authentication.
+
+    Args:
+        job_id (str): The job identifier.
+        api_key (str): The API key for validation.
+
+    Returns:
+        FileResponse: The ZIP file.
+
+    Raises:
+        HTTPException: If file is not ready or not found.
     """
     file_path = os.path.join(settings.TEMP_DIR, f"{job_id}_result.zip")
 

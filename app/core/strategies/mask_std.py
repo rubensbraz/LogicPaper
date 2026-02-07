@@ -9,11 +9,18 @@ logger = logging.getLogger(__name__)
 
 
 class MaskStrategy(BaseStrategy):
-    """
-    Handles Data Masking for Privacy (GDPR/LGPD) and Format compliance.
-    """
+    """Handles Data Masking for Privacy (GDPR/LGPD) and Format compliance."""
 
     def process(self, value: Any, ops: List[str]) -> str:
+        """Applies masking transformations based on the operations list.
+
+        Args:
+            value (Any): The input value.
+            ops (List[str]): List of operations.
+
+        Returns:
+            str: The masked string.
+        """
         if value is None:
             return ""
 
@@ -49,9 +56,16 @@ class MaskStrategy(BaseStrategy):
         return text
 
     def _apply_generic_mask(self, value: str, pattern: str) -> str:
-        """
-        Applies a pattern mask (e.g., ###-##) to a string.
+        """Applies a pattern mask (e.g., ###-##) to a string.
+
         Strips non-alphanumeric chars from input first.
+
+        Args:
+            value (str): The value to mask.
+            pattern (str): The mask pattern (use '#' for digits/chars).
+
+        Returns:
+            str: The masked string.
         """
         # Keep only alphanumeric from input
         clean_val = "".join(filter(str.isalnum, value))
@@ -71,7 +85,14 @@ class MaskStrategy(BaseStrategy):
         return masked_result
 
     def _mask_email(self, email: str) -> str:
-        """johndoe@domain.com -> j***@domain.com"""
+        """Masks email address: johndoe@domain.com -> j***@domain.com.
+
+        Args:
+            email (str): The email to mask.
+
+        Returns:
+            str: The masked email.
+        """
         if "@" not in email:
             return email
 
@@ -88,7 +109,14 @@ class MaskStrategy(BaseStrategy):
         return f"{masked_user}@{domain}"
 
     def _mask_credit_card(self, cc: str) -> str:
-        """1234567812345678 -> **** **** **** 5678"""
+        """Masks credit card: 1234567812345678 -> **** **** **** 5678.
+
+        Args:
+            cc (str): The credit card number.
+
+        Returns:
+            str: The masked credit card number.
+        """
         clean = "".join(filter(str.isdigit, cc))
         if len(clean) < 4:
             return cc
@@ -96,7 +124,14 @@ class MaskStrategy(BaseStrategy):
         return f"**** **** **** {last_four}"
 
     def _mask_name(self, name: str) -> str:
-        """John Doe -> J*** D***"""
+        """Masks name: John Doe -> J*** D***.
+
+        Args:
+            name (str): The name to mask.
+
+        Returns:
+            str: The masked name.
+        """
         if not name:
             return ""
 
@@ -104,7 +139,7 @@ class MaskStrategy(BaseStrategy):
         masked_parts = []
         for p in parts:
             if len(p) > 1:
-                masked_parts.append(f"{p[0]}{'*' * (len(p)-1)}")
+                masked_parts.append(f"{p[0]}{'*' * (len(p) - 1)}")
             else:
                 masked_parts.append(p)
         return " ".join(masked_parts)

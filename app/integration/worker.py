@@ -5,8 +5,8 @@ from typing import Optional
 import pandas as pd
 
 from app.core.config import settings, logger
+from app.core.service import BatchService
 from app.integration.state import JobRepository
-from app.core.batch import process_batch_core
 
 
 async def run_headless_generation(
@@ -20,8 +20,7 @@ async def run_headless_generation(
     filename_col: Optional[str],
     group_folders: bool,
 ) -> None:
-    """
-    Background worker function. Uses the shared 'process_batch_core'.
+    """Background worker function. Uses the shared 'BatchService'.
 
     Args:
         job_id (str): The unique Job ID.
@@ -42,8 +41,8 @@ async def run_headless_generation(
         # The Core expects a list of templates, so we wrap the single path
         template_paths = [template_path]
 
-        # Call Core
-        result = await process_batch_core(
+        # Call Core via Service
+        result = await BatchService.process_batch(
             session_id=job_id,
             df=df,
             template_paths=template_paths,

@@ -3,7 +3,7 @@ import os
 from pathlib import Path
 from typing import List, Union
 
-from pydantic import AnyHttpUrl, field_validator, Field
+from pydantic import AnyHttpUrl, Field, field_validator
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
 
@@ -15,8 +15,8 @@ logger = logging.getLogger("LogicPaper")
 
 
 class Settings(BaseSettings):
-    """
-    Central Configuration using Pydantic Settings.
+    """Central Configuration using Pydantic Settings.
+
     Reads from environment variables and .env file.
     """
 
@@ -32,6 +32,17 @@ class Settings(BaseSettings):
 
     @field_validator("ALLOWED_ORIGINS")
     def assemble_cors_origins(cls, v: Union[str, List[str]]) -> Union[List[str], str]:
+        """Validator to parse CORS origins.
+
+        Args:
+            v (Union[str, List[str]]): The value to validate.
+
+        Returns:
+            Union[List[str], str]: The parsed origins.
+
+        Raises:
+            ValueError: If the value is invalid.
+        """
         if isinstance(v, str) and not v.startswith("["):
             return [i.strip() for i in v.split(",")]
         elif isinstance(v, (list, str)):
