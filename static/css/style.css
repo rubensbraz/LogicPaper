@@ -1,4 +1,6 @@
-/* Base Layout */
+/* =========================================
+   1. Base Layout & Reset
+   ========================================= */
 body {
     background-color: #0B0C15;
     background-image:
@@ -10,36 +12,9 @@ body {
     min-height: 100vh;
 }
 
-/* Utility States */
-.hidden {
-    display: none !important;
-}
-
-.disabled-zone {
-    opacity: 0.5;
-    pointer-events: none;
-    filter: grayscale(100%);
-}
-
-/* Navbar Mobile Fixes */
-#navbar-mount {
-    width: 100%;
-    max-width: 100vw;
-    overflow-x: hidden;
-}
-
-@media (max-width: 768px) {
-    /* Ensures the glass panel or header doesn't exceed screen bounds */
-    header {
-        width: 100% !important;
-        padding-left: 1rem;
-        padding-right: 1rem;
-    }
-    
-    nav a, nav button {
-        min-height: 40px;
-    }
-}
+/* =========================================
+   2. Components & Design Tokens
+   ========================================= */
 
 /* Glassmorphism Panels */
 .glass-panel {
@@ -50,7 +25,7 @@ body {
     transition: all 0.3s ease;
 }
 
-/* SweetAlert Overrides for Glassmorphism */
+/* SweetAlert Overrides (Glass Theme) */
 div:where(.swal2-container) div:where(.swal2-popup) {
     background: rgba(15, 23, 42, 0.95) !important;
     backdrop-filter: blur(16px);
@@ -58,7 +33,31 @@ div:where(.swal2-container) div:where(.swal2-popup) {
     border: 1px solid rgba(255, 255, 255, 0.1);
 }
 
-/* Drag & Drop Interaction */
+/* Navbar Structure */
+#navbar-mount {
+    width: 100%;
+    max-width: 100vw;
+    overflow-x: hidden;
+}
+
+@media (max-width: 768px) {
+    header {
+        width: 100% !important;
+        padding-left: 1rem;
+        padding-right: 1rem;
+    }
+
+    nav a,
+    nav button {
+        min-height: 40px;
+    }
+}
+
+/* =========================================
+   3. Interactive Elements
+   ========================================= */
+
+/* Drag & Drop Zones */
 .drop-zone {
     transition: all 0.2s ease-in-out;
     border: 1px dashed #4b5563;
@@ -77,7 +76,49 @@ div:where(.swal2-container) div:where(.swal2-popup) {
     box-shadow: 0 0 15px rgba(59, 130, 246, 0.2);
 }
 
-/* Site Scrollbar (Neon Style) */
+.disabled-zone {
+    opacity: 0.5;
+    pointer-events: none;
+    filter: grayscale(100%);
+}
+
+/* Toast Notification (Global) */
+#toast {
+    visibility: hidden;
+    min-width: 250px;
+    background-color: #10b981;
+    color: #fff;
+    text-align: center;
+    border-radius: 8px;
+    padding: 12px;
+    position: fixed;
+    z-index: 50;
+    left: 50%;
+    bottom: 30px;
+    transform: translateX(-50%);
+    font-size: 0.9rem;
+    font-weight: 600;
+    box-shadow: 0 10px 30px rgba(0, 0, 0, 0.5);
+    opacity: 0;
+    transition: opacity 0.3s, bottom 0.3s;
+}
+
+#toast.show {
+    visibility: visible;
+    opacity: 1;
+    bottom: 50px;
+}
+
+/* =========================================
+   4. Utilities & Helpers
+   ========================================= */
+
+/* Force Hide (Overrides Flex/Grid) */
+.hidden {
+    display: none !important;
+}
+
+/* Custom Scrollbars (Neon Style) */
 ::-webkit-scrollbar {
     width: 8px;
     height: 8px;
@@ -96,7 +137,7 @@ div:where(.swal2-container) div:where(.swal2-popup) {
     background: #475569;
 }
 
-/* Modal Scrollbar */
+/* Modal Inner Scrollbar */
 .custom-scrollbar::-webkit-scrollbar {
     width: 6px;
 }
@@ -115,19 +156,122 @@ div:where(.swal2-container) div:where(.swal2-popup) {
     background: #475569;
 }
 
-/* Terminal Log Animation */
+/* Animations */
 @keyframes fadeIn {
     from {
         opacity: 0;
         transform: translateY(5px);
-    }
 
-    to {
-        opacity: 1;
-        transform: translateY(0);
+        to {
+            opacity: 1;
+            transform: translateY(0);
+        }
     }
 }
 
 .log-entry {
     animation: fadeIn 0.2s ease-out forwards;
+}
+
+/* =========================================
+   5. Documentation & Help
+   ========================================= */
+
+/* Table Layout */
+.doc-table {
+    width: 100%;
+    border-collapse: separate;
+    border-spacing: 0;
+}
+
+.doc-table th {
+    text-align: left;
+    padding: 16px;
+    border-bottom: 1px solid rgba(255, 255, 255, 0.1);
+    color: #94a3b8;
+    font-size: 0.7rem;
+    text-transform: uppercase;
+    letter-spacing: 0.05em;
+    font-weight: 700;
+    background: rgba(15, 23, 42, 0.6);
+    position: sticky;
+    top: 0;
+    backdrop-filter: blur(8px);
+    z-index: 10;
+}
+
+.doc-table td {
+    padding: 16px;
+    border-bottom: 1px solid rgba(255, 255, 255, 0.05);
+    font-size: 0.85rem;
+    color: #cbd5e1;
+    vertical-align: middle;
+    transition: background 0.2s;
+}
+
+.doc-table tr:last-child td {
+    border-bottom: none;
+}
+
+.doc-table tr:hover td {
+    background: rgba(59, 130, 246, 0.05);
+}
+
+/* Code Syntax Pills */
+.syntax-pill {
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 0.75rem;
+    background: rgba(0, 0, 0, 0.3);
+    border: 1px solid rgba(255, 255, 255, 0.1);
+    border-radius: 6px;
+    padding: 6px 10px;
+    color: #a5b4fc;
+    cursor: pointer;
+    transition: all 0.2s;
+    display: inline-block;
+    position: relative;
+}
+
+.syntax-pill:hover {
+    border-color: #60a5fa;
+    background: rgba(59, 130, 246, 0.1);
+    color: #fff;
+    box-shadow: 0 0 10px rgba(59, 130, 246, 0.2);
+}
+
+.syntax-pill:active {
+    transform: scale(0.98);
+}
+
+/* Tooltip "Copy" */
+.syntax-pill::after {
+    content: "Click to Copy";
+    position: absolute;
+    bottom: 100%;
+    left: 50%;
+    transform: translateX(-50%) translateY(-5px);
+    background: #0f172a;
+    border: 1px solid #334155;
+    color: #fff;
+    padding: 4px 8px;
+    border-radius: 4px;
+    font-size: 0.6rem;
+    opacity: 0;
+    pointer-events: none;
+    transition: opacity 0.2s;
+    white-space: nowrap;
+}
+
+.syntax-pill:hover::after {
+    opacity: 1;
+}
+
+/* Data Badges */
+.data-badge {
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 0.7rem;
+    padding: 2px 6px;
+    border-radius: 4px;
+    color: #cbd5e1;
+    background: rgba(255, 255, 255, 0.05);
 }

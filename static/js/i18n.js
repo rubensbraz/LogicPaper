@@ -1,24 +1,23 @@
 /**
- * Internationalization Handler.
+ * @fileoverview Internationalization Handler
  * Manages language switching, persistent storage, and DOM updates.
  */
+
 class I18nHandler {
     constructor() {
-        // 1. State Initialization (Immediate)
-        // Must run immediately so other scripts (like navbar.js) can access i18n.currentLang right away
-        this.currentLang = localStorage.getItem('logicpaper_lang') || 'en';
+        /**
+         * @type {string} The current language code ('en' or 'pt').
+         * @public
+         */
+        this.currentLang = localStorage.getItem('logicpaper_lang') || CONFIG.settings?.defaultLocale || 'en';
+
+        /**
+         * @type {Object} The translation dictionary.
+         * @private
+         */
         this.translations = TRANSLATIONS;
 
-        // 2. DOM Initialization (Deferred)
-        this.init();
-    }
-
-    /**
-     * Initializes the page language logic.
-     * Listens for DOMContentLoaded to ensure elements exist before translation.
-     */
-    init() {
-        // Safety Check: If DOM is already ready, update immediately. Otherwise, wait for the event
+        // Initialize immediately if DOM is ready, otherwise wait.
         if (document.readyState === 'loading') {
             document.addEventListener('DOMContentLoaded', () => this.updateDOM());
         } else {
@@ -39,10 +38,7 @@ class I18nHandler {
         this.currentLang = lang;
         localStorage.setItem('logicpaper_lang', lang);
 
-        // Update DOM elements with data-i18n attribute
         this.updateDOM();
-
-        // Dispatch event for other components (like Navbar)
         document.dispatchEvent(new CustomEvent('languageChanged', { detail: { lang } }));
     }
 
@@ -56,25 +52,31 @@ class I18nHandler {
     t(key, params = {}) {
         const keys = key.split('.');
 
-        // 1. Try to find in current language
+        // 1. Try current language
         let value = this._getValue(this.translations[this.currentLang], keys);
 
-        // 2. Fallback: Try to find in English if missing
+        // 2. Fallback to English
         if (!value && this.currentLang !== 'en') {
-            console.warn(`Missing translation for '${key}' in '${this.currentLang}'. Falling back to 'en'.`);
+            console.warn(`[i18n] Missing '${key}' in '${this.currentLang}'. Fallback to 'en'.`);
             value = this._getValue(this.translations['en'], keys);
         }
 
-        // 3. Last Resort: Return key name
+        // 3. Last Resort: Return key
         if (!value) return key;
 
-        // Handle Interpolation
+        // Interpolation
         return value.replace(/{{(\w+)}}/g, (_, k) => {
             return params[k] !== undefined ? params[k] : `{{${k}}}`;
         });
     }
 
-    // Helper to traverse object safely
+    /**
+     * Helper to traverse object safely.
+     * @param {Object} obj 
+     * @param {string[]} keys 
+     * @returns {*}
+     * @private
+     */
     _getValue(obj, keys) {
         return keys.reduce((acc, current) => (acc && acc[current] !== undefined) ? acc[current] : undefined, obj);
     }
@@ -83,11 +85,12 @@ class I18nHandler {
      * Updates all HTML elements with the data-i18n attribute.
      */
     updateDOM() {
+        // Text Content
         document.querySelectorAll('[data-i18n]').forEach(el => {
             const key = el.getAttribute('data-i18n');
             const translation = this.t(key);
 
-            // Check if translation contains HTML tags
+            // Safe HTML Injection check
             if (/<[a-z][\s\S]*>/i.test(translation)) {
                 el.innerHTML = translation;
             } else {
@@ -95,13 +98,13 @@ class I18nHandler {
             }
         });
 
-        // Handle placeholders
+        // Placeholders
         document.querySelectorAll('[data-i18n-placeholder]').forEach(el => {
             const key = el.getAttribute('data-i18n-placeholder');
             el.placeholder = this.t(key);
         });
 
-        // Handle generic attributes (Syntax: data-i18n-attr="attr:key")
+        // Attributes (data-i18n-attr="attr:key,attr2:key2")
         document.querySelectorAll('[data-i18n-attr]').forEach(el => {
             const raw = el.getAttribute('data-i18n-attr');
             const pairs = raw.split(',');
@@ -110,7 +113,7 @@ class I18nHandler {
                 const parts = pair.split(':');
                 if (parts.length >= 2) {
                     const attr = parts[0].trim();
-                    const key = parts.slice(1).join(':').trim(); // Handle keys that might have colons
+                    const key = parts.slice(1).join(':').trim();
                     el.setAttribute(attr, this.t(key));
                 }
             });

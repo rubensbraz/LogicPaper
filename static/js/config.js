@@ -1,9 +1,11 @@
 /**
- * Application Configuration & Theme Setup
+ * @fileoverview Application Configuration & Theme Setup
  * Defines global constants and TailwindCSS theme extensions.
  */
 
-// Tailwind Configuration (Applied to CDN)
+/**
+ * Tailwind Configuration (Applied to CDN runtime)
+ */
 tailwind.config = {
     theme: {
         extend: {
@@ -32,9 +34,10 @@ tailwind.config = {
 
 /**
  * Global Configuration Object
- * @type {Object}
+ * Frozen to prevent accidental runtime modifications.
+ * @type {Readonly<Object>}
  */
-const CONFIG = {
+const CONFIG = Object.freeze({
     env: {
         isGithubPages: window.location.hostname.includes('github.io')
     },
@@ -49,4 +52,4 @@ const CONFIG = {
         terminal: 'terminal',
         jsonPreview: 'jsonPreview'
     }
-};
+});
