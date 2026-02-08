@@ -7,6 +7,7 @@ from typing import Any, Callable, Dict, List, Optional
 import pandas as pd
 
 from app.core.engine import DocumentEngine
+from app.core.ports import JobRepositoryPort
 from app.utils import sanitize_filename
 
 
@@ -15,13 +16,22 @@ logger = logging.getLogger(__name__)
 
 
 class BatchService:
-    """Unified Service for processing batches of documents.
+    """Service for orchestrating document batch processing.
 
-    Handles both synchronous (Website) and asynchronous (Headless API) workflows.
+    Handles the core logic of iterating through data rows, processing templates,
+    generating documents, and updating job status via the repository.
     """
 
-    @staticmethod
+    def __init__(self, job_repository: JobRepositoryPort):
+        """Initializes the BatchService with dependencies.
+
+        Args:
+            job_repository (JobRepositoryPort): Port for persisting job status.
+        """
+        self.job_repository = job_repository
+
     async def process_batch(
+        self,
         session_id: str,
         df: pd.DataFrame,
         template_paths: List[str],
@@ -35,20 +45,26 @@ class BatchService:
     ) -> Dict[str, Any]:
         """Orchestrates the batch generation process.
 
+        Iterates through the provided DataFrame, processes each row against the
+        templates using the DocumentEngine, and handles result aggregation and
+        status updates.
+
         Args:
             session_id (str): Unique identifier for the batch session.
             df (pd.DataFrame): Dataframe containing the data to process.
-            template_paths (List[str]): List of paths to template files.
+            template_paths (List[str]): List of absolute paths to template files.
             session_path (str): Path to the session's temporary directory.
-            dir_outputs (str): Directory where outputs should be saved.
+            dir_outputs (str): Directory where generated files should be saved.
             dir_assets (str): Directory containing assets (images, etc.).
             to_pdf (bool): Whether to convert generated documents to PDF.
-            filename_col (Optional[str]): Column name to use for file naming.
-            group_folders (bool): Whether to group outputs into folders.
-            log_callback (Optional[Callable[[str], None]], optional): Function to call for logging. Defaults to None.
+            filename_col (Optional[str]): Column name to use for dynamic file naming.
+            group_folders (bool): Whether to group outputs into subfolders.
+            log_callback (Optional[Callable[[str], None]], optional): Function to call
+                for sending real-time logs (e.g., via SSE). Defaults to None.
 
         Returns:
-            Dict[str, Any]: A summary dictionary containing the report and stats.
+            Dict[str, Any]: A summary dictionary containing the report list, total
+            files generated, success count, and total count.
         """
         engine = DocumentEngine(session_path)
         report = []
@@ -63,6 +79,7 @@ class BatchService:
                 logger.info(f"[{session_id}] {msg}")
 
         # Iterate through Data
+        total_rows = len(df)
         for idx, row in df.iterrows():
             row_num = idx + 1
             row_success = False
@@ -96,7 +113,7 @@ class BatchService:
                 doc_output_path = os.path.join(target_dir, final_filename)
 
                 try:
-                    # Render Document (Now Async & Non-Blocking)
+                    # Render Document
                     if tmpl_ext.lower() == ".docx":
                         await engine.process_docx(
                             tmpl_path, doc_output_path, cleaned_context, dir_assets
@@ -162,30 +179,34 @@ class BatchService:
 
             if row_success:
                 success_rows_count += 1
-                percent = int(((idx + 1) / len(df)) * 100)
-                send_log(
-                    json.dumps(
-                        {
-                            "code": "row_processed",
-                            "params": {
-                                "identifier": row_identifier,
-                                "current": idx + 1,
-                                "total": len(df),
-                                "percent": percent,
-                            },
-                        }
-                    )
+                percent = int((row_num / total_rows) * 100)
+
+                # Send progress update via callback
+                progress_payload = {
+                    "code": "row_processed",
+                    "params": {
+                        "identifier": row_identifier,
+                        "current": row_num,
+                        "total": total_rows,
+                        "percent": percent,
+                    },
+                }
+                send_log(json.dumps(progress_payload))
+
+                # Update status in repository
+                self.job_repository.update_status(
+                    session_id, "processing", progress=percent
                 )
 
         return {
             "report": report,
             "total_files": total_files_generated,
             "success_rows": success_rows_count,
-            "total_rows": len(df),
+            "total_rows": total_rows,
         }
 
     @staticmethod
-    def create_zip_archive(source_dir: str, output_path_base: str):
+    def create_zip_archive(source_dir: str, output_path_base: str) -> None:
         """Creates a zip archive from a directory.
 
         Args:

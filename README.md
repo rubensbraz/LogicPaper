@@ -98,19 +98,21 @@ graph TD
 ```text
 LogicPaper/
 ├── app/
-│   ├── core/                  # Core Business Logic
+│   ├── core/                  # Core Business Logic (Hexagonal - Domain)
 │   │   ├── config.py          # Application Configuration
 │   │   ├── engine.py          # Document Rendering Engine
 │   │   ├── formatter.py       # Strategy Dispatcher
+│   │   ├── ports.py           # Domain Interfaces (Ports)
 │   │   ├── service.py         # Batch Execution Service
 │   │   ├── validator.py       # Template Compatibility Check
 │   │   └── strategies/        # Formatting Logic (Date, Number, String, etc.)
-│   ├── integration/           # Headless API Layer
+│   ├── integration/           # Adapters & Infrastructure (Hexagonal - Adapters)
 │   │   ├── router.py          # API Endpoints
 │   │   ├── schemas.py         # Pydantic Models
 │   │   ├── security.py        # API Key Authentication
 │   │   ├── state.py           # Redis Persistence Layer
 │   │   └── worker.py          # Background Job Execution
+│   ├── dependencies.py        # Dependency Injection Wiring
 │   ├── main.py                # FastAPI Main Application & UI Routes
 │   └── utils.py               # Shared Utilities & Schedulers
 ├── static/                    # Frontend UI (HTML/CSS/JS)

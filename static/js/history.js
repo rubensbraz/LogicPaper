@@ -1,10 +1,22 @@
 /**
- * History Page Logic
- * Handles loading and displaying job execution history.
+ * @fileoverview History page logic for displaying job execution history.
+ * Handles loading job data from the backend API and rendering the history table.
  */
 
 /**
  * Loads job history from the backend and renders the table.
+ * Fetches data from /api/history endpoint and dynamically generates table rows
+ * with status badges, file counts, and download links.
+ * 
+ * @async
+ * @function loadHistory
+ * @returns {Promise<void>}
+ * 
+ * @throws {Error} If the API request fails or returns invalid data
+ * 
+ * @example
+ * // Called automatically on page load or manually via refresh button
+ * loadHistory();
  */
 window.loadHistory = async function () {
     const tbody = document.getElementById('history-table-body');

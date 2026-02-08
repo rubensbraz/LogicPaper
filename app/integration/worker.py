@@ -6,7 +6,7 @@ import pandas as pd
 
 from app.core.config import settings, logger
 from app.core.service import BatchService
-from app.integration.state import JobRepository
+from app.integration.state import RedisJobRepository
 
 
 async def run_headless_generation(
@@ -19,8 +19,13 @@ async def run_headless_generation(
     to_pdf: bool,
     filename_col: Optional[str],
     group_folders: bool,
+    batch_service: BatchService,
+    job_repository: RedisJobRepository,
 ) -> None:
     """Background worker function. Uses the shared 'BatchService'.
+
+    Executes the batch processing using the injected service and updates status
+    via the repository.
 
     Args:
         job_id (str): The unique Job ID.
@@ -32,6 +37,8 @@ async def run_headless_generation(
         to_pdf (bool): Whether to convert outputs to PDF.
         filename_col (Optional[str]): Column name for output filenames.
         group_folders (bool): Whether to group outputs in folders.
+        batch_service (BatchService): The batch service instance.
+        job_repository (RedisJobRepository): The job repository instance.
     """
     try:
         # Define a simplified callback for logging
@@ -42,7 +49,7 @@ async def run_headless_generation(
         template_paths = [template_path]
 
         # Call Core via Service
-        result = await BatchService.process_batch(
+        result = await batch_service.process_batch(
             session_id=job_id,
             df=df,
             template_paths=template_paths,
@@ -60,7 +67,7 @@ async def run_headless_generation(
         shutil.make_archive(zip_base, "zip", dir_outputs)
 
         # Update State: Completed
-        JobRepository.update_status(
+        job_repository.update_status(
             job_id,
             status="completed",
             files_generated=result["total_files"],
@@ -71,4 +78,4 @@ async def run_headless_generation(
 
     except Exception as e:
         logger.error(f"Job {job_id} failed: {e}")
-        JobRepository.update_status(job_id, status="failed", error=str(e))
+        job_repository.update_status(job_id, status="failed", error=str(e))

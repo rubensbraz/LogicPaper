@@ -4,13 +4,15 @@ import uuid
 from datetime import datetime
 
 import pandas as pd
-from fastapi import APIRouter, BackgroundTasks, HTTPException, Security
+from fastapi import APIRouter, BackgroundTasks, Depends, HTTPException, Security
 from fastapi.responses import FileResponse
 
 from app.core.config import logger, settings
+from app.core.service import BatchService
+from app.dependencies import get_batch_service, get_job_repository
 from app.integration.schemas import GenerationRequest, JobStatusResponse
 from app.integration.security import get_api_key
-from app.integration.state import JobRepository
+from app.integration.state import RedisJobRepository
 from app.integration.worker import run_headless_generation
 
 
@@ -27,6 +29,8 @@ async def trigger_generation(
     request: GenerationRequest,
     background_tasks: BackgroundTasks,
     api_key: str = Security(get_api_key),
+    batch_service: BatchService = Depends(get_batch_service),
+    job_repository: RedisJobRepository = Depends(get_job_repository),
 ):
     """Endpoint for system-to-system integration.
 
@@ -34,6 +38,8 @@ async def trigger_generation(
         request (GenerationRequest): The generation request payload.
         background_tasks (BackgroundTasks): Background tasks handler.
         api_key (str): The API key for authentication.
+        batch_service (BatchService): Injected BatchService.
+        job_repository (RedisJobRepository): Injected JobRepository.
 
     Returns:
         JobStatusResponse: The initial job status.
@@ -100,7 +106,7 @@ async def trigger_generation(
             "start_time": datetime.now(),
             "path": session_path,
         }
-        JobRepository.save(job_id, initial_state)
+        job_repository.save(job_id, initial_state)
 
         # 4. Dispatch Background Task
         background_tasks.add_task(
@@ -114,6 +120,8 @@ async def trigger_generation(
             request.output_format == "pdf",
             request.filename_col,
             request.group_by_folders,
+            batch_service,
+            job_repository,
         )
 
         return {
@@ -130,12 +138,17 @@ async def trigger_generation(
 @router.get(
     "/status/{job_id}", response_model=JobStatusResponse, summary="Check Job Status"
 )
-async def check_job_status(job_id: str, api_key: str = Security(get_api_key)):
+async def check_job_status(
+    job_id: str,
+    api_key: str = Security(get_api_key),
+    job_repository: RedisJobRepository = Depends(get_job_repository),
+):
     """Polls the status of a specific generation job.
 
     Args:
         job_id (str): The job identifier.
         api_key (str): The API key for validation.
+        job_repository (RedisJobRepository): Injected JobRepository.
 
     Returns:
         JobStatusResponse: The current job status.
@@ -143,7 +156,7 @@ async def check_job_status(job_id: str, api_key: str = Security(get_api_key)):
     Raises:
         HTTPException: If the job ID is not found.
     """
-    job = JobRepository.get(job_id)
+    job = job_repository.get(job_id)
     if not job:
         raise HTTPException(status_code=404, detail="Job ID not found.")
 
@@ -154,7 +167,9 @@ async def check_job_status(job_id: str, api_key: str = Security(get_api_key)):
         "message": (
             job.get("error")
             if job["status"] == "failed"
-            else "Processing..." if job["status"] == "processing" else "Completed"
+            else "Processing..."
+            if job["status"] == "processing"
+            else "Completed"
         ),
         "statistics": {"files": job.get("files_generated", 0)},
     }
@@ -162,13 +177,16 @@ async def check_job_status(job_id: str, api_key: str = Security(get_api_key)):
 
 @router.get("/download/{job_id}", summary="Download Result ZIP")
 async def download_integration_result(
-    job_id: str, api_key: str = Security(get_api_key)
+    job_id: str,
+    api_key: str = Security(get_api_key),
+    job_repository: RedisJobRepository = Depends(get_job_repository),
 ):
     """Downloads the final ZIP file. Requires authentication.
 
     Args:
         job_id (str): The job identifier.
         api_key (str): The API key for validation.
+        job_repository (RedisJobRepository): Injected JobRepository.
 
     Returns:
         FileResponse: The ZIP file.
@@ -179,7 +197,7 @@ async def download_integration_result(
     file_path = os.path.join(settings.TEMP_DIR, f"{job_id}_result.zip")
 
     if not os.path.exists(file_path):
-        job = JobRepository.get(job_id)
+        job = job_repository.get(job_id)
         if job and job["status"] != "completed":
             raise HTTPException(
                 status_code=400,

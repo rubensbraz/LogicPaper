@@ -9,10 +9,12 @@ from typing import Any, Dict, List, Optional
 
 import anyio
 import pandas as pd
-from fastapi import BackgroundTasks, FastAPI, File, Form, UploadFile
+import redis
+from fastapi import BackgroundTasks, Depends, FastAPI, File, Form, Request, UploadFile
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import FileResponse, JSONResponse, StreamingResponse
 from fastapi.staticfiles import StaticFiles
+from fastapi.templating import Jinja2Templates
 from openpyxl import Workbook
 from openpyxl.styles import Alignment, Border, Font, PatternFill, Side
 from openpyxl.utils.dataframe import dataframe_to_rows
@@ -22,8 +24,13 @@ from app.core.config import logger, settings
 from app.core.engine import DocumentEngine
 from app.core.service import BatchService
 from app.core.validator import TemplateValidator
+from app.dependencies import (
+    get_batch_service,
+    get_job_repository,
+    global_redis_client as redis_client,
+)
 from app.integration.router import router as integration_router
-from app.integration.state import JobRepository
+from app.integration.state import RedisJobRepository
 from app.utils import extract_zip, sanitize_filename, start_scheduler
 
 
@@ -53,6 +60,9 @@ app = FastAPI(
     description="Batch Processing Engine.",
     openapi_tags=tags_metadata,
 )
+
+# Configure Jinja2 Templates
+templates = Jinja2Templates(directory="templates")
 
 # Middleware
 app.add_middleware(
@@ -86,11 +96,18 @@ async def health_check():
     Returns:
         dict: Status information including timestamp and version.
     """
+    try:
+        redis_client.ping()
+        redis_status = "connected"
+    except Exception:
+        redis_status = "error"
+
     return {
         "status": "healthy",
         "timestamp": datetime.now().isoformat(),
         "version": settings.VERSION,
         "engine": f"{settings.PROJECT_NAME} v{settings.VERSION}",
+        "redis": redis_status,
     }
 
 
@@ -757,6 +774,8 @@ async def background_batch_processor(
     filename_col: str,
     group_by_folders: bool,
     input_manifest: Dict[str, Any],
+    batch_service: BatchService,
+    job_repository: RedisJobRepository,
 ):
     """Background task to process the batch, generate report, and zip.
 
@@ -771,6 +790,8 @@ async def background_batch_processor(
         filename_col (str): The column used for filenames.
         group_by_folders (bool): Whether to group by folders.
         input_manifest (Dict[str, Any]): The input manifest.
+        batch_service (BatchService): The batch service instance.
+        job_repository (RedisJobRepository): The job repository instance.
     """
     try:
         start_time = datetime.now()
@@ -781,7 +802,7 @@ async def background_batch_processor(
             send_log(session_id, msg)
 
         # 4. Execute Core batch logic via Service
-        batch_result = await BatchService.process_batch(
+        batch_result = await batch_service.process_batch(
             session_id=session_id,
             df=df,
             template_paths=saved_template_paths,
@@ -831,7 +852,7 @@ async def background_batch_processor(
         send_log_event(session_id, "process_complete")
 
         # --- Persistence: Update State (Completed) ---
-        JobRepository.update_status(
+        job_repository.update_status(
             session_id,
             status="completed",
             duration=str(duration),
@@ -844,7 +865,7 @@ async def background_batch_processor(
         send_log_event(session_id, "process_error", {"error": str(e)})
 
         # --- Persistence: Update State (Failed) ---
-        JobRepository.update_status(session_id, status="failed", error=str(e))
+        job_repository.update_status(session_id, status="failed", error=str(e))
 
 
 @app.post("/api/process", tags=["Web Dashboard API"])
@@ -858,6 +879,8 @@ async def process_batch(
     file_json: UploadFile = File(None),
     files_templates: List[UploadFile] = File(...),
     file_assets: UploadFile = File(None),
+    batch_service: BatchService = Depends(get_batch_service),
+    job_repository: RedisJobRepository = Depends(get_job_repository),
 ):
     """Main batch processing endpoint.
 
@@ -873,6 +896,8 @@ async def process_batch(
         file_json (UploadFile, optional): JSON file.
         files_templates (List[UploadFile]): List of template files.
         file_assets (UploadFile, optional): Assets ZIP file.
+        batch_service (BatchService): Injected BatchService.
+        job_repository (RedisJobRepository): Injected JobRepository.
 
     Returns:
         JSONResponse: Status message indicating job queuing.
@@ -927,7 +952,7 @@ async def process_batch(
         send_log_event(session_id, "job_queued", {"count": total_rows})
 
         # --- Persistence: Save Initial Job State ---
-        JobRepository.save(
+        job_repository.save(
             session_id,
             {
                 "status": "processing",
@@ -936,7 +961,7 @@ async def process_batch(
                 "input_file": input_filename,
             },
         )
-        JobRepository.add_to_history(session_id)
+        job_repository.add_to_history(session_id)
 
         input_manifest = {
             "excel": input_filename,
@@ -957,6 +982,8 @@ async def process_batch(
             filename_col,
             group_by_folders,
             input_manifest,
+            batch_service,
+            job_repository,
         )
 
         return JSONResponse(
@@ -1015,14 +1042,19 @@ async def download_result(session_id: str) -> Any:
 
 
 @app.get("/api/history", tags=["Web Dashboard API"])
-async def get_job_history():
+async def get_job_history(
+    job_repository: RedisJobRepository = Depends(get_job_repository),
+):
     """Retrieves the list of recent jobs from Redis.
+
+    Args:
+        job_repository (RedisJobRepository): Injected JobRepository.
 
     Returns:
         JSONResponse: List of job objects with status and metadata.
     """
     try:
-        jobs = JobRepository.get_recent_jobs(limit=50)
+        jobs = job_repository.get_recent_jobs(limit=50)
         return JSONResponse({"status": "success", "jobs": jobs})
     except Exception as e:
         logger.error(f"History Error: {e}")
@@ -1033,29 +1065,50 @@ async def get_job_history():
 
 
 @app.get("/", tags=["Static Pages"])
-async def read_root():
+async def read_root(request: Request):
     """Serves the main application page.
 
+    Args:
+        request (Request): The FastAPI request object.
+
     Returns:
-        FileResponse: The index.html file.
+        TemplateResponse: The rendered index.html template.
     """
-    return FileResponse(os.path.join(settings.STATIC_DIR, "index.html"))
+    return templates.TemplateResponse("index.html", {"request": request})
 
 
 @app.get("/help", tags=["Static Pages"])
-async def read_help():
+async def read_help(request: Request):
     """Serves the documentation page.
 
+    Args:
+        request (Request): The FastAPI request object.
+
     Returns:
-        FileResponse: The help.html file.
+        TemplateResponse: The rendered help.html template.
     """
-    return FileResponse(os.path.join(settings.STATIC_DIR, "help.html"))
+    return templates.TemplateResponse("help.html", {"request": request})
 
 
-# --- STATIC FILES CONFIGURATION (SPA/Static Site Mode) ---
+@app.get("/history", tags=["Static Pages"])
+async def read_history(request: Request):
+    """Serves the execution history page.
+
+    Args:
+        request (Request): The FastAPI request object.
+
+    Returns:
+        TemplateResponse: The rendered history.html template.
+    """
+    return templates.TemplateResponse("history.html", {"request": request})
 
 
-# This mounts the 'static' folder to the root URL ("/")
-# It allows relative paths (e.g., "css/style.css") to work locally AND on GitHub Pages
-# 'html=True' automatically serves 'index.html' when accessing root
-app.mount("/", StaticFiles(directory=settings.STATIC_DIR, html=True), name="site")
+# --- Static Files ---
+
+
+app.mount(
+    "/css", StaticFiles(directory=os.path.join(settings.STATIC_DIR, "css")), name="css"
+)
+app.mount(
+    "/js", StaticFiles(directory=os.path.join(settings.STATIC_DIR, "js")), name="js"
+)

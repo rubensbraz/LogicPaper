@@ -1,84 +1,61 @@
 import json
 import logging
-import time
-from typing import Any, Dict, Optional
+from typing import Any, Dict, List, Optional
 
 import redis
 
 from app.core.config import settings
+from app.core.ports import JobRepositoryPort
 
 
 # Configure Logging
 logger = logging.getLogger(__name__)
 
-# Redis Connection with Retry Logic
-for attempt in range(settings.REDIS_MAX_RETRIES):
-    try:
-        pool = redis.ConnectionPool(
-            host=settings.REDIS_HOST,
-            port=settings.REDIS_PORT,
-            db=0,
-            decode_responses=True,
-        )
-        redis_client = redis.Redis(connection_pool=pool)
-        redis_client.ping()
-        logger.info("[REDIS] Connected successfully.")
-        break
-    except Exception as e:
-        if attempt < settings.REDIS_MAX_RETRIES - 1:
-            logger.warning(
-                f"[REDIS] Connection failed. Retrying in {settings.REDIS_RETRY_DELAY}s... "
-                f"({attempt + 1}/{settings.REDIS_MAX_RETRIES})"
-            )
-            time.sleep(settings.REDIS_RETRY_DELAY)
-        else:
-            logger.error(
-                f"[REDIS] Failed to connect after {settings.REDIS_MAX_RETRIES} attempts: {e}"
-            )
 
-            raise e
+class RedisJobRepository(JobRepositoryPort):
+    """Redis-based implementation of the JobRepositoryPort.
 
-
-class JobRepository:
-    """Persistence Layer for Job Status using Redis.
-
-    Replaces in-memory dictionary to ensure data survival across restarts.
+    Persists job state and history using Redis keys and lists.
     """
 
-    # Fetch TTL from centralized settings
-    EXPIRATION_SECONDS = settings.REDIS_JOB_TTL
+    def __init__(self, redis_client: redis.Redis):
+        """Initializes the repository with a Redis client.
 
-    @staticmethod
-    def save(job_id: str, data: Dict[str, Any]) -> None:
+        Args:
+            redis_client (redis.Redis): The Redis client instance.
+        """
+        self.redis_client = redis_client
+        self.expiration_seconds = settings.REDIS_JOB_TTL
+
+    def save(self, job_id: str, data: Dict[str, Any]) -> None:
         """Saves or updates job data in Redis.
 
         Args:
-            job_id (str): The job identifier.
-            data (Dict[str, Any]): The job data to save.
+            job_id (str): The unique job identifier.
+            data (Dict[str, Any]): The job data to persist.
         """
         try:
             # Serialize Dict to JSON String
             # default=str handles datetime objects automatically
             payload = json.dumps(data, default=str)
 
-            redis_client.set(
-                name=job_id, value=payload, ex=JobRepository.EXPIRATION_SECONDS
+            self.redis_client.set(
+                name=job_id, value=payload, ex=self.expiration_seconds
             )
         except Exception as e:
             logger.error(f"Redis Save Error ({job_id}): {e}")
 
-    @staticmethod
-    def get(job_id: str) -> Optional[Dict[str, Any]]:
+    def get(self, job_id: str) -> Optional[Dict[str, Any]]:
         """Retrieves job data from Redis.
 
         Args:
-            job_id (str): The job identifier.
+            job_id (str): The unique job identifier.
 
         Returns:
-            Optional[Dict[str, Any]]: The job data or None if not found.
+            Optional[Dict[str, Any]]: The job data, or None if not found.
         """
         try:
-            payload = redis_client.get(job_id)
+            payload = self.redis_client.get(job_id)
             if payload:
                 return json.loads(payload)
             return None
@@ -86,54 +63,52 @@ class JobRepository:
             logger.error(f"Redis Get Error ({job_id}): {e}")
             return None
 
-    @staticmethod
-    def update_status(job_id: str, status: str, **kwargs) -> None:
-        """Helper to fetch, update a specific field, and save back.
+    def update_status(self, job_id: str, status: str, **kwargs) -> None:
+        """Updates the status and optional metadata of a job.
 
+        Fetches the current state, updates the fields, and saves it back.
         Note: This is not atomic, but sufficient for this architecture.
 
         Args:
-            job_id (str): The job identifier.
-            status (str): The new status.
-            **kwargs: Additional key-value pairs to update.
+            job_id (str): The unique job identifier.
+            status (str): The new status string.
+            **kwargs: Additional fields to update.
         """
-        current_data = JobRepository.get(job_id) or {}
+        current_data = self.get(job_id) or {}
         current_data["status"] = status
         current_data.update(kwargs)
-        JobRepository.save(job_id, current_data)
+        self.save(job_id, current_data)
 
-    @staticmethod
-    def add_to_history(job_id: str) -> None:
-        """Adds a job_id to the global history list.
+    def add_to_history(self, job_id: str) -> None:
+        """Adds a job to the global history list.
 
         Args:
-            job_id (str): The job identifier.
+            job_id (str): The unique job identifier.
         """
         try:
             # LPUSH adds to the head of the list (newest first)
-            redis_client.lpush("jobs:history", job_id)
+            self.redis_client.lpush("jobs:history", job_id)
             # Trim list to keep only last 50 jobs
-            redis_client.ltrim("jobs:history", 0, 49)
+            self.redis_client.ltrim("jobs:history", 0, 49)
         except Exception as e:
             logger.error(f"Redis History Add Error: {e}")
 
-    @staticmethod
-    def get_recent_jobs(limit: int = 10) -> list:
-        """Retrieves the most recent jobs with their statuses.
+    def get_recent_jobs(self, limit: int = 10) -> List[Dict[str, Any]]:
+        """Retrieves a list of recent jobs with their statuses.
 
         Args:
-            limit (int): Number of jobs to return.
+            limit (int): The maximum number of jobs to return. Defaults to 10.
 
         Returns:
-            list: List of dicts containing job details.
+            List[Dict[str, Any]]: A list of job dictionaries.
         """
         try:
             # Get job IDs
-            job_ids = redis_client.lrange("jobs:history", 0, limit - 1)
+            job_ids = self.redis_client.lrange("jobs:history", 0, limit - 1)
             results = []
 
             for jid in job_ids:
-                data = JobRepository.get(jid)
+                data = self.get(jid)
                 if data:
                     # Enrich with ID if missing
                     if "job_id" not in data:

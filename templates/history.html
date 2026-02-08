@@ -1,0 +1,50 @@
+{% extends "base.html" %}
+
+{% block title %}LogicPaper | Execution History{% endblock %}
+
+{% block meta_description %}View your LogicPaper job execution history, check status, and re-download completed files.{% endblock %}
+{% block meta_description_attr %}data-i18n-attr="content:meta.description_history"{% endblock %}
+
+{% block meta_keywords %}batch processing, document generation, job history, logicpaper{% endblock %}
+
+{% block content %}
+<main class="w-full max-w-7xl mt-4 animate-in fade-in zoom-in duration-300">
+    <div class="glass-panel p-6 rounded-2xl shadow-2xl">
+        <div class="flex items-center justify-between mb-6">
+            <h2 class="text-xl font-bold text-gray-100 flex items-center gap-3">
+                <span class="text-2xl">📜</span> 
+                <span data-i18n="history.title">Execution History</span>
+            </h2>
+            <button onclick="loadHistory()" class="group flex items-center gap-2 px-4 py-2 bg-white/5 hover:bg-white/10 border border-white/5 rounded-xl transition text-sm text-gray-400 hover:text-white">
+                <svg class="w-4 h-4 group-hover:rotate-180 transition-transform duration-500" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" />
+                </svg>
+                <span data-i18n="history.btn_refresh">Refresh</span>
+            </button>
+        </div>
+        
+        <div class="overflow-x-auto rounded-xl border border-white/10">
+            <table class="w-full text-left border-collapse">
+                <thead>
+                    <tr class="text-xs font-mono uppercase tracking-wider text-gray-500 bg-black/40 border-b border-white/10">
+                        <th class="p-4" data-i18n="history.col_date">Date</th>
+                        <th class="p-4" data-i18n="history.col_input">Input File</th>
+                        <th class="p-4" data-i18n="history.col_status">Status</th>
+                        <th class="p-4 text-center" data-i18n="history.col_stats">Files</th>
+                        <th class="p-4 text-right" data-i18n="history.col_action">Action</th>
+                    </tr>
+                </thead>
+                <tbody id="history-table-body" class="text-sm text-gray-300 divide-y divide-white/5 bg-black/20">
+                    <tr>
+                        <td colspan="5" class="p-8 text-center text-gray-500 animate-pulse" data-i18n="history.loading">Loading history...</td>
+                    </tr>
+                </tbody>
+            </table>
+        </div>
+    </div>
+</main>
+{% endblock %}
+
+{% block extra_scripts %}
+<script src="/js/history.js"></script>
+{% endblock %}

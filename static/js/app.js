@@ -1,13 +1,27 @@
 /**
- * Main Application Logic
- * Handles state management, file uploading, and SSE communication.
+ * @fileoverview Main Application Logic.
+ * Handles state management, file uploading, and Server-Sent Events (SSE) communication.
+ * Implements the core workflow for the LogicPaper dashboard.
  */
 
 // --- Global State ---
+
+/**
+ * Unique identifier for the current user session.
+ * resets on page load or after a batch completes.
+ * @type {string}
+ */
 let sessionId = crypto.randomUUID();
+
+/**
+ * Flag indicating if a batch process is currently active.
+ * Prevents re-submission or state changes during processing.
+ * @type {boolean}
+ */
 let isProcessing = false;
 
 // --- Initialization ---
+
 document.addEventListener('DOMContentLoaded', () => {
     initializeDragDrop(['dropData', 'dropTemplates', 'dropAssets']);
 });
@@ -15,7 +29,7 @@ document.addEventListener('DOMContentLoaded', () => {
 // --- State Management ---
 
 /**
- * COMPLETELY resets the application state by reloading the page.
+ * Completely resets the application state by reloading the page.
  * This ensures a truly clean slate (memory, file inputs, global variables).
  */
 function performFullReset() {
@@ -25,7 +39,8 @@ function performFullReset() {
 /**
  * Resets the UI state when inputs change.
  * Allows the user to start a fresh batch without page reload.
- * @param {string} type - The type of input changed ('excel', 'template', 'asset').
+ *
+ * @param {string} type - The type of input changed ('data', 'template', 'asset').
  */
 function resetStateOnInput(type) {
     if (isProcessing) return;
@@ -56,7 +71,9 @@ function resetStateOnInput(type) {
 
 /**
  * Initializes drag and drop listeners for a list of element IDs.
- * @param {string[]} ids - Array of DOM IDs.
+ * Binds events for visual feedback and file handling.
+ *
+ * @param {string[]} ids - Array of DOM IDs to initialize.
  */
 function initializeDragDrop(ids) {
     ids.forEach(id => {
@@ -94,6 +111,7 @@ function initializeDragDrop(ids) {
 /**
  * Updates the UI labels when files are selected.
  * Triggers state reset but DOES NOT auto-analyze.
+ *
  * @param {HTMLInputElement} input - The file input element.
  */
 function updateUI(input) {
@@ -120,7 +138,11 @@ function updateUI(input) {
 // --- API Helpers ---
 
 /**
- * Helper to append correct data file to FormData
+ * Helper to append correct data file to FormData.
+ * Distinguishes between JSON and Excel files based on extension.
+ *
+ * @param {FormData} formData - The FormData object to append to.
+ * @param {File} file - The file object to append.
  */
 function appendDataFile(formData, file) {
     if (file.name.toLowerCase().endsWith('.json')) {
@@ -133,15 +155,16 @@ function appendDataFile(formData, file) {
 // --- API Actions ---
 
 /**
- * MASTER FUNCTION: Orchestrates the Analysis and Validation workflow.
+ * Orchestrates the Analysis and Validation workflow.
  * 1. Checks inputs.
  * 2. Runs Data Preview (Backend Analysis).
  * 3. Runs Template Validation (Backend Comparison).
  * 4. Unlocks Configuration if successful.
+ *
+ * @returns {Promise<void>}
  */
 async function performAnalysisSequence() {
     // Environment Guard: Check for Static Demo (GitHub Pages)
-    // Since GitHub Pages only hosts static files, the backend API is unreachable
     if (CONFIG.env.isGithubPages) {
         Swal.fire({
             icon: 'info',
@@ -152,7 +175,7 @@ async function performAnalysisSequence() {
             confirmButtonColor: '#3b82f6',
             confirmButtonText: i18n.t('alerts.btn_understood')
         });
-        return; // Halt execution immediately
+        return;
     }
 
     const fileData = document.getElementById('fileData').files[0];
@@ -169,8 +192,7 @@ async function performAnalysisSequence() {
     btn.disabled = true;
 
     try {
-        // 3. Step 1: Preview Data (Excel Analysis)
-        // We await the result. If false, we stop.
+        // 3. Step 1: Preview Data (Excel/JSON Analysis)
         const previewSuccess = await previewData(fileData);
         if (!previewSuccess) throw new Error(i18n.t('alerts.analysis_failed'));
 
@@ -180,7 +202,6 @@ async function performAnalysisSequence() {
         // 5. Unlock Configuration Panel only if everything passed
         if (validationSuccess) {
             document.getElementById('configPanel').classList.remove('opacity-50', 'pointer-events-none');
-            // Log success to terminal
             logToTerminal(i18n.t('logs.validation_success'), "success");
         }
 
@@ -192,10 +213,12 @@ async function performAnalysisSequence() {
         btn.disabled = false;
     }
 }
+
 /**
- * Analyzes the Excel file and populates the JSON preview.
- * @param {File} fileData - The Excel file object.
- * @returns {Promise<boolean>} True if successful.
+ * Analyzes the Data file (Excel/JSON) and populates the JSON preview.
+ *
+ * @param {File} fileData - The data file object.
+ * @returns {Promise<boolean>} True if successful, false otherwise.
  */
 async function previewData(fileData) {
     const formData = new FormData();
@@ -236,10 +259,11 @@ async function previewData(fileData) {
 }
 
 /**
- * Validates that template variables match Excel headers.
- * @param {File} fileData - The Excel file.
+ * Validates that template placeholders match data headers.
+ *
+ * @param {File} fileData - The data file.
  * @param {FileList} fileTemplates - The list of templates.
- * @returns {Promise<boolean>} True if valid (or warning shown).
+ * @returns {Promise<boolean>} True if valid (or warning shown/accepted).
  */
 async function validateTemplates(fileData, fileTemplates) {
     const formData = new FormData();
@@ -254,8 +278,6 @@ async function validateTemplates(fileData, fileTemplates) {
 
         if (data.status === 'success') {
             renderValidationReport(data.report);
-            // We return true even if there are warnings, to allow the user to proceed if they choose.
-            // Strict mode would return data.report.overall_valid
             return true;
         } else {
             throw new Error(data.message);
@@ -267,13 +289,12 @@ async function validateTemplates(fileData, fileTemplates) {
 }
 
 /**
- * Renders the validation results modal.
+ * Renders the validation results modal using SweetAlert2.
+ *
  * @param {Object} report - The validation report object from the backend.
  */
 function renderValidationReport(report) {
     const valid = report.overall_valid;
-
-    // Use i18n keys from 'alerts.validation_modal'
     const titleText = valid ? i18n.t('alerts.validation_modal.title_ok') : i18n.t('alerts.validation_modal.title_fail');
     const descText = valid ? i18n.t('alerts.validation_modal.desc_ok') : i18n.t('alerts.validation_modal.desc_fail');
 
@@ -329,7 +350,6 @@ function renderValidationReport(report) {
 
             html += `</div></div>`;
         } else {
-            // "variables matched successfully"
             html += `<div class="mt-1 text-sm text-gray-500 flex items-center gap-1">
                 <span class="text-green-500">●</span> ${item.matched_vars.length} ${i18n.t('alerts.validation_modal.matched')}
              </div>`;
@@ -364,6 +384,8 @@ function renderValidationReport(report) {
 /**
  * Generates a single sample row for testing.
  * Blocks the Batch Process button while generating.
+ *
+ * @returns {Promise<void>}
  */
 async function generateSample() {
     const params = validateInputs();
@@ -411,6 +433,7 @@ async function generateSample() {
 /**
  * Starts the production batch process.
  * Permanently locks the Sample button during execution.
+ * Configures Server-Sent Events (SSE) for real-time updates.
  */
 function startProcessing() {
     const params = validateInputs();
@@ -432,9 +455,7 @@ function startProcessing() {
     const evtSource = new EventSource(`/stream-logs/${sessionId}`);
 
     evtSource.onopen = () => {
-        // Only trigger backend processing once the connection is established
-        // to ensure we don't miss early logs (session_init, etc.)
-        logToTerminal(i18n.t('logs.connection_established'), 'info'); // Optional: Feedback
+        logToTerminal(i18n.t('logs.connection_established'), 'info');
 
         const formData = buildFormData(params);
         fetch(CONFIG.endpoints.process, { method: 'POST', body: formData })
@@ -442,15 +463,13 @@ function startProcessing() {
             .then(data => {
                 if (data.status === 'processing' || data.status === 'success') {
                     logToTerminal(i18n.t('logs.job_accepted'), 'info');
-                    // We do NOT stop here. We wait for SSE "PROCESS_COMPLETE".
-                    // Pre-configure the download button logic (it will be shown by finishBatch)
+                    // Pre-configure the download button logic
                     document.getElementById('mainDownloadBtn').href = `/api/download/${sessionId}`;
                 } else {
                     throw new Error(data.message || i18n.t('alerts.server_error'));
                 }
             })
             .catch(e => {
-                // If the initial request failed, we won't get SSE updates
                 logToTerminal(i18n.t('logs.request_error', { error: e.message }), 'error');
                 finishBatch(false);
                 evtSource.close();
@@ -458,48 +477,7 @@ function startProcessing() {
     };
 
     evtSource.onmessage = (event) => {
-        let message = event.data;
-        let isComplete = false;
-
-        try {
-            // Try parsing as structured JSON log
-            const logData = JSON.parse(event.data);
-            if (logData.code) {
-                // Sanitize parameters to prevent XSS when using innerHTML in logs
-                const safeParams = logData.params || {};
-                Object.keys(safeParams).forEach(k => {
-                    if (typeof safeParams[k] === 'string') safeParams[k] = escapeHtml(safeParams[k]);
-                });
-
-                message = i18n.t(`logs.${logData.code}`, safeParams);
-
-                // Check for signals in the code itself
-                if (logData.code === 'process_complete') isComplete = true;
-                // If the message came back unchanged (key missing) or empty, show raw code as fallback
-                if (!message) message = event.data;
-            } else if (logData.message) {
-                // Fallback for simple JSON {"message": "..."}
-                message = logData.message;
-            }
-        } catch (e) {
-            // Not JSON, treat as raw string
-            message = event.data;
-        }
-
-        // Check for legacy string signals
-        if (message.includes("PROCESS_COMPLETE") || isComplete) {
-            evtSource.close();
-            if (!isComplete) logToTerminal(i18n.t('logs.process_complete'), 'success');
-            else logToTerminal(message, 'success');
-
-            finishBatch(true);
-        } else if (message.includes("PROCESS_ERROR")) {
-            evtSource.close();
-            logToTerminal(message, 'error');
-            finishBatch(false);
-        } else {
-            logToTerminal(message);
-        }
+        handleSSEMessage(event, evtSource);
     };
 
     evtSource.onerror = () => {
@@ -509,11 +487,60 @@ function startProcessing() {
     };
 }
 
+/**
+ * Handles incoming SSE messages.
+ * Parses JSON logs, updates the UI, and detects completion signals.
+ *
+ * @param {MessageEvent} event - The SSE event.
+ * @param {EventSource} evtSource - The EventSource instance.
+ */
+function handleSSEMessage(event, evtSource) {
+    let message = event.data;
+    let isComplete = false;
+
+    try {
+        const logData = JSON.parse(event.data);
+        if (logData.code) {
+            // Sanitize parameters to prevent XSS
+            const safeParams = logData.params || {};
+            Object.keys(safeParams).forEach(k => {
+                if (typeof safeParams[k] === 'string') safeParams[k] = escapeHtml(safeParams[k]);
+            });
+
+            message = i18n.t(`logs.${logData.code}`, safeParams);
+
+            if (logData.code === 'process_complete') isComplete = true;
+            if (!message) message = event.data;
+        } else if (logData.message) {
+            message = logData.message;
+        }
+    } catch (e) {
+        // Not JSON, treat as raw string
+        message = event.data;
+    }
+
+    if (message.includes("PROCESS_COMPLETE") || isComplete) {
+        evtSource.close();
+        if (!isComplete) logToTerminal(i18n.t('logs.process_complete'), 'success');
+        else logToTerminal(message, 'success');
+
+        finishBatch(true);
+    } else if (message.includes("PROCESS_ERROR")) {
+        evtSource.close();
+        logToTerminal(message, 'error');
+        finishBatch(false);
+    } else {
+        logToTerminal(message);
+    }
+}
+
 // --- Helpers ---
 
 /**
  * Validates form inputs before submission.
- * @returns {Object|null} Parameters object or null if invalid.
+ * Checks for missing files or required configurations.
+ *
+ * @returns {Object|null} Parameters object containing all inputs, or null if invalid.
  */
 function validateInputs() {
     const fileData = document.getElementById('fileData').files[0];
@@ -536,7 +563,10 @@ function validateInputs() {
 }
 
 /**
- * Builds the FormData object for the request.
+ * Builds the FormData object for the API request.
+ *
+ * @param {Object} p - The parameters object from validateInputs().
+ * @returns {FormData} The constructed FormData.
  */
 function buildFormData(p) {
     const fd = new FormData();
@@ -552,7 +582,10 @@ function buildFormData(p) {
 }
 
 /**
- * Toggles the loading state of buttons.
+ * Toggles the loading state of a button and disables inputs.
+ *
+ * @param {boolean} isLoading - Whether to show loading state.
+ * @param {string} btnId - The ID of the button to toggle.
  */
 function toggleLoadingState(isLoading, btnId) {
     const btn = document.getElementById(btnId);
@@ -571,9 +604,10 @@ function toggleLoadingState(isLoading, btnId) {
 }
 
 /**
- * Appends a log message to the terminal.
- * @param {string} msg - The raw message.
- * @param {string} [type] - 'info', 'error', 'success'.
+ * Appends a log message to the terminal UI.
+ *
+ * @param {string} msg - The raw message to display.
+ * @param {string} [type='normal'] - The log type ('info', 'error', 'success').
  */
 function logToTerminal(msg, type = 'normal') {
     const term = document.getElementById('terminal');
@@ -586,10 +620,12 @@ function logToTerminal(msg, type = 'normal') {
     // Default base style
     p.classList.add('text-gray-300');
 
-    // If type is explicitly 'error', we adds a red tint fallback, 
-    // but primarily we rely on the message content (from locales) to carry the style
     if (type === 'error') {
         p.classList.add('text-red-400', 'bg-red-900/10');
+    } else if (type === 'success') {
+        p.classList.add('text-green-400');
+    } else if (type === 'info') {
+        p.classList.add('text-blue-300');
     }
 
     p.innerHTML = cleanMsg;
@@ -599,6 +635,8 @@ function logToTerminal(msg, type = 'normal') {
 
 /**
  * Handles batch completion UI logic.
+ *
+ * @param {boolean} success - Whether the batch finished successfully.
  */
 function finishBatch(success) {
     isProcessing = false;
@@ -620,11 +658,15 @@ function finishBatch(success) {
         Swal.fire({ icon: 'error', title: i18n.t('alerts.batch_fail_title'), text: i18n.t('alerts.batch_fail_text'), background: '#1e293b', color: '#fff' });
     }
 
+    // New session ID for the next run
     sessionId = crypto.randomUUID();
 }
 
 /**
  * Triggers a browser download from a Blob.
+ *
+ * @param {Blob} blob - The file blob.
+ * @param {string} filename - The target filename.
  */
 function downloadBlob(blob, filename) {
     const url = window.URL.createObjectURL(blob);

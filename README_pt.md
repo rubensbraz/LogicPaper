@@ -98,19 +98,21 @@ graph TD
 ```text
 LogicPaper/
 ├── app/
-│   ├── core/                  # Lógica de Negócio Central
+│   ├── core/                  # Lógica de Negócios (Hexagonal - Domínio)
 │   │   ├── config.py          # Configuração da Aplicação
 │   │   ├── engine.py          # Motor de Renderização de Documentos
 │   │   ├── formatter.py       # Despachante de Estratégias
+│   │   ├── ports.py           # Interfaces de Domínio (Ports)
 │   │   ├── service.py         # Serviço de Execução em Lote
-│   │   ├── validator.py       # Verificação de Compatibilidade
-│   │   └── strategies/        # Lógica de Formatação (Data, Número, String, etc.)
-│   ├── integration/           # Camada de API Headless
+│   │   ├── validator.py       # Verificação de Compatibilidade de Templates
+│   │   └── strategies/        # Lógica de Formatação (Data, Número, Texto, etc.)
+│   ├── integration/           # Adaptadores e Infraestrutura (Hexagonal - Adaptadores)
 │   │   ├── router.py          # Endpoints da API
 │   │   ├── schemas.py         # Modelos Pydantic
-│   │   ├── security.py        # Autenticação via API Key
-│   │   ├── state.py           # Camada de Persistência Redis
-│   │   └── worker.py          # Execução de Jobs em Background
+│   │   ├── security.py        # Autenticação via Chave de API
+│   │   ├── state.py           # Camada de Persistência com Redis
+│   │   └── worker.py          # Execução de Jobs em Segundo Plano
+│   ├── dependencies.py        # Injeção de Dependências
 │   ├── main.py                # Aplicação Principal e Rotas da UI
 │   └── utils.py               # Utilitários e Agendadores
 ├── static/                    # Interface Frontend (HTML/CSS/JS)
