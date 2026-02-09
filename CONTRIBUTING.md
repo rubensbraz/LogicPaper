@@ -20,10 +20,6 @@ Before diving in, feel free to check our current strategic goals. If any of thes
 - **Authentication Layer:** Implement robust User Authentication (JWT/OAuth2) with the ability to enforce mandatory login for all system features.
 - **Data Isolation (Multi-Tenancy):** Create logical separation of data so users can only access their own generated documents and templates.
 - **Advanced API Management:** Develop scoped API keys with expiration dates, usage quotas, and permission levels for external integrations.
-
-### 📊 Persistence (PostgreSQL) & Analytics
-
-- **Job History:** Enable users to view, audit, and re-download past document generations.
 - **Metrics & Statistics:** Store and display template usage statistics, processing times, and success rates per user or API key.
 
 ---
