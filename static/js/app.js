@@ -322,18 +322,21 @@ function renderValidationReport(report) {
         const borderColor = isOk ? 'border-l-green-500' : 'border-l-red-500';
         const icon = isOk ? '📄' : '📑';
 
+        const statusKey = isOk ? 'status_ok' : 'status_missing';
+        const statusLabel = i18n.t(`alerts.validation_modal.${statusKey}`);
+
         html += `
-        <div class="bg-black/40 rounded-lg border border-white/5 border-l-4 ${borderColor} p-4 transition hover:bg-black/60">
-            <div class="flex justify-between items-start mb-2">
-                <div class="flex items-center gap-2">
-                    <span class="text-xl">${icon}</span>
-                    <span class="font-semibold text-gray-200 text-sm">${item.template}</span>
+            <div class="bg-black/40 rounded-lg border border-white/5 border-l-4 ${borderColor} p-4 transition hover:bg-black/60">
+                <div class="flex justify-between items-start mb-2">
+                    <div class="flex items-center gap-2">
+                        <span class="text-xl">${icon}</span>
+                        <span class="font-semibold text-gray-200 text-sm">${item.template}</span>
+                    </div>
+                    <span class="px-2 py-1 rounded text-[10px] font-bold uppercase tracking-wider ${isOk ? 'bg-green-500/20 text-green-400' : 'bg-red-500/20 text-red-400'}">
+                        ${statusLabel}
+                    </span>
                 </div>
-                <span class="px-2 py-1 rounded text-[10px] font-bold uppercase tracking-wider ${isOk ? 'bg-green-500/20 text-green-400' : 'bg-red-500/20 text-red-400'}">
-                    ${item.status}
-                </span>
-            </div>
-        `;
+            `;
 
         // 3. Render Missing Variables
         if (item.missing_vars.length > 0) {

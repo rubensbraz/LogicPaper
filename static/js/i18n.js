@@ -72,9 +72,9 @@ class I18nHandler {
 
     /**
      * Helper to traverse object safely.
-     * @param {Object} obj 
-     * @param {string[]} keys 
-     * @returns {*}
+     * @param {Object} obj - The object to traverse.
+     * @param {string[]} keys - The array of keys.
+     * @returns {string|Object|undefined} The found value.
      * @private
      */
     _getValue(obj, keys) {

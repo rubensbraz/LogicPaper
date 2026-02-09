@@ -109,6 +109,11 @@ class NavbarController {
         `;
     }
 
+    /**
+     * Generates HTML for the 'Preview Only' badge (Github Pages).
+     * @returns {string} HTML string.
+     * @private
+     */
     _getGithubBadge() {
         return `
             <div class="flex items-center justify-center gap-2 px-3 py-1.5 bg-red-500/10 border border-red-500/20 rounded-full w-fit mx-auto md:mx-0" title="Backend Unavailable">
@@ -117,6 +122,11 @@ class NavbarController {
             </div>`;
     }
 
+    /**
+     * Generates HTML for the 'System Online' badge.
+     * @returns {string} HTML string.
+     * @private
+     */
     _getOnlineBadge() {
         return `
             <div class="flex items-center justify-center gap-2 px-3 py-1.5 bg-green-500/10 border border-green-500/20 rounded-full w-fit mx-auto md:mx-0">

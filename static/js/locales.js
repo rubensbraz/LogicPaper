@@ -285,7 +285,9 @@ const TRANSLATIONS = {
                 missing_vars: "❌ Missing Variables (in Excel):",
                 matched: "variables matched successfully.",
                 btn_proceed: "Proceed",
-                btn_close: "Understood"
+                btn_close: "Understood",
+                status_ok: "OK",
+                status_missing: "Missing"
             },
             sample_ready_title: "Sample Ready",
             sample_ready_text: "Check your downloads folder.",
@@ -605,7 +607,9 @@ const TRANSLATIONS = {
                 missing_vars: "❌ Variáveis Ausentes (no Excel):",
                 matched: "variáveis correspondidas com sucesso.",
                 btn_proceed: "Prosseguir",
-                btn_close: "Entendido"
+                btn_close: "Entendido",
+                status_ok: "OK",
+                status_missing: "Ausente"
             },
             sample_ready_title: "Amostra Pronta",
             sample_ready_text: "Verifique sua pasta de downloads.",
