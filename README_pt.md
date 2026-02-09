@@ -83,59 +83,16 @@ Estes são os dados simulados que alimentam o sistema:
 O LogicPaper segue os princípios da **Arquitetura Hexagonal** (Portas e Adaptadores), garantindo separação limpa de responsabilidades e testabilidade.
 
 ```mermaid
-graph TB
-    Cliente[Cliente / API Key]
-    
-    subgraph Apresentacao["Camada de Apresentação"]
-        Router[API Router]
-        Dashboard[Dashboard Router]
-        UI[Interface Web]
-    end
-    
-    subgraph Aplicacao["Camada de Aplicação"]
-        Service[BatchService]
-        Validator[TemplateValidator]
-    end
-    
-    subgraph Dominio["Camada de Domínio (Core)"]
-        Engine[DocumentEngine]
-        Formatter[DataFormatter]
-        Strategies[Estratégias de Formatação]
-        Ports[Interfaces de Portas]
-    end
-    
-    subgraph Infraestrutura["Camada de Infraestrutura"]
-        FileAdapter[FileSystemAdapter]
-        LibreAdapter[LibreOfficeAdapter]
-        RedisRepo[RedisJobRepository]
-    end
-    
-    Cliente -->|HTTP/JSON| Router
-    Cliente -->|Navegador| UI
-    Router --> Service
-    Dashboard --> Service
-    UI --> Dashboard
-    Service --> Engine
-    Service --> Validator
-    Engine --> Formatter
-    Formatter --> Strategies
-    Service -.->|via Portas| Ports
-    Ports -.->|implementado por| FileAdapter
-    Ports -.->|implementado por| LibreAdapter
-    Ports -.->|implementado por| RedisRepo
-    
-    style Dominio fill:#e1f5ff
-    style Aplicacao fill:#fff4e1
-    style Infraestrutura fill:#ffe1e1
-    style Apresentacao fill:#e8f5e1
+graph TD
+    Client[Dashboard Web / Cliente API] -->|HTTP/JSON| FastAPI[Servidor Web FastAPI]
+    FastAPI -->|Enfileirar Job| Worker[Worker em Segundo Plano]
+    Worker -->|Gerenciamento de Estado| Redis[(Redis State Store)]
+    Worker -->|Orquestração| Core[Núcleo de Processamento em Lote]
+    Core -->|Validação| Validator[Validador de Templates]
+    Core -->|Formatação| Strategies[Módulos de Estratégia]
+    Core -->|Conversão| LibreOffice[LibreOffice Headless]
+    Worker -->|Operações de E/S| Storage[/Adaptador de Sistema de Arquivos/]
 ```
-
-### Camadas da Arquitetura
-
-* **Camada de Domínio** (`app/core/`): Lógica de negócio pura, sem dependências de infraestrutura
-* **Camada de Aplicação** (`app/core/service.py`): Orquestra a lógica de domínio via portas
-* **Camada de Infraestrutura** (`app/integration/`): Implementações concretas das portas
-* **Camada de Apresentação** (`app/integration/*_router.py`): Endpoints HTTP e UI
 
 ---
 

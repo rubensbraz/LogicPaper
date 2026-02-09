@@ -83,59 +83,16 @@ This is the mock data feeding the system:
 LogicPaper follows **Hexagonal Architecture** (Ports and Adapters) principles, ensuring clean separation of concerns and testability.
 
 ```mermaid
-graph TB
-    Client[Client / API Key]
-    
-    subgraph Presentation["Presentation Layer"]
-        Router[API Router]
-        Dashboard[Dashboard Router]
-        UI[Web UI]
-    end
-    
-    subgraph Application["Application Layer"]
-        Service[BatchService]
-        Validator[TemplateValidator]
-    end
-    
-    subgraph Domain["Domain Layer (Core)"]
-        Engine[DocumentEngine]
-        Formatter[DataFormatter]
-        Strategies[Formatting Strategies]
-        Ports[Ports Interfaces]
-    end
-    
-    subgraph Infrastructure["Infrastructure Layer"]
-        FileAdapter[FileSystemAdapter]
-        LibreAdapter[LibreOfficeAdapter]
-        RedisRepo[RedisJobRepository]
-    end
-    
-    Client -->|HTTP/JSON| Router
-    Client -->|Browser| UI
-    Router --> Service
-    Dashboard --> Service
-    UI --> Dashboard
-    Service --> Engine
-    Service --> Validator
-    Engine --> Formatter
-    Formatter --> Strategies
-    Service -.->|via Ports| Ports
-    Ports -.->|implemented by| FileAdapter
-    Ports -.->|implemented by| LibreAdapter
-    Ports -.->|implemented by| RedisRepo
-    
-    style Domain fill:#e1f5ff
-    style Application fill:#fff4e1
-    style Infrastructure fill:#ffe1e1
-    style Presentation fill:#e8f5e1
+graph TD
+    Client[Web Dashboard / API Client] -->|HTTP/JSON| FastAPI[FastAPI Web Server]
+    FastAPI -->|Enqueue Job| Worker[Background Worker]
+    Worker -->|State Management| Redis[(Redis State Store)]
+    Worker -->|Orchestration| Core[Batch Processing Core]
+    Core -->|Validation| Validator[Template Validator]
+    Core -->|Formatting| Strategies[Strategy Modules]
+    Core -->|Conversion| LibreOffice[LibreOffice Headless]
+    Worker -->|I/O Operations| Storage[/File System Adapter/]
 ```
-
-### Architecture Layers
-
-* **Domain Layer** (`app/core/`): Pure business logic, no infrastructure dependencies
-* **Application Layer** (`app/core/service.py`): Orchestrates domain logic via ports
-* **Infrastructure Layer** (`app/integration/`): Concrete implementations of ports
-* **Presentation Layer** (`app/integration/*_router.py`): HTTP endpoints and UI
 
 ---
 
