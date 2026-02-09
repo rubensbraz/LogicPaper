@@ -192,12 +192,13 @@ async function performAnalysisSequence() {
     btn.disabled = true;
 
     try {
-        // 3. Step 1: Preview Data (Excel/JSON Analysis)
+        // 3. Preview Data (Excel/JSON Analysis)
         const previewSuccess = await previewData(fileData);
         if (!previewSuccess) throw new Error(i18n.t('alerts.analysis_failed'));
 
-        // 4. Step 2: Validate Templates (Compatibility Check)
-        const validationSuccess = await validateTemplates(fileData, fileTemplates);
+        // 4. Validate Templates (Compatibility Check)
+        const fileAssets = document.getElementById('fileAssets').files[0];
+        const validationSuccess = await validateTemplates(fileData, fileTemplates, fileAssets);
 
         // 5. Unlock Configuration Panel only if everything passed
         if (validationSuccess) {
@@ -263,13 +264,17 @@ async function previewData(fileData) {
  *
  * @param {File} fileData - The data file.
  * @param {FileList} fileTemplates - The list of templates.
+ * @param {File} [fileAssets] - The assets zip file (optional).
  * @returns {Promise<boolean>} True if valid (or warning shown/accepted).
  */
-async function validateTemplates(fileData, fileTemplates) {
+async function validateTemplates(fileData, fileTemplates, fileAssets) {
     const formData = new FormData();
     appendDataFile(formData, fileData);
     for (let i = 0; i < fileTemplates.length; i++) {
         formData.append('files_templates', fileTemplates[i]);
+    }
+    if (fileAssets) {
+        formData.append('file_assets', fileAssets);
     }
 
     try {
@@ -294,20 +299,40 @@ async function validateTemplates(fileData, fileTemplates) {
  * @param {Object} report - The validation report object from the backend.
  */
 function renderValidationReport(report) {
-    const valid = report.overall_valid;
-    const titleText = valid ? i18n.t('alerts.validation_modal.title_ok') : i18n.t('alerts.validation_modal.title_fail');
-    const descText = valid ? i18n.t('alerts.validation_modal.desc_ok') : i18n.t('alerts.validation_modal.desc_fail');
+    // Determine Status
+    // Priority: ERROR > WARNING > OK
+    const status = report.overall_status;
+    const isValid = status === 'OK' || status === 'WARNING';
+
+    let titleText, descText, colorClass, iconMain;
+
+    if (status === 'OK') {
+        titleText = i18n.t('alerts.validation_modal.title_ok');
+        descText = i18n.t('alerts.validation_modal.desc_ok');
+        colorClass = 'green';
+        iconMain = '✔';
+    } else if (status === 'WARNING') {
+        titleText = i18n.t('alerts.validation_modal.title_warn');
+        descText = i18n.t('alerts.validation_modal.desc_warn');
+        colorClass = 'yellow';
+        iconMain = '⚠️';
+    } else {
+        titleText = i18n.t('alerts.validation_modal.title_fail');
+        descText = i18n.t('alerts.validation_modal.desc_fail');
+        colorClass = 'red';
+        iconMain = '✖';
+    }
 
     // 1. Build Header
     let html = `
     <div class="flex flex-col gap-6 text-left">
-        <div class="p-4 rounded-xl border ${valid ? 'bg-green-500/10 border-green-500/50' : 'bg-red-500/10 border-red-500/50'} flex items-center gap-4">
-            <div class="w-12 h-12 flex items-center justify-center rounded-full shrink-0 ${valid ? 'bg-green-500/20 text-green-400' : 'bg-red-500/20 text-red-400'}">
-                <span class="text-2xl leading-none">${valid ? '✔' : '⚠'}</span>
+        <div class="p-4 rounded-xl border bg-${colorClass}-500/10 border-${colorClass}-500/50 flex items-center gap-4">
+            <div class="w-12 h-12 flex items-center justify-center rounded-full shrink-0 bg-${colorClass}-500/20 text-${colorClass}-400">
+                <span class="text-2xl leading-none">${iconMain}</span>
             </div>
             <div>
                 <h3 class="text-lg font-bold text-white">${titleText}</h3>
-                <p class="text-sm ${valid ? 'text-green-300' : 'text-red-300'}">
+                <p class="text-sm text-${colorClass}-300">
                     ${descText}
                 </p>
             </div>
@@ -318,11 +343,28 @@ function renderValidationReport(report) {
 
     // 2. Build Cards
     report.details.forEach(item => {
-        const isOk = item.status === 'OK';
-        const borderColor = isOk ? 'border-l-green-500' : 'border-l-red-500';
-        const icon = isOk ? '📄' : '📑';
+        let isOk = item.status === 'OK';
+        let isWarning = item.status.includes('Warning');
 
-        const statusKey = isOk ? 'status_ok' : 'status_missing';
+        let borderColor = 'border-l-green-500';
+        let icon = '📄';
+        let statusKey = 'status_ok';
+        let badgeColor = 'bg-green-500/20 text-green-400';
+
+        if (!isOk && !isWarning) {
+            // Error (Missing Data)
+            borderColor = 'border-l-red-500';
+            icon = '📑';
+            statusKey = 'status_missing';
+            badgeColor = 'bg-red-500/20 text-red-400';
+        } else if (isWarning) {
+            // Warning (Missing Images)
+            borderColor = 'border-l-yellow-500';
+            icon = '⚠️';
+            statusKey = 'status_warning';
+            badgeColor = 'bg-yellow-500/20 text-yellow-400';
+        }
+
         const statusLabel = i18n.t(`alerts.validation_modal.${statusKey}`);
 
         html += `
@@ -332,7 +374,7 @@ function renderValidationReport(report) {
                         <span class="text-xl">${icon}</span>
                         <span class="font-semibold text-gray-200 text-sm">${item.template}</span>
                     </div>
-                    <span class="px-2 py-1 rounded text-[10px] font-bold uppercase tracking-wider ${isOk ? 'bg-green-500/20 text-green-400' : 'bg-red-500/20 text-red-400'}">
+                    <span class="px-2 py-1 rounded text-[10px] font-bold uppercase tracking-wider ${badgeColor}">
                         ${statusLabel}
                     </span>
                 </div>
@@ -352,13 +394,53 @@ function renderValidationReport(report) {
             });
 
             html += `</div></div>`;
-        } else {
-            html += `<div class="mt-1 text-sm text-gray-500 flex items-center gap-1">
+        }
+
+        // 4. Render Missing Assets (Warning)
+        if (item.potential_missing_assets && item.potential_missing_assets.length > 0) {
+            let msg = i18n.t('alerts.validation_modal.missing_assets');
+            let colorClass = 'yellow';
+
+            if (item.assets_error) {
+                msg = "❌ " + item.assets_error;
+                colorClass = 'red';
+            } else if (!item.assets_provided) {
+                msg = "❓ " + i18n.t('alerts.validation_modal.no_assets_provided');
+                colorClass = 'orange';
+            }
+
+            html += `
+            <div class="mt-3 bg-${colorClass}-900/10 rounded p-3 border border-${colorClass}-500/10">
+                <p class="text-sm text-${colorClass}-300 mb-2 font-semibold flex items-center gap-1">
+                    ${msg}
+                </p>
+                <div class="flex flex-wrap gap-2">`;
+
+            item.potential_missing_assets.forEach(a => {
+                html += `<span class="font-mono text-sm bg-${colorClass}-500/20 text-${colorClass}-200 px-2 py-1 rounded border border-${colorClass}-500/30">${a}</span>`;
+            });
+
+            html += `</div></div>`;
+        }
+
+        // 5. Render Success Stats
+        html += `<div class="mt-2 text-xs text-gray-500 space-y-1">`;
+
+        if (item.matched_vars.length > 0) {
+            html += `
+             <div class="flex items-center gap-1">
                 <span class="text-green-500">●</span> ${item.matched_vars.length} ${i18n.t('alerts.validation_modal.matched')}
              </div>`;
         }
 
-        html += `</div>`;
+        if (item.matched_assets && item.matched_assets.length > 0) {
+            html += `
+             <div class="flex items-center gap-1">
+                <span class="text-green-500">●</span> ${item.matched_assets.length} ${i18n.t('alerts.validation_modal.matched_assets')}
+             </div>`;
+        }
+
+        html += `</div></div>`;
     });
 
     html += `</div></div>`;
@@ -371,8 +453,8 @@ function renderValidationReport(report) {
         color: '#e2e8f0',
         showCloseButton: true,
         focusConfirm: false,
-        confirmButtonText: valid ? i18n.t('alerts.validation_modal.btn_proceed') : i18n.t('alerts.validation_modal.btn_close'),
-        confirmButtonColor: valid ? '#10b981' : '#3b82f6',
+        confirmButtonText: isValid ? i18n.t('alerts.validation_modal.btn_proceed') : i18n.t('alerts.validation_modal.btn_close'),
+        confirmButtonColor: isValid ? '#10b981' : '#3b82f6',
         customClass: {
             popup: 'glass-panel border border-white/10 shadow-2xl',
             title: 'text-left border-b border-white/10 pb-4',

@@ -83,12 +83,15 @@ class StoragePort(ABC):
         pass
 
     @abstractmethod
-    def list_files(self, dir_path: str, extension: Optional[str] = None) -> List[str]:
+    def list_files(
+        self, dir_path: str, extension: Optional[str] = None, recursive: bool = False
+    ) -> List[str]:
         """Lists files in a directory, optionally filtered by extension.
 
         Args:
             dir_path (str): The absolute path to the directory.
             extension (Optional[str]): Filter by file extension (e.g., '.docx').
+            recursive (bool): Whether to search recursively. Defaults to False.
 
         Returns:
             List[str]: A list of absolute file paths.

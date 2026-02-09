@@ -67,11 +67,17 @@ async def validate_compatibility(
     file_excel: UploadFile = File(None),
     file_json: UploadFile = File(None),
     files_templates: List[UploadFile] = File(...),
+    file_assets: UploadFile = File(None),
     storage: StoragePort = Depends(get_storage_port),
 ):
-    """Validates that template tags exist in Excel/JSON headers."""
+    """Validates that template tags exist in Excel/JSON headers.
+
+    If assets.zip is provided, also validates that PPTX image placeholders exist in the zip.
+    """
     session_id = f"val_{uuid.uuid4().hex[:8]}"
     session_path = storage.join_path(settings.TEMP_DIR, session_id)
+    dir_assets_internal = storage.join_path(session_path, settings.DIR_ASSETS_NAME)
+
     storage.make_dir(session_path)
 
     try:
@@ -86,8 +92,33 @@ async def validate_compatibility(
             await anyio.to_thread.run_sync(storage.write_binary, t_path, content)
             templates_map[tmpl.filename] = t_path
 
+        # Handle Assets (Extract if provided)
+        assets_ready = False
+        assets_error = None
+        if file_assets:
+            storage.make_dir(dir_assets_internal)
+            zip_input_path = storage.join_path(session_path, file_assets.filename)
+            content = await file_assets.read()
+            await anyio.to_thread.run_sync(
+                storage.write_binary, zip_input_path, content
+            )
+
+            try:
+                await anyio.to_thread.run_sync(
+                    storage.extract_zip, zip_input_path, dir_assets_internal
+                )
+                assets_ready = True
+            except Exception as e:
+                logger.error(f"Validation: Failed to extract assets zip: {e}")
+                assets_error = f"Zip Extraction Failed: {str(e)}"
+
         validator = TemplateValidator(storage)
-        result = await validator.compare(headers, templates_map)
+        result = await validator.compare(
+            headers,
+            templates_map,
+            assets_path=dir_assets_internal if assets_ready else None,
+            assets_error=assets_error,
+        )
 
         return JSONResponse({"status": "success", "report": result})
 

@@ -173,16 +173,109 @@ class TemplateValidator:
             logger.error(f"Failed to parse PPTX {file_path}: {e}")
             return set()
 
-    async def compare(
-        self, excel_headers: List[str], templates_map: Dict[str, str]
-    ) -> Dict[str, Any]:
-        """Compares Excel headers against variables required by templates.
+    def extract_image_placeholders(self, file_path: str) -> List[Set[str]]:
+        """Extracts grouped shape identifiers (Name + Alt Text) from PPTX.
 
-        Run in a separate thread to avoid blocking.
+        Args:
+            file_path (str): Absolute path to the PPTX file.
+
+        Returns:
+            List[Set[str]]: A list where each element is a set of aliases for a single shape.
+        """
+        shape_groups = []
+        try:
+            content = self.storage.read_binary(file_path)
+            prs = Presentation(io.BytesIO(content))
+            for slide in prs.slides:
+                for shape in slide.shapes:
+                    aliases = set()
+                    # 1. Object Name
+                    if shape.name:
+                        aliases.add(shape.name.strip().lower())
+
+                    # 2. Alt Text (Title/Description)
+                    try:
+                        if hasattr(shape._element, "nvPicPr"):
+                            cNvPr = shape._element.nvPicPr.cNvPr
+                        elif hasattr(shape._element, "nvSpPr"):
+                            cNvPr = shape._element.nvSpPr.cNvPr
+                        else:
+                            cNvPr = None
+
+                        if cNvPr is not None:
+                            title = cNvPr.get("title")
+                            descr = cNvPr.get("descr")
+                            if title:
+                                aliases.add(title.strip().lower())
+                            if descr:
+                                aliases.add(descr.strip().lower())
+                    except Exception:
+                        pass
+
+                    if aliases:
+                        shape_groups.append(aliases)
+            return shape_groups
+        except Exception as e:
+            logger.error(f"Failed to extract shapes from PPTX {file_path}: {e}")
+            return []
+
+    def extract_image_placeholders_from_docx(self, file_path: str) -> List[Set[str]]:
+        """Extracts grouped shape identifiers (Name + Alt Text) from DOCX.
+
+        Args:
+            file_path (str): The absolute path to the DOCX file.
+
+        Returns:
+            List[Set[str]]: A list where each element is a set of aliases for a single shape.
+        """
+        shape_groups = []
+        try:
+            content = self.storage.read_binary(file_path)
+            doc = Document(io.BytesIO(content))
+
+            for shape in doc.inline_shapes:
+                aliases = set()
+                try:
+                    doc_props = shape._inline.docPr
+
+                    title = doc_props.get("title")
+                    description = doc_props.get("descr")
+                    name = doc_props.get("name")
+
+                    if title:
+                        aliases.add(title.strip().lower())
+                    if description:
+                        aliases.add(description.strip().lower())
+                    if name:
+                        aliases.add(name.strip().lower())
+
+                except AttributeError:
+                    continue
+                except Exception:
+                    continue
+
+                if aliases:
+                    shape_groups.append(aliases)
+
+            return shape_groups
+        except Exception as e:
+            logger.error(f"Failed to extract shapes from DOCX {file_path}: {e}")
+            return []
+
+    async def compare(
+        self,
+        excel_headers: List[str],
+        templates_map: Dict[str, str],
+        assets_path: str = None,
+        assets_error: str = None,
+    ) -> Dict[str, Any]:
+        """Compares Excel headers and Assets against requirements.
 
         Args:
             excel_headers (List[str]): List of headers from the Excel file.
             templates_map (Dict[str, str]): Map of filename to file path for templates.
+            assets_path (str, optional): Path to the extracted assets directory.
+            assets_error (str, optional): Error message if assets extraction failed.
 
         Returns:
             Dict[str, Any]: Validation report.
@@ -191,40 +284,136 @@ class TemplateValidator:
         def _blocking_compare():
             # Normalize headers
             available_vars = set(str(h).strip() for h in excel_headers)
+
+            available_assets = set()
+            if assets_path and self.storage.exists(assets_path):
+                # Search recursively for all files
+                files = self.storage.list_files(assets_path, recursive=True)
+                for f in files:
+                    # We use basename to flatten the structure (e.g. assets/img.png -> img)
+                    f_name = self.storage.splitext(self.storage.basename(f))[0].lower()
+                    available_assets.add(f_name)
+
             validation_report = []
-            all_valid = True
 
             for filename, path in templates_map.items():
                 ext = self.storage.splitext(filename)[1].lower()
                 required_vars = set()
+                required_assets = []
 
                 if ext == ".docx":
                     required_vars = self.extract_tags_from_docx(path)
+                    required_assets = self.extract_image_placeholders_from_docx(path)
                 elif ext in [".md", ".txt"]:
                     required_vars = self.extract_tags_from_text_file(path)
                 elif ext == ".pptx":
                     required_vars = self.extract_tags_from_pptx(path)
+                    required_assets = self.extract_image_placeholders(path)
 
-                # Find mismatches: Variables in Template that are NOT in Excel
-                missing_in_excel = required_vars - available_vars
+                # Check Variables
+                missing_vars = required_vars - available_vars
+
+                # Check Assets
+                matched_assets_set = set()
+                potential_missing_assets_set = set()
+
+                # Filter noise from unmatched shapes (basic heuristic)
+                ignored_patterns = [
+                    "title",
+                    "subtitle",
+                    "footer",
+                    "date",
+                    "slide number",
+                    "placeholder",
+                    "rectangle",
+                    "textbox",
+                    "group",
+                    "line",
+                    "oval",
+                    "logo",
+                    "image",
+                    "picture",
+                ]
+
+                for group in required_assets:
+                    # Check if ANY alias in this shape group matches an available asset
+                    match_found = False
+                    for alias in group:
+                        if alias in available_assets:
+                            matched_assets_set.add(alias)
+                            match_found = True
+                            break
+
+                    if not match_found:
+                        # If no match, check if this shape is "Interesting" enough to report missing
+                        # We pick the "best" alias (not noise) to report
+                        best_reporting_name = None
+                        for alias in group:
+                            is_noise = any(p in alias for p in ignored_patterns)
+                            is_digit = alias.isdigit()
+                            is_short = len(alias) <= 2
+
+                            if not is_noise and not is_digit and not is_short:
+                                best_reporting_name = alias
+                                break
+
+                        if best_reporting_name:
+                            potential_missing_assets_set.add(best_reporting_name)
+
+                matched_assets = list(matched_assets_set)
+                potential_missing_assets = list(potential_missing_assets_set)
 
                 status = "OK"
-                if missing_in_excel:
+                if missing_vars:
                     status = "Missing Data"
-                    all_valid = False
+
+                if potential_missing_assets:
+                    if status == "OK":
+                        status = "Warning: Missing Images"
 
                 validation_report.append(
                     {
                         "template": filename,
                         "status": status,
-                        "missing_vars": list(missing_in_excel),
+                        "missing_vars": list(missing_vars),
                         "matched_vars": list(
                             required_vars.intersection(available_vars)
                         ),
+                        "matched_assets": matched_assets,
+                        "potential_missing_assets": potential_missing_assets,
+                        "assets_provided": bool(assets_path) and not bool(assets_error),
+                        "assets_error": assets_error,
                     }
                 )
 
-            return {"overall_valid": all_valid, "details": validation_report}
+            # Determine Overall Status
+            # Priority: ERROR > WARNING > OK
+            final_status = "OK"
+
+            has_error = any(
+                item["status"] == "Missing Data" or item.get("assets_error")
+                for item in validation_report
+            )
+
+            # Check for specific "Warning" string in status, or explicit missing assets
+            has_warning = any(
+                "Warning" in item["status"]
+                or (
+                    item.get("potential_missing_assets")
+                    and not item.get("assets_error")
+                )
+                for item in validation_report
+            )
+
+            if has_error:
+                final_status = "ERROR"
+            elif has_warning:
+                final_status = "WARNING"
+
+            return {
+                "overall_status": final_status,  # Enum-like status: 'OK' | 'WARNING' | 'ERROR'
+                "details": validation_report,
+            }
 
         # Offload to thread
         return await anyio.to_thread.run_sync(_blocking_compare)

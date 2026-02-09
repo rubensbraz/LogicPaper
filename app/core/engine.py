@@ -238,6 +238,19 @@ class DocumentEngine:
 
                 tpl.render(context, jinja_env=jinja_env)
 
+                if assets_path and self.storage.exists(assets_path):
+                    # Build Assets Map (Name -> Path) for Shape Replacement
+                    assets_map = {}
+                    files = self.storage.list_dir(assets_path)
+                    for f in files:
+                        f_name, _ = self.storage.splitext(f)
+                        assets_map[f_name.lower()] = self.storage.join_path(
+                            assets_path, f
+                        )
+
+                    if assets_map:
+                        self._replace_images_in_docx_shapes(tpl, assets_map)
+
                 # Save to memory
                 out_stream = io.BytesIO()
                 tpl.save(out_stream)
@@ -255,6 +268,83 @@ class DocumentEngine:
                 raise e
 
         return await anyio.to_thread.run_sync(_blocking_docx_render)
+
+    def _replace_images_in_docx_shapes(
+        self, tpl: DocxTemplate, assets_map: Dict[str, str]
+    ) -> None:
+        """Replaces images in DOCX inline shapes based on Alt Text or Object Name.
+
+        Iterates through all inline shapes in the document. Checks for matches in:
+        1. Alt Text Title
+        2. Alt Text Description
+        3. Object Name (Selection Pane name)
+
+        Args:
+            tpl (DocxTemplate): The active template object.
+            assets_map (Dict[str, str]): A dictionary mapping asset names (lowercase, no extension)
+                                         to their absolute file paths.
+        """
+        try:
+            # tpl is a DocxTemplate, but we treat it as a Document for shape iteration
+            for shape in tpl.inline_shapes:
+                try:
+                    # Access Alt Text (Title/Description) via XML attributes
+                    # 'docPr' is the CT_NonVisualDrawingProps element
+                    doc_props = shape._inline.docPr
+                    title = doc_props.get("title", "").strip().lower()
+                    description = doc_props.get("descr", "").strip().lower()
+                    obj_name = doc_props.get("name", "").strip().lower()
+
+                    match_name = None
+                    if title in assets_map:
+                        match_name = title
+                    elif description in assets_map:
+                        match_name = description
+                    elif obj_name in assets_map:
+                        match_name = obj_name
+
+                    if match_name:
+                        img_path = assets_map[match_name]
+                        if not self.storage.exists(img_path):
+                            logger.warning(
+                                f"Asset defined in DOCX shape '{match_name}' not found at: {img_path}"
+                            )
+                            continue
+
+                        # Replace the Image Blob
+                        # 1. Get Relationship ID from the blip element
+                        # path: shape -> inline -> graphic -> graphicData -> pic -> blipFill -> blip -> embed
+                        graphic = shape._inline.graphic
+                        pic = graphic.graphicData.pic
+                        blip = pic.blipFill.blip
+                        r_id = blip.embed
+
+                        # 2. Get the related Image Part using the Relationship ID
+                        # tpl.part is the Main Document Part
+                        if r_id in tpl.part.related_parts:
+                            related_part = tpl.part.related_parts[r_id]
+
+                            # 3. Read the New Image Data
+                            new_img_bytes = self.storage.read_binary(img_path)
+
+                            # 4. Overwrite the Blob directly
+                            # This updates the underlying image data. Note that if multiple shapes
+                            # share the same rId, ALL of them will be updated
+                            related_part._blob = new_img_bytes
+
+                            logger.info(
+                                f"Replaced DOCX image shape '{match_name}' with asset '{self.storage.basename(img_path)}'."
+                            )
+
+                except AttributeError:
+                    # Shape does not have the expected XML structure (e.g. no docPr)
+                    continue
+                except Exception:
+                    # General safety catch for individual shapes
+                    continue
+
+        except Exception as e:
+            logger.error(f"DOCX Image Replacement Error: {e}")
 
     async def process_text(
         self,
@@ -306,25 +396,58 @@ class DocumentEngine:
             logger.error(f"Text/MD Render Error: {e}")
             raise e
 
-    def _replace_images_in_slide(self, slide, assets_map: Dict[str, str]) -> None:
-        """Replaces matched shapes with images from assets.
+    def _replace_images_in_slide(self, slide: Any, assets_map: Dict[str, str]) -> None:
+        """Replaces images in PPTX slides based on Alt Text or Shape Name.
 
-        Matches shape.name (case-insensitive) against assets_map keys.
+        Iterates through all shapes in the slide. Checks for matches in:
+        1. Alt Text Title
+        2. Alt Text Description
+        3. Shape Name (Selection Pane name)
 
         Args:
-            slide: The slide object to process.
-            assets_map (Dict[str, str]): Map of filename (lowercase, no ext) to absolute path.
+            slide (Any): The PPTX slide object to process.
+            assets_map (Dict[str, str]): A dictionary mapping asset names (lowercase, no extension)
+                                         to their absolute file paths.
         """
         # Shapes to remove after replacement to avoid modifying list while iterating
         shapes_to_remove = []
 
         for shape in slide.shapes:
-            # Check if shape name matches an image (ignoring case)
+            # Check for matches in multiple properties
+            # 1. Object Name
             shape_name_clean = shape.name.strip().lower()
 
-            if shape_name_clean in assets_map:
+            # 2. Alt Text (Title/Description)
+            alt_title = ""
+            alt_descr = ""
+            try:
+                # Accessing XML properties for Alt Text
+                # Pictures use nvPicPr, Shapes use nvSpPr
+                if hasattr(shape._element, "nvPicPr"):
+                    cNvPr = shape._element.nvPicPr.cNvPr
+                elif hasattr(shape._element, "nvSpPr"):
+                    cNvPr = shape._element.nvSpPr.cNvPr
+                else:
+                    cNvPr = None
+
+                if cNvPr is not None:
+                    alt_title = cNvPr.get("title", "").strip().lower()
+                    alt_descr = cNvPr.get("descr", "").strip().lower()
+            except Exception:
+                pass
+
+            # Prioritized matching
+            match_name = None
+            if alt_title in assets_map:
+                match_name = alt_title
+            elif alt_descr in assets_map:
+                match_name = alt_descr
+            elif shape_name_clean in assets_map:
+                match_name = shape_name_clean
+
+            if match_name:
                 try:
-                    img_path = assets_map[shape_name_clean]
+                    img_path = assets_map[match_name]
 
                     # Get placeholder dimensions & position
                     ph_left = shape.left

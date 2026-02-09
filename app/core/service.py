@@ -91,11 +91,16 @@ class BatchService:
             row_num = idx + 1
             row_success = False
 
-            # Prepare Context
+            # Prepare Context and handle potential NaN/List issues safely
             context = row.to_dict()
-            cleaned_context = {
-                k: (None if pd.isna(v) else v) for k, v in context.items()
-            }
+            cleaned_context = {}
+            for k, v in context.items():
+                if isinstance(v, (list, dict)):
+                    cleaned_context[k] = v
+                elif pd.isna(v):
+                    cleaned_context[k] = None
+                else:
+                    cleaned_context[k] = v
 
             # Determine Identifier
             row_identifier = f"Row_{row_num}"
@@ -246,7 +251,14 @@ class BatchService:
 
         # Prepare Context
         context = row.to_dict()
-        cleaned_context = {k: (None if pd.isna(v) else v) for k, v in context.items()}
+        cleaned_context = {}
+        for k, v in context.items():
+            if isinstance(v, (list, dict)):
+                cleaned_context[k] = v
+            elif pd.isna(v):
+                cleaned_context[k] = None
+            else:
+                cleaned_context[k] = v
 
         # Determine Identifier
         row_identifier = "SAMPLE"

@@ -29,7 +29,7 @@ class ImageStrategy(BaseStrategy):
         try:
             # Op 0: Width (Optional)
             if len(ops) > 0:
-                raw_w = ops[0].strip()
+                raw_w = str(ops[0]).strip()
                 if raw_w and raw_w.lower() != "auto":
                     try:
                         width = float(raw_w)
@@ -38,7 +38,7 @@ class ImageStrategy(BaseStrategy):
 
             # Op 1: Height (Optional)
             if len(ops) > 1:
-                raw_h = ops[1].strip()
+                raw_h = str(ops[1]).strip()
                 if raw_h and raw_h.lower() != "auto":
                     try:
                         height = float(raw_h)

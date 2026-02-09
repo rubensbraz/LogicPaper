@@ -17,12 +17,15 @@ class FileSystemAdapter(StoragePort):
             return []
         return os.listdir(dir_path)
 
-    def list_files(self, dir_path: str, extension: Optional[str] = None) -> List[str]:
+    def list_files(
+        self, dir_path: str, extension: Optional[str] = None, recursive: bool = False
+    ) -> List[str]:
         """Lists files in a directory, optionally filtered by extension.
 
         Args:
             dir_path (str): The absolute path to the directory.
             extension (Optional[str]): Filter by file extension (e.g., '.docx').
+            recursive (bool): Whether to search recursively. Defaults to False.
 
         Returns:
             List[str]: A list of absolute file paths.
@@ -31,10 +34,17 @@ class FileSystemAdapter(StoragePort):
             return []
 
         files = []
-        for f in os.listdir(dir_path):
-            if extension and not f.lower().endswith(extension.lower()):
-                continue
-            files.append(os.path.join(dir_path, f))
+        if recursive:
+            for root, _, filenames in os.walk(dir_path):
+                for f in filenames:
+                    if extension and not f.lower().endswith(extension.lower()):
+                        continue
+                    files.append(os.path.join(root, f))
+        else:
+            for f in os.listdir(dir_path):
+                if extension and not f.lower().endswith(extension.lower()):
+                    continue
+                files.append(os.path.join(dir_path, f))
         return files
 
     def exists(self, path: str) -> bool:
