@@ -3,6 +3,7 @@
  * Contains full text resources for English (en-US) and Portuguese (pt-BR).
  * Used by i18n.js.
  */
+
 const TRANSLATIONS = {
     en: {
         meta: {

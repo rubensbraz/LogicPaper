@@ -1,20 +1,18 @@
-import asyncio
+import io
 import logging
-import os
 import re
-import subprocess
 import zipfile
 from typing import Any, Dict, List
 
 import anyio
 from docx.shared import Cm
 from docxtpl import DocxTemplate, InlineImage
-from jinja2 import Environment, BaseLoader
+from jinja2 import BaseLoader, Environment
 from pptx import Presentation
 
 from app.core.config import settings
 from app.core.formatter import DataFormatter
-
+from app.core.ports import ProcessPort, StoragePort
 
 # Configure Logging
 logger = logging.getLogger(__name__)
@@ -24,15 +22,20 @@ class DocumentEngine:
     """Core engine to manipulate DOCX/PPTX and convert to PDF.
 
     Template-based formatting via Jinja2 filters and custom PPTX regex parsing.
+    Decoupled from filesystem/subprocess via Ports.
     """
 
-    def __init__(self, temp_dir: str):
+    def __init__(self, temp_dir: str, storage: StoragePort, process: ProcessPort):
         """Initialize the Engine.
 
         Args:
             temp_dir (str): Base directory for temporary files.
+            storage (StoragePort): Port for file I/O.
+            process (ProcessPort): Port for external processes.
         """
         self.temp_dir = temp_dir
+        self.storage = storage
+        self.process = process
         self.formatter = DataFormatter()
 
     def _get_image_object(
@@ -42,19 +45,19 @@ class DocumentEngine:
         args: List[str],
         assets_path: str,
     ) -> Any:
-        """Custom helper to generate InlineImage objects within Jinja2 templates.
+        """Generates an InlineImage object for insertion into a DOCX template.
 
-        Usage:
-            {{ my_image_filename | format_image('width_cm', 'height_cm') }}
+        Parses arguments to determine dimensions and locates the image file within
+        the assets directory.
 
         Args:
-            tpl (DocxTemplate): The DocxTemplate instance.
-            value (Any): The image filename or value.
-            args (List[str]): Additional arguments (width, height).
-            assets_path (str): Path to the assets directory.
+            tpl (DocxTemplate): The active DocxTemplate instance.
+            value (Any): The filename or value indicating the image.
+            args (List[str]): Additional arguments (e.g., width_cm, height_cm).
+            assets_path (str): The absolute path to the assets directory.
 
         Returns:
-            Any: InlineImage object or error string.
+            Any: An InlineImage object if successful, or an error string if failed.
         """
         # Resolve dimensions and filename from strategy
         img_data = self.formatter._apply_strategy("image", value, *args)
@@ -64,23 +67,27 @@ class DocumentEngine:
             return ""
 
         try:
-            img_path = os.path.join(assets_path, filename)
+            img_path = self.storage.join_path(assets_path, filename)
 
-            # Security: Basic check to prevent path traversal (though assets_path is managed)
-            if not os.path.abspath(img_path).startswith(os.path.abspath(assets_path)):
+            if not self.storage.is_safe_path(assets_path, img_path):
                 logger.warning(
                     f"Security: Attempted path traversal for image: {filename}"
                 )
                 return "[Invalid Image Path]"
 
-            if not os.path.exists(img_path):
+            if not self.storage.exists(img_path):
                 logger.warning(f"Image not found: {img_path}")
                 return "[IMAGE NOT FOUND]"
+
+            # Read image to memory to fully decouple from file path requirements of some libraries
+            # InlineImage supports file path or file-like object
+            img_bytes = self.storage.read_binary(img_path)
+            img_stream = io.BytesIO(img_bytes)
 
             width = Cm(float(img_data["width"])) if img_data.get("width") else None
             height = Cm(float(img_data["height"])) if img_data.get("height") else None
 
-            return InlineImage(tpl, img_path, width=width, height=height)
+            return InlineImage(tpl, img_stream, width=width, height=height)
         except Exception as e:
             logger.error(f"Error loading image '{filename}': {e}")
             return f"[IMAGE ERROR: {str(e)}]"
@@ -101,6 +108,7 @@ class DocumentEngine:
         pattern = re.compile(r"\{\{\s*([a-zA-Z0-9_]+)(\s*\|.*?)?\s*\}\}")
 
         def replace_match(match):
+            """Regex callback to replace Jinja2 tags with formatted values."""
             var_name = match.group(1)
             filter_part = match.group(2)  # e.g., " | format_string('upper')"
 
@@ -123,8 +131,6 @@ class DocumentEngine:
                     f_name = content
                     args_raw = ""
 
-                # Parse Args (Naive split by comma, respecting basic quotes)
-                # Note: This is a basic parser. Complex nested quotes in PPTX args are limited
                 args = []
                 if args_raw:
                     # Remove quotes and split
@@ -165,24 +171,27 @@ class DocumentEngine:
 
         return pattern.sub(replace_match, text)
 
-    def _remove_office_thumbnail(self, file_path: str) -> None:
-        """Removes the 'docProps/thumbnail.jpeg' from the Office file to fix icon issues.
+    def _remove_office_thumbnail_stream(self, content: bytes) -> bytes:
+        """Removes the thumbnail from the Office file stream.
 
         Args:
-            file_path (str): Path to the office file.
+            content (bytes): The binary content of the Office file.
+
+        Returns:
+            bytes: The binary content with the thumbnail removed.
         """
         try:
-            temp_path = f"{file_path}.tmp"
-            with zipfile.ZipFile(file_path, "r") as zin:
-                with zipfile.ZipFile(temp_path, "w") as zout:
+            in_buffer = io.BytesIO(content)
+            out_buffer = io.BytesIO()
+            with zipfile.ZipFile(in_buffer, "r") as zin:
+                with zipfile.ZipFile(out_buffer, "w") as zout:
                     for item in zin.infolist():
-                        if "thumbnail" not in item.filename.lower():
-                            buffer = zin.read(item.filename)
-                            zout.writestr(item, buffer)
-            os.remove(file_path)
-            os.rename(temp_path, file_path)
+                        if settings.OFFICE_THUMBNAIL_PATH not in item.filename:
+                            zout.writestr(item, zin.read(item.filename))
+            return out_buffer.getvalue()
         except Exception as e:
-            logger.warning(f"Could not strip thumbnail from {file_path}: {e}")
+            logger.warning(f"Could not strip thumbnail in stream: {e}")
+            return content
 
     async def process_docx(
         self,
@@ -193,35 +202,32 @@ class DocumentEngine:
     ) -> bool:
         """Renders a DOCX template using Jinja2 context and Custom Filters.
 
-        Runs in a separate thread to prevent blocking the Event Loop.
+        This method runs in a separate thread to prevent blocking the asyncio event loop.
 
         Args:
-            template_path (str): Path to the template file.
-            output_path (str): Path to save the rendered file.
-            context (Dict[str, Any]): Data context for rendering.
-            assets_path (str, optional): Path to assets directory. Defaults to None.
+            template_path (str): The absolute path to the template file.
+            output_path (str): The absolute path where the rendered file will be saved.
+            context (Dict[str, Any]): The data context dictionary for rendering.
+            assets_path (str, optional): The path to the assets directory. Defaults to None.
 
         Returns:
-            bool: True if successful, False otherwise.
+            bool: True if rendering was successful, False otherwise.
 
         Raises:
-            Exception: If rendering fails.
+            Exception: Propagates any exception that occurs during rendering.
         """
 
         def _blocking_docx_render():
+            """Executes blocking DOCX rendering logic."""
             try:
-                tpl = DocxTemplate(template_path)
+                # Read template to memory
+                tpl_bytes = self.storage.read_binary(template_path)
+                tpl = DocxTemplate(io.BytesIO(tpl_bytes))
 
-                # 1. Create a fresh Jinja2 Environment
-                # This fixes the 'NoneType' object has no attribute 'render_context' error
                 jinja_env = Environment(autoescape=True)
-
-                # 2. Register Standard Filters
                 filters = self.formatter.get_jinja_filters()
                 jinja_env.filters.update(filters)
 
-                # 3. Register Special Image Filter (Requires closure for 'tpl' and 'assets_path')
-                # Usage in DOCX: {{ image_var | format_image(width, height) }}
                 def format_image_wrapper(val, *args):
                     if not assets_path:
                         return "[NO ASSETS PATH]"
@@ -229,17 +235,24 @@ class DocumentEngine:
 
                 jinja_env.filters["format_image"] = format_image_wrapper
 
-                # 4. Render and Save
                 tpl.render(context, jinja_env=jinja_env)
-                tpl.save(output_path)
-                self._remove_office_thumbnail(output_path)
+
+                # Save to memory
+                out_stream = io.BytesIO()
+                tpl.save(out_stream)
+                out_bytes = out_stream.getvalue()
+
+                # Post-process (Thumbnail removal)
+                final_bytes = self._remove_office_thumbnail_stream(out_bytes)
+
+                # Write to storage
+                self.storage.write_binary(output_path, final_bytes)
                 return True
 
             except Exception as e:
                 logger.error(f"DOCX Render Error: {e}")
                 raise e
 
-        # Offload to thread
         return await anyio.to_thread.run_sync(_blocking_docx_render)
 
     async def process_text(
@@ -249,8 +262,6 @@ class DocumentEngine:
         context: Dict[str, Any],
     ) -> bool:
         """Renders Text-based templates (MD, TXT).
-
-        Uses non-blocking I/O for file operations.
 
         Args:
             template_path (str): Path to the template file.
@@ -264,32 +275,29 @@ class DocumentEngine:
             Exception: If rendering fails.
         """
         try:
-            # 1. Read content (Async)
-            async with await anyio.open_file(template_path, "r", encoding="utf-8") as f:
-                content = await f.read()
+            # Read content
+            content = self.storage.read_text(template_path)
 
-            # 2. Create a fresh Jinja2 Environment
-            # autoescape=False is standard for text/markdown generation to avoid escaping < > &
+            # Render
             jinja_env = Environment(loader=BaseLoader(), autoescape=False)
 
-            # 3. Register Standard Filters (String, Date, Number, etc.)
+            # Register Standard Filters (String, Date, Number, etc.)
             filters = self.formatter.get_jinja_filters()
             jinja_env.filters.update(filters)
 
-            # 4. Handle Image Filter for Text
+            # Handle Image Filter for Text
             # In text files, we return the filename string so the user can use it in Markdown tags:
             # Example: ![Alt]({{ photo | format_image }}) -> ![Alt](photo.jpg)
             jinja_env.filters["format_image"] = lambda val, *args: (
                 str(val) if val else ""
             )
 
-            # 5. Render
+            # Render
             template = jinja_env.from_string(content)
             rendered_content = template.render(context)
 
-            # 6. Write Output (Async)
-            async with await anyio.open_file(output_path, "w", encoding="utf-8") as f:
-                await f.write(rendered_content)
+            # Write Output
+            self.storage.write_text(output_path, rendered_content)
 
             return True
 
@@ -300,25 +308,28 @@ class DocumentEngine:
     async def process_pptx(
         self, template_path: str, output_path: str, context: Dict[str, Any]
     ) -> bool:
-        """Renders a PPTX using python-pptx.
+        """Renders a PPTX template using python-pptx.
 
-        Runs in a separate thread to prevent blocking the Event Loop.
+        This method runs in a separate thread to prevent blocking the asyncio event loop.
+        It iterates through slides and replaces placeholders with values from the context.
 
         Args:
-            template_path (str): Path to the template file.
-            output_path (str): Path to save the rendered file.
-            context (Dict[str, Any]): Data context for rendering.
+            template_path (str): The absolute path to the template file.
+            output_path (str): The absolute path where the rendered file will be saved.
+            context (Dict[str, Any]): The data context dictionary for rendering.
 
         Returns:
-            bool: True if successful, False otherwise.
+            bool: True if rendering was successful, False otherwise.
 
         Raises:
-            Exception: If rendering fails.
+            Exception: Propagates any exception that occurs during rendering.
         """
 
         def _blocking_pptx_render():
             try:
-                prs = Presentation(template_path)
+                # Read template to memory
+                tpl_bytes = self.storage.read_binary(template_path)
+                prs = Presentation(io.BytesIO(tpl_bytes))
 
                 for slide in prs.slides:
                     for shape in slide.shapes:
@@ -357,8 +368,16 @@ class DocumentEngine:
                                                     ):
                                                         paragraph.runs[i].text = ""
 
-                prs.save(output_path)
-                self._remove_office_thumbnail(output_path)
+                # Save to memory
+                out_stream = io.BytesIO()
+                prs.save(out_stream)
+                out_bytes = out_stream.getvalue()
+
+                # Post-process
+                final_bytes = self._remove_office_thumbnail_stream(out_bytes)
+
+                # Write to storage
+                self.storage.write_binary(output_path, final_bytes)
                 return True
             except Exception as e:
                 logger.error(f"PPTX Render Error: {e}")
@@ -368,21 +387,21 @@ class DocumentEngine:
         return await anyio.to_thread.run_sync(_blocking_pptx_render)
 
     async def convert_to_pdf(self, input_path: str, output_dir: str) -> bool:
-        """Converts Office files to PDF using LibreOffice Headless via subprocess.
+        """Converts an Office document to PDF via ProcessPort.
 
         Args:
-            input_path (str): Path to the input file.
-            output_dir (str): Directory for the output PDF.
+            input_path (str): The absolute path to the input document.
+            output_dir (str): The directory where the output PDF should be saved.
 
         Returns:
-            bool: True if successful.
+            bool: True if the conversion process completes successfully.
 
         Raises:
-            Exception: If conversion fails or times out.
+            Exception: If the conversion fails (non-zero exit code) or times out.
         """
         try:
             cmd = [
-                "soffice",
+                settings.LIBREOFFICE_BINARY,
                 "--headless",
                 "--convert-to",
                 "pdf",
@@ -391,25 +410,15 @@ class DocumentEngine:
                 input_path,
             ]
 
-            process = await asyncio.to_thread(
-                subprocess.run,
-                cmd,
-                stdout=subprocess.PIPE,
-                stderr=subprocess.PIPE,
-                timeout=settings.LIBREOFFICE_TIMEOUT,
+            result = await self.process.run_command(
+                cmd, timeout=settings.LIBREOFFICE_TIMEOUT
             )
 
-            if process.returncode != 0:
-                logger.error(f"LibreOffice failed: {process.stderr.decode()}")
+            if result["returncode"] != 0:
+                logger.error(f"LibreOffice failed: {result['stderr'].decode()}")
                 raise Exception("PDF Conversion Failed: LibreOffice Error")
 
             return True
-
-        except subprocess.TimeoutExpired:
-            logger.error(
-                f"PDF Conversion Timed Out after {settings.LIBREOFFICE_TIMEOUT}s for: {input_path}"
-            )
-            raise Exception("PDF Conversion Failed: Timeout")
 
         except Exception as e:
             logger.error(f"PDF Convert Error: {e}")

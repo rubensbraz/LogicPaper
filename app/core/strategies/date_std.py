@@ -6,7 +6,6 @@ import babel.dates
 
 from app.core.strategies.base import BaseStrategy
 
-
 # Configure Logging
 logger = logging.getLogger(__name__)
 

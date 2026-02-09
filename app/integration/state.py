@@ -7,7 +7,6 @@ import redis
 from app.core.config import settings
 from app.core.ports import JobRepositoryPort
 
-
 # Configure Logging
 logger = logging.getLogger(__name__)
 
@@ -28,11 +27,11 @@ class RedisJobRepository(JobRepositoryPort):
         self.expiration_seconds = settings.REDIS_JOB_TTL
 
     def save(self, job_id: str, data: Dict[str, Any]) -> None:
-        """Saves or updates job data in Redis.
+        """Persists job data to Redis with an expiration time.
 
         Args:
             job_id (str): The unique job identifier.
-            data (Dict[str, Any]): The job data to persist.
+            data (Dict[str, Any]): The job data dictionary to store.
         """
         try:
             # Serialize Dict to JSON String
@@ -46,13 +45,13 @@ class RedisJobRepository(JobRepositoryPort):
             logger.error(f"Redis Save Error ({job_id}): {e}")
 
     def get(self, job_id: str) -> Optional[Dict[str, Any]]:
-        """Retrieves job data from Redis.
+        """Retrieves and deserializes job data from Redis.
 
         Args:
             job_id (str): The unique job identifier.
 
         Returns:
-            Optional[Dict[str, Any]]: The job data, or None if not found.
+            Optional[Dict[str, Any]]: The job data dictionary, or None if not found/error.
         """
         try:
             payload = self.redis_client.get(job_id)

@@ -11,7 +11,6 @@ from app.core.strategies.mask_std import MaskStrategy
 from app.core.strategies.number_std import NumberStrategy
 from app.core.strategies.string_std import StringStrategy
 
-
 # Configure Logging
 logger = logging.getLogger(__name__)
 

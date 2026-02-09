@@ -1,5 +1,5 @@
 /**
- * Shared Utility Functions
+ * @fileoverview Shared Utility Functions.
  * Common helpers used across multiple pages.
  */
 

@@ -1,5 +1,4 @@
 import os
-import shutil
 import uuid
 from datetime import datetime
 
@@ -8,14 +7,15 @@ from fastapi import APIRouter, BackgroundTasks, Depends, HTTPException, Security
 from fastapi.responses import FileResponse
 
 from app.core.config import logger, settings
+from app.core.ports import StoragePort
 from app.core.service import BatchService
-from app.dependencies import get_batch_service, get_job_repository
+from app.dependencies import get_batch_service, get_job_repository, get_storage_port
 from app.integration.schemas import GenerationRequest, JobStatusResponse
 from app.integration.security import get_api_key
 from app.integration.state import RedisJobRepository
 from app.integration.worker import run_headless_generation
 
-
+# Router
 router = APIRouter()
 
 
@@ -31,84 +31,78 @@ async def trigger_generation(
     api_key: str = Security(get_api_key),
     batch_service: BatchService = Depends(get_batch_service),
     job_repository: RedisJobRepository = Depends(get_job_repository),
+    storage: StoragePort = Depends(get_storage_port),
 ):
-    """Endpoint for system-to-system integration.
+    """Trigger a document generation job via API.
+
+    Validates inputs, sets up a temporary session workspace, and dispatches
+    a background task to process the generation.
 
     Args:
-        request (GenerationRequest): The generation request payload.
-        background_tasks (BackgroundTasks): Background tasks handler.
-        api_key (str): The API key for authentication.
-        batch_service (BatchService): Injected BatchService.
-        job_repository (RedisJobRepository): Injected JobRepository.
+        request (GenerationRequest): The request payload containing data and options.
+        background_tasks (BackgroundTasks): FastAPI BackgroundTasks handler.
+        api_key (str): Valid API Key.
+        batch_service (BatchService): The domain service for batch processing.
+        job_repository (RedisJobRepository): Repository for job state persistence.
 
     Returns:
-        JobStatusResponse: The initial job status.
+        JobStatusResponse: The initial status of the created job.
 
     Raises:
-        HTTPException: If path traversal is detected or template not found.
+        HTTPException: If the template path is invalid or authentication fails.
     """
-    # 1. Security & Validation: Path Traversal Prevention
+    # Security & Path Validation
+    base_dir = storage.join_path(
+        settings.PERSISTENT_TEMPLATES_DIR
+    )  # Ensure abstract path
 
-    # Resolve the absolute path of the persistent storage
-    base_dir = os.path.abspath(settings.PERSISTENT_TEMPLATES_DIR)
+    # Resolve and sanitize target path
+    safe_template_input = (
+        request.template_path.replace("..", "").lstrip("/").lstrip("\\")
+    )
+    target_path = storage.join_path(base_dir, safe_template_input)
 
-    # Sanitize user input (remove leading slashes to prevent absolute path override) and join with base directory
-    safe_template_input = request.template_path.lstrip(os.sep)
-    target_path = os.path.abspath(os.path.join(base_dir, safe_template_input))
-
-    # Security Check: Ensure the resolved path is actually INSIDE the base directory
-    # os.path.commonpath returns the longest common sub-path.
-    # If the target is valid, the common path must be equal to the base_dir
-    try:
-        common = os.path.commonpath([base_dir, target_path])
-    except ValueError:
-        # Happens on Windows if paths are on different drives
-        common = ""
-
-    if common != base_dir:
+    # Security Check: Ensure the resolved path is actually inside the base directory
+    if not storage.is_safe_path(base_dir, target_path):
         logger.warning(
-            f"SECURITY ALERT: Path traversal attempt detected. "
+            f"SECURITY ALERT: Path traversal attempt. "
             f"Input: '{request.template_path}' | Resolved: '{target_path}'"
         )
         raise HTTPException(
             status_code=403, detail="Access denied: Invalid template path."
         )
 
-    # Existence Check
-    if not os.path.exists(target_path):
+    if not storage.exists(target_path):
         raise HTTPException(
             status_code=404, detail=f"Template not found: {request.template_path}"
         )
 
-    # 2. Initialize Session
+    # Initialize Session
     job_id = f"job_{uuid.uuid4().hex}"
-    session_path = os.path.join(settings.TEMP_DIR, job_id)
+    session_path = storage.join_path(settings.TEMP_DIR, job_id)
 
-    dir_inputs = os.path.join(session_path, "inputs")
-    dir_outputs = os.path.join(session_path, "outputs")
-    dir_assets = os.path.join(session_path, ".temp_assets")
+    dir_inputs = storage.join_path(session_path, settings.DIR_INPUTS_NAME)
+    dir_outputs = storage.join_path(session_path, settings.DIR_OUTPUTS_NAME)
+    dir_assets = storage.join_path(session_path, settings.DIR_ASSETS_NAME)
 
     for p in [dir_inputs, dir_outputs, dir_assets]:
-        os.makedirs(p, exist_ok=True)
+        storage.make_dir(p)
 
     try:
-        # 3. Prepare Inputs
-        template_filename = os.path.basename(target_path)
-        dest_template_path = os.path.join(dir_inputs, template_filename)
-        shutil.copy2(target_path, dest_template_path)
+        template_filename = storage.basename(target_path)
+        dest_template_path = storage.join_path(dir_inputs, template_filename)
+        storage.copy(target_path, dest_template_path)
 
-        # Convert JSON to DataFrame
         df = pd.json_normalize(request.data)
 
-        # Initialize Job State
         initial_state = {
             "status": "processing",
-            "start_time": datetime.now(),
+            "start_time": datetime.now().isoformat(),
             "path": session_path,
         }
         job_repository.save(job_id, initial_state)
 
-        # 4. Dispatch Background Task
+        # Dispatch Background Task
         background_tasks.add_task(
             run_headless_generation,
             job_id,
@@ -146,15 +140,15 @@ async def check_job_status(
     """Polls the status of a specific generation job.
 
     Args:
-        job_id (str): The job identifier.
-        api_key (str): The API key for validation.
-        job_repository (RedisJobRepository): Injected JobRepository.
+        job_id (str): The unique job identifier.
+        api_key (str): Valid API Key.
+        job_repository (RedisJobRepository): Repository for job state persistence.
 
     Returns:
-        JobStatusResponse: The current job status.
+        JobStatusResponse: The current status and metadata of the job.
 
     Raises:
-        HTTPException: If the job ID is not found.
+        HTTPException: If the job ID is not found in the repository.
     """
     job = job_repository.get(job_id)
     if not job:
@@ -181,18 +175,18 @@ async def download_integration_result(
     api_key: str = Security(get_api_key),
     job_repository: RedisJobRepository = Depends(get_job_repository),
 ):
-    """Downloads the final ZIP file. Requires authentication.
+    """Downloads the final ZIP file for a completed job.
 
     Args:
-        job_id (str): The job identifier.
-        api_key (str): The API key for validation.
-        job_repository (RedisJobRepository): Injected JobRepository.
+        job_id (str): The unique job identifier.
+        api_key (str): Valid API Key.
+        job_repository (RedisJobRepository): Repository for job state persistence.
 
     Returns:
-        FileResponse: The ZIP file.
+        FileResponse: The ZIP file stream.
 
     Raises:
-        HTTPException: If file is not ready or not found.
+        HTTPException: If the job is not completed or the file is missing/expired.
     """
     file_path = os.path.join(settings.TEMP_DIR, f"{job_id}_result.zip")
 

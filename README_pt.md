@@ -80,16 +80,62 @@ Estes são os dados simulados que alimentam o sistema:
 
 ## 🔄 Arquitetura do Sistema
 
+O LogicPaper segue os princípios da **Arquitetura Hexagonal** (Portas e Adaptadores), garantindo separação limpa de responsabilidades e testabilidade.
+
 ```mermaid
-graph TD
-    API[Cliente / API Key] -->|JSON/Multipart| FastAPI[Servidor Web FastAPI]
-    FastAPI -->|Enfileirar Job| Worker[Background Worker]
-    Worker -->|Leitura/Escrita| Redis[(Redis Store)]
-    Worker -->|Templates| Core[Núcleo de Processamento]
-    Core -->|Formatação| Strategies[Módulos de Estratégia]
-    Core -->|Conversão| LibreOffice[LibreOffice Headless]
-    Worker -->|Saída| Storage[/Armazenamento Persistente/]
+graph TB
+    Cliente[Cliente / API Key]
+    
+    subgraph Apresentacao["Camada de Apresentação"]
+        Router[API Router]
+        Dashboard[Dashboard Router]
+        UI[Interface Web]
+    end
+    
+    subgraph Aplicacao["Camada de Aplicação"]
+        Service[BatchService]
+        Validator[TemplateValidator]
+    end
+    
+    subgraph Dominio["Camada de Domínio (Core)"]
+        Engine[DocumentEngine]
+        Formatter[DataFormatter]
+        Strategies[Estratégias de Formatação]
+        Ports[Interfaces de Portas]
+    end
+    
+    subgraph Infraestrutura["Camada de Infraestrutura"]
+        FileAdapter[FileSystemAdapter]
+        LibreAdapter[LibreOfficeAdapter]
+        RedisRepo[RedisJobRepository]
+    end
+    
+    Cliente -->|HTTP/JSON| Router
+    Cliente -->|Navegador| UI
+    Router --> Service
+    Dashboard --> Service
+    UI --> Dashboard
+    Service --> Engine
+    Service --> Validator
+    Engine --> Formatter
+    Formatter --> Strategies
+    Service -.->|via Portas| Ports
+    Ports -.->|implementado por| FileAdapter
+    Ports -.->|implementado por| LibreAdapter
+    Ports -.->|implementado por| RedisRepo
+    
+    style Dominio fill:#e1f5ff
+    style Aplicacao fill:#fff4e1
+    style Infraestrutura fill:#ffe1e1
+    style Apresentacao fill:#e8f5e1
 ```
+
+### Camadas da Arquitetura
+
+* **Camada de Domínio** (`app/core/`): Lógica de negócio pura, sem dependências de infraestrutura
+* **Camada de Aplicação** (`app/core/service.py`): Orquestra a lógica de domínio via portas
+* **Camada de Infraestrutura** (`app/integration/`): Implementações concretas das portas
+* **Camada de Apresentação** (`app/integration/*_router.py`): Endpoints HTTP e UI
 
 ---
 
@@ -98,29 +144,57 @@ graph TD
 ```text
 LogicPaper/
 ├── app/
-│   ├── core/                  # Lógica de Negócios (Hexagonal - Domínio)
-│   │   ├── config.py          # Configuração da Aplicação
-│   │   ├── engine.py          # Motor de Renderização de Documentos
-│   │   ├── formatter.py       # Despachante de Estratégias
-│   │   ├── ports.py           # Interfaces de Domínio (Ports)
-│   │   ├── service.py         # Serviço de Execução em Lote
-│   │   ├── validator.py       # Verificação de Compatibilidade de Templates
-│   │   └── strategies/        # Lógica de Formatação (Data, Número, Texto, etc.)
-│   ├── integration/           # Adaptadores e Infraestrutura (Hexagonal - Adaptadores)
-│   │   ├── router.py          # Endpoints da API
-│   │   ├── schemas.py         # Modelos Pydantic
-│   │   ├── security.py        # Autenticação via Chave de API
-│   │   ├── state.py           # Camada de Persistência com Redis
-│   │   └── worker.py          # Execução de Jobs em Segundo Plano
-│   ├── dependencies.py        # Injeção de Dependências
-│   ├── main.py                # Aplicação Principal e Rotas da UI
-│   └── utils.py               # Utilitários e Agendadores
-├── static/                    # Interface Frontend (HTML/CSS/JS)
-├── persistent_templates/      # Biblioteca de Modelos para API
-├── data/                      # Volume Docker para Arquivos Temporários
-├── Dockerfile                 # Definição da imagem
-└── docker-compose.yml         # Orquestração de Containers
+│   ├── core/                      # Camada de Domínio (Lógica de Negócio Pura)
+│   │   ├── config.py              # Configuração da Aplicação (Pydantic Settings)
+│   │   ├── engine.py              # Motor de Renderização de Documentos
+│   │   ├── formatter.py           # Registro de Estratégias & Ponte Jinja2
+│   │   ├── ports.py               # Interfaces Abstratas (Portas)
+│   │   ├── service.py             # Orquestração de Processamento em Lote
+│   │   ├── validator.py           # Verificador de Compatibilidade Template-Dados
+│   │   ├── reporter.py            # Geração de Relatórios Excel
+│   │   └── strategies/            # Estratégias de Formatação (Padrão Strategy)
+│   │       ├── base.py            # Interface Abstrata de Estratégia
+│   │       ├── string_std.py      # Manipulação de Texto
+│   │       ├── number_std.py      # Formatação de Números & Moeda
+│   │       ├── date_std.py        # Operações de Data/Hora
+│   │       ├── boolean_std.py     # Conversão Booleana
+│   │       ├── logic_std.py       # Lógica Condicional
+│   │       ├── mask_std.py        # Mascaramento de Dados Privados
+│   │       └── image_std.py       # Análise de Dimensões de Imagem
+│   │
+│   ├── integration/               # Camadas de Infraestrutura & Apresentação
+│   │   ├── infrastructure.py      # Adaptadores (FileSystem, LibreOffice)
+│   │   ├── state.py               # Repositório de Jobs Redis
+│   │   ├── router.py              # Endpoints API Headless
+│   │   ├── dashboard_router.py    # Endpoints API da UI Web
+│   │   ├── worker.py              # Processadores de Jobs em Background
+│   │   ├── schemas.py             # Modelos Pydantic Request/Response
+│   │   ├── security.py            # Autenticação via Chave API
+│   │   └── sse.py                 # Server-Sent Events (Logs em Tempo Real)
+│   │
+│   ├── dependencies.py            # Container de Injeção de Dependências
+│   ├── main.py                    # Ponto de Entrada da Aplicação FastAPI
+│   └── utils.py                   # Utilitários Compartilhados & Agendadores
+│
+├── static/                        # Interface Frontend (HTML/CSS/JS)
+│   ├── index.html                 # Dashboard Principal
+│   ├── help.html                  # Página de Documentação
+│   └── assets/                    # CSS, JS, Imagens
+│
+├── persistent_templates/          # Biblioteca de Templates para Acesso via API
+├── data/                          # Volume Docker (Arquivos Temporários)
+├── Dockerfile                     # Definição da Imagem do Container
+├── docker-compose.yml             # Orquestração Multi-Container
+└── .env                           # Configuração de Ambiente
 ```
+
+### Principais Padrões de Design
+
+* **Arquitetura Hexagonal**: Separação limpa entre domínio e infraestrutura
+* **Injeção de Dependências**: Sistema DI do FastAPI para baixo acoplamento
+* **Padrão Strategy**: Operações de formatação extensíveis
+* **Padrão Repository**: Persistência de dados abstrata via portas
+* **Padrão Adapter**: Implementações de infraestrutura das portas de domínio
 
 ---
 

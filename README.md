@@ -80,16 +80,62 @@ This is the mock data feeding the system:
 
 ## 🔄 System Architecture
 
+LogicPaper follows **Hexagonal Architecture** (Ports and Adapters) principles, ensuring clean separation of concerns and testability.
+
 ```mermaid
-graph TD
-    API[Client / API Key] -->|JSON/Multipart| FastAPI[FastAPI Web Server]
-    FastAPI -->|Enqueue Job| Worker[Background Worker]
-    Worker -->|Read/Write State| Redis[(Redis State Store)]
-    Worker -->|Templates| Core[Processing Core]
-    Core -->|Formatting| Strategies[Strategy Modules]
-    Core -->|Conversion| LibreOffice[LibreOffice Headless]
-    Worker -->|Output| Storage[/Persistent Storage/]
+graph TB
+    Client[Client / API Key]
+    
+    subgraph Presentation["Presentation Layer"]
+        Router[API Router]
+        Dashboard[Dashboard Router]
+        UI[Web UI]
+    end
+    
+    subgraph Application["Application Layer"]
+        Service[BatchService]
+        Validator[TemplateValidator]
+    end
+    
+    subgraph Domain["Domain Layer (Core)"]
+        Engine[DocumentEngine]
+        Formatter[DataFormatter]
+        Strategies[Formatting Strategies]
+        Ports[Ports Interfaces]
+    end
+    
+    subgraph Infrastructure["Infrastructure Layer"]
+        FileAdapter[FileSystemAdapter]
+        LibreAdapter[LibreOfficeAdapter]
+        RedisRepo[RedisJobRepository]
+    end
+    
+    Client -->|HTTP/JSON| Router
+    Client -->|Browser| UI
+    Router --> Service
+    Dashboard --> Service
+    UI --> Dashboard
+    Service --> Engine
+    Service --> Validator
+    Engine --> Formatter
+    Formatter --> Strategies
+    Service -.->|via Ports| Ports
+    Ports -.->|implemented by| FileAdapter
+    Ports -.->|implemented by| LibreAdapter
+    Ports -.->|implemented by| RedisRepo
+    
+    style Domain fill:#e1f5ff
+    style Application fill:#fff4e1
+    style Infrastructure fill:#ffe1e1
+    style Presentation fill:#e8f5e1
 ```
+
+### Architecture Layers
+
+* **Domain Layer** (`app/core/`): Pure business logic, no infrastructure dependencies
+* **Application Layer** (`app/core/service.py`): Orchestrates domain logic via ports
+* **Infrastructure Layer** (`app/integration/`): Concrete implementations of ports
+* **Presentation Layer** (`app/integration/*_router.py`): HTTP endpoints and UI
 
 ---
 
@@ -98,29 +144,57 @@ graph TD
 ```text
 LogicPaper/
 ├── app/
-│   ├── core/                  # Core Business Logic (Hexagonal - Domain)
-│   │   ├── config.py          # Application Configuration
-│   │   ├── engine.py          # Document Rendering Engine
-│   │   ├── formatter.py       # Strategy Dispatcher
-│   │   ├── ports.py           # Domain Interfaces (Ports)
-│   │   ├── service.py         # Batch Execution Service
-│   │   ├── validator.py       # Template Compatibility Check
-│   │   └── strategies/        # Formatting Logic (Date, Number, String, etc.)
-│   ├── integration/           # Adapters & Infrastructure (Hexagonal - Adapters)
-│   │   ├── router.py          # API Endpoints
-│   │   ├── schemas.py         # Pydantic Models
-│   │   ├── security.py        # API Key Authentication
-│   │   ├── state.py           # Redis Persistence Layer
-│   │   └── worker.py          # Background Job Execution
-│   ├── dependencies.py        # Dependency Injection Wiring
-│   ├── main.py                # FastAPI Main Application & UI Routes
-│   └── utils.py               # Shared Utilities & Schedulers
-├── static/                    # Frontend UI (HTML/CSS/JS)
-├── persistent_templates/      # Storage for API Template Library
-├── data/                      # Docker Volume for Temp Files
-├── Dockerfile                 # Image definition
-└── docker-compose.yml         # Container orchestration
+│   ├── core/                      # Domain Layer (Pure Business Logic)
+│   │   ├── config.py              # Application Configuration (Pydantic Settings)
+│   │   ├── engine.py              # Document Rendering Engine
+│   │   ├── formatter.py           # Strategy Registry & Jinja2 Bridge
+│   │   ├── ports.py               # Abstract Interfaces (Ports)
+│   │   ├── service.py             # Batch Processing Orchestration
+│   │   ├── validator.py           # Template-Data Compatibility Checker
+│   │   ├── reporter.py            # Excel Report Generation
+│   │   └── strategies/            # Formatting Strategies (Strategy Pattern)
+│   │       ├── base.py            # Abstract Strategy Interface
+│   │       ├── string_std.py      # Text Manipulation
+│   │       ├── number_std.py      # Number & Currency Formatting
+│   │       ├── date_std.py        # Date/Time Operations
+│   │       ├── boolean_std.py     # Boolean Conversion
+│   │       ├── logic_std.py       # Conditional Logic
+│   │       ├── mask_std.py        # Data Privacy Masking
+│   │       └── image_std.py       # Image Dimension Parsing
+│   │
+│   ├── integration/               # Infrastructure & Presentation Layers
+│   │   ├── infrastructure.py      # Adapters (FileSystem, LibreOffice)
+│   │   ├── state.py               # Redis Job Repository
+│   │   ├── router.py              # Headless API Endpoints
+│   │   ├── dashboard_router.py    # Web UI API Endpoints
+│   │   ├── worker.py              # Background Job Processors
+│   │   ├── schemas.py             # Pydantic Request/Response Models
+│   │   ├── security.py            # API Key Authentication
+│   │   └── sse.py                 # Server-Sent Events (Real-time Logs)
+│   │
+│   ├── dependencies.py            # Dependency Injection Container
+│   ├── main.py                    # FastAPI Application Entry Point
+│   └── utils.py                   # Shared Utilities & Schedulers
+│
+├── static/                        # Frontend UI (HTML/CSS/JS)
+│   ├── index.html                 # Main Dashboard
+│   ├── help.html                  # Documentation Page
+│   └── assets/                    # CSS, JS, Images
+│
+├── persistent_templates/          # Template Library for API Access
+├── data/                          # Docker Volume (Temporary Files)
+├── Dockerfile                     # Container Image Definition
+├── docker-compose.yml             # Multi-Container Orchestration
+└── .env                           # Environment Configuration
 ```
+
+### Key Design Patterns
+
+* **Hexagonal Architecture**: Clean separation between domain and infrastructure
+* **Dependency Injection**: FastAPI's DI system for loose coupling
+* **Strategy Pattern**: Extensible formatting operations
+* **Repository Pattern**: Abstract data persistence via ports
+* **Adapter Pattern**: Infrastructure implementations of domain ports
 
 ---
 

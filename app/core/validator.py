@@ -1,5 +1,5 @@
+import io
 import logging
-import os
 import re
 from typing import Any, Dict, List, Set
 
@@ -7,6 +7,7 @@ import anyio
 from docx import Document
 from pptx import Presentation
 
+from app.core.ports import StoragePort
 
 # Configure Logging
 logger = logging.getLogger(__name__)
@@ -15,57 +16,65 @@ logger = logging.getLogger(__name__)
 class TemplateValidator:
     """Analyzes template files (DOCX/PPTX) using Regex to extract expected Jinja2 variables.
 
-    This approach is robust against custom filters (pipes) that typically crash standard
-    template introspection tools.
+    Decoupled from filesystem via StoragePort.
     """
 
-    def __init__(self):
-        """Initialize the TemplateValidator with regex patterns."""
+    def __init__(self, storage: StoragePort):
+        """Initialize the TemplateValidator.
+
+        Args:
+            storage (StoragePort): Port for file I/O.
+        """
         # Regex Explanation:
         # \{\{\s* -> Match opening braces '{{' and optional whitespace
         # ([a-zA-Z0-9_]+) -> Capture Group 1: The Variable Name (alphanumeric + underscore)
         # .*?           -> Non-greedy match of any character (filters, args, spaces)
         # \}\}          -> Match closing braces '}}'
+        self.storage = storage
         self.tag_pattern = re.compile(r"\{\{\s*([a-zA-Z0-9_]+).*?\}\}")
 
     def _extract_from_text(self, text: str) -> Set[str]:
-        """Helper to run regex on a string and return found variables.
+        """Scans the provided text for Jinja2-style variables using regex.
 
         Args:
-            text (str): The text to search.
+            text (str): The text content to search.
 
         Returns:
-            Set[str]: A set of found variable names.
+            Set[str]: A set of unique variable names found in the text.
         """
         if not text:
             return set()
         return set(self.tag_pattern.findall(text))
 
     def extract_tags_from_docx(self, file_path: str) -> Set[str]:
-        """Extracts tags from a Word document by scanning paragraphs and tables.
+        """Extracts Jinja2 tags from a DOCX file via StoragePort.
+
+        Scans paragraphs, tables, headers, and footers for variables.
 
         Args:
-            file_path (str): Path to the DOCX file.
+            file_path (str): The absolute path to the DOCX file.
 
         Returns:
-            Set[str]: A set of extracted tags.
+            Set[str]: A set of unique extracted tags. Returns an empty set on failure.
         """
         tags = set()
         try:
-            doc = Document(file_path)
+            # Read to memory
+            content = self.storage.read_binary(file_path)
+            doc = Document(io.BytesIO(content))
 
-            # 1. Body Paragraphs
+            # Body Paragraphs
             for paragraph in doc.paragraphs:
                 tags.update(self._extract_from_text(paragraph.text))
 
-            # 2. Tables
+            # Tables
             for table in doc.tables:
                 for row in table.rows:
                     for cell in row.cells:
                         for paragraph in cell.paragraphs:
                             tags.update(self._extract_from_text(paragraph.text))
 
-            # 3. Headers and Footers (Optional but recommended)
+            # Headers and Footers
             for section in doc.sections:
                 # Headers
                 for header in [
@@ -106,7 +115,7 @@ class TemplateValidator:
             return set()
 
     def extract_tags_from_text_file(self, file_path: str) -> Set[str]:
-        """Extracts tags from Plain Text or Markdown files.
+        """Extracts tags from Plain Text or Markdown files via StoragePort.
 
         Args:
             file_path (str): Path to the text/markdown file.
@@ -115,25 +124,28 @@ class TemplateValidator:
             Set[str]: A set of extracted tags.
         """
         try:
-            with open(file_path, "r", encoding="utf-8", errors="ignore") as f:
-                content = f.read()
+            content = self.storage.read_text(file_path)
             return self._extract_from_text(content)
         except Exception as e:
             logger.error(f"Failed to parse Text File {file_path}: {e}")
             return set()
 
     def extract_tags_from_pptx(self, file_path: str) -> Set[str]:
-        """Extracts tags from a PowerPoint presentation.
+        """Extracts Jinja2 tags from a PPTX file via StoragePort.
+
+        Iterates through slides, shapes, text frames, and tables to find variables.
 
         Args:
-            file_path (str): Path to the PPTX file.
+            file_path (str): The absolute path to the PPTX file.
 
         Returns:
-            Set[str]: A set of extracted tags.
+            Set[str]: A set of unique extracted tags. Returns an empty set on failure.
         """
         tags = set()
         try:
-            prs = Presentation(file_path)
+            content = self.storage.read_binary(file_path)
+            prs = Presentation(io.BytesIO(content))
+
             for slide in prs.slides:
                 for shape in slide.shapes:
                     # Text Frames
@@ -177,13 +189,13 @@ class TemplateValidator:
         """
 
         def _blocking_compare():
-            # Normalize headers (strip whitespace just in case)
+            # Normalize headers
             available_vars = set(str(h).strip() for h in excel_headers)
             validation_report = []
             all_valid = True
 
             for filename, path in templates_map.items():
-                ext = os.path.splitext(filename)[1].lower()
+                ext = self.storage.splitext(filename)[1].lower()
                 required_vars = set()
 
                 if ext == ".docx":
