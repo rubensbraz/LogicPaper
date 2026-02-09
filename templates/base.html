@@ -22,14 +22,19 @@
         <script src="https://cdn.jsdelivr.net/npm/sweetalert2@11"></script>
         
         {# Application CSS #}
-        <link rel="stylesheet" href="/css/style.css">
+        <link rel="stylesheet" href="css/style.css">
         {% block extra_css %}{% endblock %}
         
         {# Core JavaScript Dependencies #}
-        <script src="/js/locales.js"></script>
-        <script src="/js/i18n.js"></script>
-        <script src="/js/config.js"></script>
-        <script src="/js/utils.js"></script>
+        <script src="js/locales.js"></script>
+        <script src="js/i18n.js"></script>
+        <script src="js/config.js"></script>
+        <script src="js/utils.js"></script>
+        
+        <script>
+            // Injected by build_static.py or defaults to false
+            window.IS_STATIC = {{ is_static | default('false') | lower }};
+        </script>
         
         {% block extra_head %}{% endblock %}
     </head>

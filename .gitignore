@@ -185,3 +185,6 @@ cython_debug/
 
 # Temp files
 /data/temp
+
+# Static Site Generation
+_site/

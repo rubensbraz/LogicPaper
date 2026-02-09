@@ -39,7 +39,7 @@ tailwind.config = {
  */
 const CONFIG = Object.freeze({
     env: {
-        isGithubPages: window.location.hostname.includes('github.io')
+        isGithubPages: window.IS_STATIC || window.location.hostname.includes('github.io') || window.location.protocol === 'file:'
     },
     endpoints: {
         preview: '/api/preview',
