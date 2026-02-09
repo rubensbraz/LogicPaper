@@ -34,7 +34,7 @@ window.loadHistory = async function () {
         const response = await fetch('/api/history');
         const data = await response.json();
 
-        if (!data.jobs || data.jobs.length === 0) {
+        if (!data.history || data.history.length === 0) {
             tbody.innerHTML = `
                 <tr>
                     <td colspan="5" class="p-8 text-center text-gray-400">
@@ -46,9 +46,9 @@ window.loadHistory = async function () {
         }
 
         // Render rows
-        tbody.innerHTML = data.jobs.map(job => {
-            const date = job.start_time ? new Date(job.start_time).toLocaleString() : 'N/A';
-            const inputFile = escapeHtml(job.input_file || 'N/A');
+        tbody.innerHTML = data.history.map(job => {
+            const date = job.start_time ? new Date(job.start_time).toLocaleString(i18n.currentLang) : i18n.t('history.na');
+            const inputFile = escapeHtml(job.input_file || i18n.t('history.na'));
             const filesGenerated = job.files_generated || 0;
 
             // Status badge
@@ -74,9 +74,9 @@ window.loadHistory = async function () {
                     </a>
                 `;
             } else if (job.status === 'failed') {
-                actionButton = `<span class="text-xs text-gray-600">${escapeHtml(job.error || 'Error')}</span>`;
+                actionButton = `<span class="text-xs text-gray-600">${escapeHtml(job.error || i18n.t('history.error'))}</span>`;
             } else {
-                actionButton = `<span class="text-xs text-gray-600">—</span>`;
+                actionButton = `<span class="text-xs text-gray-600">${i18n.t('history.no_action')}</span>`;
             }
 
             return `
@@ -95,7 +95,7 @@ window.loadHistory = async function () {
         tbody.innerHTML = `
             <tr>
                 <td colspan="5" class="p-8 text-center text-red-400">
-                    Error loading history: ${escapeHtml(error.message)}
+                    ${i18n.t('history.error')}: ${escapeHtml(error.message)}
                 </td>
             </tr>
         `;

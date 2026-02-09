@@ -94,6 +94,9 @@ const TRANSLATIONS = {
             status_completed: "Completed",
             status_failed: "Failed",
             btn_download: "Download",
+            error: "Error",
+            na: "N/A",
+            no_action: "—"
         },
         help: {
             toast: "Code copied to clipboard!",
@@ -416,6 +419,9 @@ const TRANSLATIONS = {
             status_completed: "Concluído",
             status_failed: "Falhou",
             btn_download: "Baixar",
+            error: "Erro",
+            na: "N/D",
+            no_action: "—"
         },
         help: {
             toast: "Código copiado para a área de transferência!",
