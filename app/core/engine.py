@@ -8,6 +8,7 @@ import anyio
 from docx.shared import Cm
 from docxtpl import DocxTemplate, InlineImage
 from jinja2 import BaseLoader, Environment
+from PIL import Image
 from pptx import Presentation
 
 from app.core.config import settings
@@ -305,8 +306,87 @@ class DocumentEngine:
             logger.error(f"Text/MD Render Error: {e}")
             raise e
 
+    def _replace_images_in_slide(self, slide, assets_map: Dict[str, str]) -> None:
+        """Replaces matched shapes with images from assets.
+
+        Matches shape.name (case-insensitive) against assets_map keys.
+
+        Args:
+            slide: The slide object to process.
+            assets_map (Dict[str, str]): Map of filename (lowercase, no ext) to absolute path.
+        """
+        # Shapes to remove after replacement to avoid modifying list while iterating
+        shapes_to_remove = []
+
+        for shape in slide.shapes:
+            # Check if shape name matches an image (ignoring case)
+            shape_name_clean = shape.name.strip().lower()
+
+            if shape_name_clean in assets_map:
+                try:
+                    img_path = assets_map[shape_name_clean]
+
+                    # Get placeholder dimensions & position
+                    ph_left = shape.left
+                    ph_top = shape.top
+                    ph_width = shape.width
+                    ph_height = shape.height
+
+                    # Load Image Bytes via Storage
+                    if not self.storage.exists(img_path):
+                        logger.warning(f"Image asset not found: {img_path}")
+                        continue
+
+                    img_bytes = self.storage.read_binary(img_path)
+
+                    # Calculate Aspect Ratio Preservation
+                    with Image.open(io.BytesIO(img_bytes)) as img:
+                        img_w_px, img_h_px = img.size
+                        img_ratio = img_w_px / img_h_px
+
+                    ph_ratio = ph_width / ph_height
+
+                    if img_ratio > ph_ratio:
+                        # Image is wider relative to placeholder -> Fit to Width
+                        new_width = ph_width
+                        new_height = int(ph_width / img_ratio)
+                    else:
+                        # Image is taller relative to placeholder -> Fit to Height
+                        new_height = ph_height
+                        new_width = int(ph_height * img_ratio)
+
+                    # Center the image
+                    left_offset = (ph_width - new_width) // 2
+                    top_offset = (ph_height - new_height) // 2
+
+                    new_left = ph_left + left_offset
+                    new_top = ph_top + top_offset
+
+                    # Insert Picture
+                    slide.shapes.add_picture(
+                        io.BytesIO(img_bytes), new_left, new_top, new_width, new_height
+                    )
+
+                    # Mark for removal
+                    shapes_to_remove.append(shape)
+
+                except Exception as e:
+                    logger.error(
+                        f"Failed to replace image for shape '{shape.name}': {e}"
+                    )
+
+        # Remove replaced shapes
+        # Fallback safe removal for python-pptx
+        for shape in shapes_to_remove:
+            sp = shape._element
+            sp.getparent().remove(sp)
+
     async def process_pptx(
-        self, template_path: str, output_path: str, context: Dict[str, Any]
+        self,
+        template_path: str,
+        output_path: str,
+        context: Dict[str, Any],
+        assets_path: str = None,
     ) -> bool:
         """Renders a PPTX template using python-pptx.
 
@@ -317,6 +397,7 @@ class DocumentEngine:
             template_path (str): The absolute path to the template file.
             output_path (str): The absolute path where the rendered file will be saved.
             context (Dict[str, Any]): The data context dictionary for rendering.
+            assets_path (str, optional): The path to the assets directory. Defaults to None.
 
         Returns:
             bool: True if rendering was successful, False otherwise.
@@ -330,6 +411,19 @@ class DocumentEngine:
                 # Read template to memory
                 tpl_bytes = self.storage.read_binary(template_path)
                 prs = Presentation(io.BytesIO(tpl_bytes))
+
+                # Build Assets Map (Name -> Path)
+                assets_map = {}
+                if assets_path and self.storage.exists(assets_path):
+                    # Use storage to list files
+                    files = self.storage.list_dir(assets_path)
+                    for f in files:
+                        f_name, f_ext = self.storage.splitext(f)
+                        # Key: lowercase filename without extension
+                        # Value: absolute path
+                        assets_map[f_name.lower()] = self.storage.join_path(
+                            assets_path, f
+                        )
 
                 for slide in prs.slides:
                     for shape in slide.shapes:
@@ -367,6 +461,10 @@ class DocumentEngine:
                                                         1, len(paragraph.runs)
                                                     ):
                                                         paragraph.runs[i].text = ""
+
+                    # Image Replacement (if available)
+                    if assets_map:
+                        self._replace_images_in_slide(slide, assets_map)
 
                 # Save to memory
                 out_stream = io.BytesIO()

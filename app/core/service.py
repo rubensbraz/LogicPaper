@@ -128,7 +128,7 @@ class BatchService:
                         )
                     elif tmpl_ext.lower() == ".pptx":
                         await engine.process_pptx(
-                            tmpl_path, doc_output_path, cleaned_context
+                            tmpl_path, doc_output_path, cleaned_context, dir_assets
                         )
                     elif tmpl_ext.lower() in [".md", ".txt"]:
                         await engine.process_text(

@@ -11,6 +11,12 @@ from app.core.ports import ProcessPort, StoragePort
 class FileSystemAdapter(StoragePort):
     """Adapter for local file system operations."""
 
+    def list_dir(self, dir_path: str) -> List[str]:
+        """Lists all files and directories in a directory (filenames only)."""
+        if not os.path.exists(dir_path):
+            return []
+        return os.listdir(dir_path)
+
     def list_files(self, dir_path: str, extension: Optional[str] = None) -> List[str]:
         """Lists files in a directory, optionally filtered by extension.
 
