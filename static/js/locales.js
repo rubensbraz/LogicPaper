@@ -82,6 +82,7 @@ const TRANSLATIONS = {
         },
         history: {
             title: "Execution History",
+            static_mode: "Static Demo Mode",
             btn_refresh: "Refresh",
             col_date: "Date",
             col_input: "Input File",
@@ -407,6 +408,7 @@ const TRANSLATIONS = {
         },
         history: {
             title: "Histórico de Execuções",
+            static_mode: "Modo de Demonstração Estático",
             btn_refresh: "Atualizar",
             col_date: "Data",
             col_input: "Arquivo de Entrada",

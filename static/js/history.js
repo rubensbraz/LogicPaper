@@ -30,6 +30,21 @@ window.loadHistory = async function () {
         </tr>
     `;
 
+    // Check for Static Mode (GitHub Pages)
+    if (typeof CONFIG !== 'undefined' && CONFIG.env && CONFIG.env.isGithubPages) {
+        tbody.innerHTML = `
+            <tr>
+                <td colspan="5" class="p-8 text-center text-gray-400">
+                    <div class="flex flex-col items-center gap-2">
+                        <span class="text-xl">⚠️</span>
+                        <span>${i18n.t('history.static_mode')}</span>
+                    </div>
+                </td>
+            </tr>
+        `;
+        return;
+    }
+
     try {
         const response = await fetch('/api/history');
         const data = await response.json();
