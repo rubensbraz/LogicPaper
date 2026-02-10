@@ -133,6 +133,9 @@ async def load_dataframe(
                         raise ValueError(
                             "JSON list must contain objects (key-value pairs)."
                         )
+                    # Use standard DataFrame constructor to preserve nested objects (dicts)
+                    # json_normalize would flatten 'user': {'active': True} into 'user.active'
+                    return pd.DataFrame(data)
                 else:
                     raise ValueError("JSON must be an Object or a List of Objects.")
 

@@ -6,7 +6,7 @@ services:
       context: .
       dockerfile: Dockerfile
       target: production
-    image: logicpaper:v1.3.0
+    image: logicpaper:v1.4.0
     container_name: logicpaper_core
     restart: unless-stopped
 

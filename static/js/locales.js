@@ -18,7 +18,7 @@ const TRANSLATIONS = {
         navbar: {
             title_main: "Logic",
             title_sub: "Paper",
-            subtitle: "Batch Processing Engine v1.3.0",
+            subtitle: "Batch Processing Engine v1.4.0",
             link_dashboard: "Dashboard",
             link_history: "History",
             link_help: "How to Use",
@@ -352,7 +352,7 @@ const TRANSLATIONS = {
         navbar: {
             title_main: "Logic",
             title_sub: "Paper",
-            subtitle: "Processamento em Lote v1.3.0",
+            subtitle: "Processamento em Lote v1.4.0",
             link_dashboard: "Dashboard",
             link_history: "Histórico",
             link_help: "Como Usar",

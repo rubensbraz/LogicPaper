@@ -1,0 +1,17 @@
+[
+    {
+        "template_name": "admin_user_verify",
+        "show_welcome": true,
+        "show_secret": false,
+        "user_level": "admin",
+        "score": 85,
+        "system_active": true,
+        "show_premium": true,
+        "show_enterprise": false,
+        "user": {
+            "active": true,
+            "role": "user",
+            "banned": false
+        }
+    }
+]

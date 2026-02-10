@@ -1,0 +1,25 @@
+{
+    "report": "sales",
+    "sales_data": [
+        {
+            "product": "Monitor",
+            "quantity": 2,
+            "price": 850.00
+        },
+        {
+            "product": "Keyboard",
+            "quantity": 5,
+            "price": 320.50
+        },
+        {
+            "product": "Mouse",
+            "quantity": 10,
+            "price": 145.90
+        },
+        {
+            "product": "Headset",
+            "quantity": 3,
+            "price": 550.00
+        }
+    ]
+}

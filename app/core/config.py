@@ -26,7 +26,7 @@ class Settings(BaseSettings):
 
     # --- App Info ---
     PROJECT_NAME: str = "LogicPaper"
-    VERSION: str = "1.3.0"
+    VERSION: str = "1.4.0"
     DEBUG: bool = False
     API_PREFIX: str = "/api/v1"
     LOG_LEVEL: str = "INFO"
