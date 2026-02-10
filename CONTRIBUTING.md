@@ -22,6 +22,13 @@ Before diving in, feel free to check our current strategic goals. If any of thes
 - **Advanced API Management:** Develop scoped API keys with expiration dates, usage quotas, and permission levels for external integrations.
 - **Metrics & Statistics:** Store and display template usage statistics, processing times, and success rates per user or API key.
 
+### 📝 Other Useful Features
+
+- **CSV Support:** Add support for CSV files as input data.
+- **Dry Run PDF Preview:**
+  - **Today:** The "Test (1st Row)" button generates a ZIP for download.
+  - **Feature:** Show the PDF or an image of the first slide directly on the browser screen. Much faster visual feedback!
+
 ---
 
 ## 🏗️ Architectural Philosophy
