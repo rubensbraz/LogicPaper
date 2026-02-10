@@ -311,6 +311,9 @@ class DocumentEngine:
                             )
                             continue
 
+                        # Read the New Image Data
+                        new_img_bytes = self.storage.read_binary(img_path)
+
                         # Replace the Image Blob
                         # 1. Get Relationship ID from the blip element
                         # path: shape -> inline -> graphic -> graphicData -> pic -> blipFill -> blip -> embed
@@ -324,16 +327,40 @@ class DocumentEngine:
                         if r_id in tpl.part.related_parts:
                             related_part = tpl.part.related_parts[r_id]
 
-                            # 3. Read the New Image Data
-                            new_img_bytes = self.storage.read_binary(img_path)
+                            # 3. Calculate Aspect Ratio Preservation
+                            # Get original dimensions (EMU)
+                            # shape.width and shape.height are in EMUs (English Metric Units)
+                            # 1 inch = 914400 EMUs
+                            # 1 cm = 360000 EMUs
+                            ph_width = shape.width
+                            ph_height = shape.height
 
-                            # 4. Overwrite the Blob directly
+                            with Image.open(io.BytesIO(new_img_bytes)) as img:
+                                img_w_px, img_h_px = img.size
+                                img_ratio = img_w_px / img_h_px
+
+                            ph_ratio = ph_width / ph_height
+
+                            if img_ratio > ph_ratio:
+                                # Image is wider relative to placeholder -> Fit to Width
+                                new_width = ph_width
+                                new_height = int(ph_width / img_ratio)
+                            else:
+                                # Image is taller relative to placeholder -> Fit to Height
+                                new_height = ph_height
+                                new_width = int(ph_height * img_ratio)
+
+                            # 4. Update Shape Dimensions
+                            shape.width = new_width
+                            shape.height = new_height
+
+                            # 5. Overwrite the Blob directly
                             # This updates the underlying image data. Note that if multiple shapes
                             # share the same rId, ALL of them will be updated
                             related_part._blob = new_img_bytes
 
                             logger.info(
-                                f"Replaced DOCX image shape '{match_name}' with asset '{self.storage.basename(img_path)}'."
+                                f"Replaced DOCX image shape '{match_name}' with asset '{self.storage.basename(img_path)}' (Resized to {new_width}x{new_height} EMU)."
                             )
 
                 except AttributeError:
