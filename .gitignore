@@ -185,6 +185,7 @@ cython_debug/
 
 # Temp files
 /data/temp
+tasks.md
 
 # Static Site Generation
 _site/

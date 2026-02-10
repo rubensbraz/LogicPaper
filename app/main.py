@@ -3,6 +3,7 @@ import os
 from datetime import datetime
 
 from fastapi import FastAPI, Request
+from fastapi.responses import HTMLResponse, JSONResponse
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.staticfiles import StaticFiles
 from fastapi.templating import Jinja2Templates
@@ -96,7 +97,29 @@ app.include_router(
 # --- System Status (Health Checks) ---
 
 
-@app.get("/health", tags=["System"])
+@app.get(
+    "/health",
+    tags=["System"],
+    summary="System Health Check",
+    description="Returns the operational status of the service and its dependencies (Redis).",
+    responses={
+        200: {
+            "description": "Service is healthy.",
+            "content": {
+                "application/json": {
+                    "example": {
+                        "status": "healthy",
+                        "timestamp": "2026-01-01T12:00:00",
+                        "version": "1.3.0",
+                        "engine": "LogicPaper v1.3.0",
+                        "redis": "connected",
+                    }
+                }
+            },
+        },
+        503: {"description": "Service is unhealthy (e.g. Redis disconnected)."},
+    },
+)
 async def health_check():
     """Standard Health Check.
 
@@ -106,22 +129,36 @@ async def health_check():
     try:
         redis_client.ping()
         redis_status = "connected"
+        http_status = 200
+        service_status = "healthy"
     except Exception:
         redis_status = "error"
+        http_status = 503
+        service_status = "unhealthy"
 
-    return {
-        "status": "healthy",
-        "timestamp": datetime.now().isoformat(),
-        "version": settings.VERSION,
-        "engine": f"{settings.PROJECT_NAME} v{settings.VERSION}",
-        "redis": redis_status,
-    }
+    return JSONResponse(
+        status_code=http_status,
+        content={
+            "status": service_status,
+            "timestamp": datetime.now().isoformat(),
+            "version": settings.VERSION,
+            "engine": f"{settings.PROJECT_NAME} v{settings.VERSION}",
+            "redis": redis_status,
+        },
+    )
 
 
 # --- Static Pages ---
 
 
-@app.get("/", tags=["Static Pages"])
+@app.get(
+    "/",
+    tags=["Static Pages"],
+    summary="Dashboard Home",
+    description="Serves the main HTML dashboard interface for document generation, uploads, and monitoring.",
+    response_class=HTMLResponse,
+    responses={200: {"description": "HTML Dashboard loaded successfully."}},
+)
 async def read_root(request: Request):
     """Serves the main application page.
 
@@ -134,7 +171,14 @@ async def read_root(request: Request):
     return templates.TemplateResponse("index.html", {"request": request})
 
 
-@app.get("/help", tags=["Static Pages"])
+@app.get(
+    "/help",
+    tags=["Static Pages"],
+    summary="Documentation Page",
+    description="Serves the user guide, syntax reference, and help documentation.",
+    response_class=HTMLResponse,
+    responses={200: {"description": "HTML Documentation loaded successfully."}},
+)
 async def read_help(request: Request):
     """Serves the documentation page.
 
@@ -147,7 +191,14 @@ async def read_help(request: Request):
     return templates.TemplateResponse("help.html", {"request": request})
 
 
-@app.get("/history", tags=["Static Pages"])
+@app.get(
+    "/history",
+    tags=["Static Pages"],
+    summary="Job History Page",
+    description="Serves the history view of recent processing jobs and their outcomes.",
+    response_class=HTMLResponse,
+    responses={200: {"description": "HTML History page loaded successfully."}},
+)
 async def read_history(request: Request):
     """Serves the execution history page.
 

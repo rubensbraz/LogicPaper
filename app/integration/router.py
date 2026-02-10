@@ -1,3 +1,4 @@
+import base64
 import os
 import uuid
 from datetime import datetime
@@ -22,8 +23,22 @@ router = APIRouter()
 @router.post(
     "/generate",
     response_model=JobStatusResponse,
-    summary="Trigger Document Generation",
-    description="Accepts JSON data and a template path to start an async generation job.",
+    summary="Start Document Generation Job",
+    description="""
+    Initiates an asynchronous document generation process.
+    
+    **Features:**
+    - Supports **DOCX**, **PPTX**, **PDF**, **MD**, and **TXT** output formats.
+    - Accepts a **list of data rows** (JSON) to generate multiple documents in batch.
+    - Allows **dynamic image replacement** via a Base64-encoded ZIP file containing assets.
+    - Returns a `job_id` immediately, allowing the client to poll for status.
+    """,
+    responses={
+        200: {"description": "Job successfully queued."},
+        403: {"description": "Access denied (e.g., Invalid template path traversal)."},
+        404: {"description": "Template file not found."},
+        500: {"description": "Internal server error during job initialization."},
+    },
 )
 async def trigger_generation(
     request: GenerationRequest,
@@ -36,7 +51,8 @@ async def trigger_generation(
     """Trigger a document generation job via API.
 
     Validates inputs, sets up a temporary session workspace, and dispatches
-    a background task to process the generation.
+    a background task to process the generation. Supports dynamic asset replacement
+    via Base64 ZIP upload.
 
     Args:
         request (GenerationRequest): The request payload containing data and options.
@@ -93,6 +109,20 @@ async def trigger_generation(
         dest_template_path = storage.join_path(dir_inputs, template_filename)
         storage.copy(target_path, dest_template_path)
 
+        # Handle Assets (Base64 ZIP)
+        if request.assets_base64:
+            try:
+                zip_path = storage.join_path(dir_inputs, "assets.zip")
+                decoded_assets = base64.b64decode(request.assets_base64)
+                storage.write_binary(zip_path, decoded_assets)
+                storage.extract_zip(zip_path, dir_assets)
+                logger.info(f"Assets extracted for Job {job_id}")
+            except Exception as e:
+                logger.error(f"Failed to process assets_base64 for Job {job_id}: {e}")
+                # We log but do not fail the job immediately, though assets might be missing
+                # Alternatively, we could raise an 400 error here
+                pass
+
         df = pd.json_normalize(request.data)
 
         initial_state = {
@@ -130,7 +160,14 @@ async def trigger_generation(
 
 
 @router.get(
-    "/status/{job_id}", response_model=JobStatusResponse, summary="Check Job Status"
+    "/status/{job_id}",
+    response_model=JobStatusResponse,
+    summary="Get Job Status",
+    description="Polls the status of a specific background job. Returns the current state (processing, completed, failed) and a download URL if finished.",
+    responses={
+        200: {"description": "Status retrieved successfully."},
+        404: {"description": "Job ID not found (expired or invalid)."},
+    },
 )
 async def check_job_status(
     job_id: str,
@@ -169,7 +206,16 @@ async def check_job_status(
     }
 
 
-@router.get("/download/{job_id}", summary="Download Result ZIP")
+@router.get(
+    "/download/{job_id}",
+    summary="Download Job Result",
+    description="Downloads the final ZIP file containing all generated documents. The file is available only after the job status is 'completed'.",
+    responses={
+        200: {"description": "ZIP file stream.", "content": {"application/zip": {}}},
+        400: {"description": "Job is still processing or failed."},
+        404: {"description": "File expired or not found."},
+    },
+)
 async def download_integration_result(
     job_id: str,
     api_key: str = Security(get_api_key),

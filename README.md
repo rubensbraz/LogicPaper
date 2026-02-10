@@ -192,6 +192,7 @@ LogicPaper provides a dedicated integration layer for external systems.
 * **Documentation:** `http://localhost:8000/docs` (Interactive Swagger UI)
 * **Authentication:** `X-API-Key` header.
 * **Workflow:** Submit a JSON payload with data and template path; receive a `job_id` to poll for status and download the result.
+* **Asset Support:** Optional `assets_base64` field to provide a ZIP of images for dynamic replacement.
 
 ---
 

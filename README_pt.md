@@ -192,6 +192,7 @@ O LogicPaper fornece uma camada de integração dedicada para sistemas externos.
 * **Documentação:** `http://localhost:8000/docs` (Interface Interativa Swagger)
 * **Autenticação:** Header `X-API-Key`.
 * **Fluxo:** Envie o payload JSON com os dados e o caminho do template; receba um `job_id` para consultar o status e baixar o resultado final.
+* **Suporte a Assets:** Campo opcional `assets_base64` para fornecer um ZIP de imagens para substituição dinâmica.
 
 ---
 

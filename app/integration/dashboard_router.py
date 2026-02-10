@@ -31,13 +31,39 @@ logger = logging.getLogger(__name__)
 router = APIRouter()
 
 
-@router.get("/stream-logs/{session_id}")
+@router.get(
+    "/stream-logs/{session_id}",
+    summary="Stream Real-time Logs",
+    description="Establishes a Server-Sent Events (SSE) connection to stream log messages for a specific session ID.",
+    responses={
+        200: {"description": "SSE stream established."},
+    },
+)
 async def stream_logs(session_id: str):
     """Streams real-time logs for a specific session."""
     return StreamingResponse(log_generator(session_id), media_type="text/event-stream")
 
 
-@router.post("/api/preview")
+@router.post(
+    "/api/preview",
+    summary="Preview Data File",
+    description="Parses an uploaded Excel or JSON file and returns the headers and the first 5 rows for UI verification.",
+    responses={
+        200: {
+            "description": "Preview data returned successfully.",
+            "content": {
+                "application/json": {
+                    "example": {
+                        "status": "success",
+                        "headers": ["name", "date"],
+                        "preview": [{"name": "Alice", "date": "2024-01-01"}],
+                    }
+                }
+            },
+        },
+        500: {"description": "Failed to parse the file."},
+    },
+)
 async def preview_data(
     file_excel: UploadFile = File(None), file_json: UploadFile = File(None)
 ):
@@ -62,7 +88,14 @@ async def preview_data(
         return JSONResponse({"status": "error", "message": str(e)}, status_code=500)
 
 
-@router.post("/api/validate")
+@router.post(
+    "/api/validate",
+    summary="Validate Templates & Assets",
+    description="""
+    Checks compatibility between the data file headers and the template tags. 
+    If an assets ZIP is provided, it also validates that required image placeholders exist in the assets.
+    """,
+)
 async def validate_compatibility(
     file_excel: UploadFile = File(None),
     file_json: UploadFile = File(None),
@@ -130,7 +163,15 @@ async def validate_compatibility(
             storage.delete(session_path)
 
 
-@router.post("/api/sample")
+@router.post(
+    "/api/sample",
+    summary="Generate Sample Document",
+    description="""
+    runs a 'Dry Run' generation using ONLY the first row of data.
+    Useful for verifying the final output layout before processing a large batch.
+    Returns a ZIP file containing the sample document(s) and a validation report.
+    """,
+)
 async def generate_sample(
     session_id: str = Form(...),
     filename_col: str = Form(...),
@@ -243,7 +284,20 @@ async def generate_sample(
         return JSONResponse({"status": "error", "message": str(e)}, status_code=500)
 
 
-@router.post("/api/process")
+@router.post(
+    "/api/process",
+    summary="Start Batch Processing",
+    description="""
+    Queues a full batch processing job.
+    Accepts Data (Excel/JSON), Templates, and Assets (ZIP).
+    A background worker will process all rows and update the session status via Redis/SSE.
+    """,
+    status_code=202,
+    responses={
+        202: {"description": "Job successfully queued."},
+        500: {"description": "Failed to initiate background job."},
+    },
+)
 async def process_batch(
     background_tasks: BackgroundTasks,
     session_id: str = Form(...),
@@ -352,7 +406,15 @@ async def process_batch(
         return JSONResponse({"status": "error", "message": str(e)}, status_code=500)
 
 
-@router.get("/api/download/{session_id}")
+@router.get(
+    "/api/download/{session_id}",
+    summary="Download Batch Result",
+    description="Downloads the final ZIP file containing all generated documents for a session.",
+    responses={
+        200: {"description": "ZIP file stream."},
+        404: {"description": "File not found (expired or not ready)."},
+    },
+)
 async def download_result(
     session_id: str,
     storage: StoragePort = Depends(get_storage_port),
@@ -382,7 +444,11 @@ async def download_result(
         )
 
 
-@router.get("/api/history")
+@router.get(
+    "/api/history",
+    summary="Get Job History",
+    description="Retrieves the list of the 10 most recent jobs from the Redis store.",
+)
 async def get_job_history(
     job_repository: RedisJobRepository = Depends(get_job_repository),
 ):
