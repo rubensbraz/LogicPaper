@@ -1,55 +1,50 @@
 <!DOCTYPE html>
-
 <html lang="en">
     <head>
         <meta charset="UTF-8">
         <meta name="viewport" content="width=device-width, initial-scale=1.0">
-        
         {# Page-specific title #}
-        <title>{% block title %}LogicPaper | Document Generation Engine{% endblock %}</title>
-        
+        <title>
+            {% block title %}LogicPaper | Document Generation Engine{% endblock %}
+        </title>
         {# SEO Meta Tags #}
-        <meta name="description" content="{% block meta_description %}LogicPaper: A powerful batch processing engine for generating DOCX, PPTX, and PDF documents from Excel/JSON data with advanced logic integration.{% endblock %}" {% block meta_description_attr %}data-i18n-attr="content:meta.description"{% endblock %}>
-        <meta name="keywords" content="{% block meta_keywords %}batch processing, document generation, excel to pdf, excel to word, json to docx, automation, logicpaper{% endblock %}" {% block meta_keywords_attr %}data-i18n-attr="content:meta.keywords"{% endblock %}>
+        <meta name="description"
+              content="{% block meta_description %}LogicPaper: A powerful batch processing engine for generating DOCX, PPTX, and PDF documents from Excel/JSON data with advanced logic integration.{% endblock %}"
+              {% block meta_description_attr %}data-i18n-attr="content:meta.description"{% endblock %}>
+        <meta name="keywords"
+              content="{% block meta_keywords %}batch processing, document generation, excel to pdf, excel to word, json to docx, automation, logicpaper{% endblock %}"
+              {% block meta_keywords_attr %}data-i18n-attr="content:meta.keywords"{% endblock %}>
         <meta name="author" content="Rubens Braz">
-        
         {# Favicon #}
-        <link rel="icon" href="data:image/svg+xml,<svg xmlns=%22http://www.w3.org/2000/svg%22 viewBox=%220 0 100 100%22><text y=%22.9em%22 font-size=%2290%22>📘</text></svg>">
-        
-        {# Core CSS Dependencies #}
-        <script src="https://cdn.tailwindcss.com"></script>
-        <link href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;700&family=Inter:wght@300;400;600;800&display=swap" rel="stylesheet">
-        <script src="https://cdn.jsdelivr.net/npm/sweetalert2@11"></script>
-        
-        {# Application CSS #}
-        <link rel="stylesheet" href="css/style.css">
-        {% block extra_css %}{% endblock %}
-        
-        {# Core JavaScript Dependencies #}
-        <script src="js/locales.js"></script>
-        <script src="js/i18n.js"></script>
-        <script src="js/config.js"></script>
-        <script src="js/utils.js"></script>
-        
-        <script>
+        <link rel="icon"
+              href="data:image/svg+xml,<svg xmlns=%22http://www.w3.org/2000/svg%22 viewBox=%220 0 100 100%22><text y=%22.9em%22 font-size=%2290%22>📘</text></svg>">
+            {# Core CSS Dependencies #}
+            <script src="https://cdn.tailwindcss.com"></script>
+            <link href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;700&family=Inter:wght@300;400;600;800&display=swap"
+                  rel="stylesheet">
+            <script src="https://cdn.jsdelivr.net/npm/sweetalert2@11"></script>
+            {# Application CSS #}
+            <link rel="stylesheet" href="css/style.css">
+            {% block extra_css %}{% endblock %}
+            {# Core JavaScript Dependencies #}
+            <script src="js/locales.js"></script>
+            <script src="js/i18n.js"></script>
+            <script src="js/config.js"></script>
+            <script src="js/utils.js"></script>
+            <script>
             // Injected by build_static.py or defaults to false
             window.IS_STATIC = {{ is_static | default('false') | lower }};
-        </script>
-        
-        {% block extra_head %}{% endblock %}
-    </head>
-
-    <body class="min-h-screen p-4 md:p-8 flex flex-col items-center">
-        {# Navigation Component #}
-        {% include 'components/navbar.html' %}
-        
-        {# Main Content Area #}
-        {% block content %}{% endblock %}
-        
-        {# Footer Component #}
-        {% include 'components/footer.html' %}
-        
-        {# Page-specific JavaScript #}
-        {% block extra_scripts %}{% endblock %}
-    </body>
-</html>
+            </script>
+            {% block extra_head %}{% endblock %}
+        </head>
+        <body class="min-h-screen p-4 md:p-8 flex flex-col items-center">
+            {# Navigation Component #}
+            {% include 'components/navbar.html' %}
+            {# Main Content Area #}
+            {% block content %}{% endblock %}
+            {# Footer Component #}
+            {% include 'components/footer.html' %}
+            {# Page-specific JavaScript #}
+            {% block extra_scripts %}{% endblock %}
+        </body>
+    </html>

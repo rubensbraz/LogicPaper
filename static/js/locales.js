@@ -117,7 +117,10 @@ const TRANSLATIONS = {
                 str_logic: "Logic & Defaults",
                 str_bool: "Booleans",
                 str_mask: "Privacy & Masking",
-                str_image: "Dynamic Images"
+                str_image: "Dynamic Images",
+                advanced: "Advanced (Word)",
+                adv_logic: "Conditional Logic",
+                adv_tables: "Dynamic Tables"
             },
             sections: {
                 behavior: {
@@ -262,7 +265,51 @@ const TRANSLATIONS = {
                     ppt_text: "Fully supported in Word (.docx). <br> <span class='text-yellow-500 text-xs'>Note: PowerPoint support is limited to text-replacement only in this version.</span>",
                     desc_resize: "Resizes image to 5cm Width x 3cm Height.",
                     desc_width: "Fixes Width to 5cm, calculates Height.",
-                    desc_height: "Fixes Height to 4cm, calculates Width."
+                    desc_height: "Fixes Height to 4cm, calculates Width.",
+                    method1_title: "Method 1: Template Filter (Word Only)",
+                    method1_desc: "Use this method to insert images directly into a paragraph using Jinja2 syntax. The image file must be present in the uploaded <code>assets.zip</code>.",
+                    method2_title: "Method 2: Shape Replacement (Word & PowerPoint)",
+                    method2_desc: "This is the <strong>best method for design precision</strong>. Create a placeholder shape (Rectangle, Circle, or generic Picture) in your document.",
+                    method2_step1: "Insert a Shape or Picture in Word/PowerPoint.",
+                    method2_step2: "Right-click and select <strong>View Alt Text</strong> (or use Selection Pane to rename it).",
+                    method2_step3: "Enter the <strong>exact filename</strong> of your image asset (e.g., <code>photo.jpg</code> or <code>logo.png</code>).",
+                    method2_step4: "LogicPaper will replace the shape with the image, matching its size and position.",
+                    method2_tip: "<strong>Tip:</strong> This works perfectly for profile circular photos, slide backgrounds, or precise grid layouts."
+                },
+                logic_adv: {
+                    title: "Conditional Logic (Word Only)",
+                    desc: "Control visibility of text, paragraphs, and tables.",
+                    note: "Use these tags to show or hide content based on your data.",
+                    col_op: "Operation",
+                    col_syntax: "Full Template Syntax (Click to Copy)",
+                    col_input: "Input Data",
+                    col_output: "Output Result",
+                    col_details: "Technical Details",
+                    op_p: "Paragraph",
+                    op_inline: "Inline",
+                    op_tr: "Table Row",
+                    desc_p: "Removes entire paragraph including line breaks.",
+                    desc_inline: "Hides specific words within a sentence.",
+                    desc_tr: "Removes the entire table row. Tag must be in first cell.",
+                    lbl_removed: "(Removed)",
+                    lbl_visible: "Active",
+                    lbl_hidden: "Hidden"
+                },
+                tables: {
+                    title: "Dynamic Tables (Word Only)",
+                    desc: "Generate rows automatically from Excel lists.",
+                    note: "Use this to turn a list of items (e.g., Invoice Items, product lists) into a Word table.",
+                    setup_title: "How to setup in Word:",
+                    setup_step1: "Create a table with <strong>1 Header Row</strong>, <strong>1 Start Row</strong>, <strong>1 Data Row</strong>, and <strong>1 End Row</strong>.",
+                    setup_step2: "Start Row: Contains <code>{%tr for item in sales_data %}</code>.",
+                    setup_step3: "Data Row: Contains variables like <code>{{ item.product }}</code>.",
+                    setup_step4: "End Row: Contains <code>{%tr endfor %}</code>.",
+                    setup_step5: "LogicPaper will repeat the Data Row for every item in text.",
+                    lbl_input: "Input Data (JSON)",
+                    lbl_output: "Output Result (Word Table)",
+                    col_product: "Product",
+                    col_qty: "Quantity",
+                    col_price: "Price"
                 }
             }
         },
@@ -451,7 +498,10 @@ const TRANSLATIONS = {
                 str_logic: "Lógica e Padrões",
                 str_bool: "Booleanos",
                 str_mask: "Privacidade e Máscaras",
-                str_image: "Imagens Dinâmicas"
+                str_image: "Imagens Dinâmicas",
+                advanced: "Avançado (Word)",
+                adv_logic: "Lógica Condicional",
+                adv_tables: "Tabelas Dinâmicas"
             },
             sections: {
                 behavior: {
@@ -596,7 +646,51 @@ const TRANSLATIONS = {
                     ppt_text: "Totalmente suportado no Word (.docx). <br> <span class='text-yellow-500 text-xs'>Nota: O suporte ao PowerPoint é limitado apenas à substituição de texto nesta versão.</span>",
                     desc_resize: "Redimensiona para 5cm Largura x 3cm Altura.",
                     desc_width: "Fixa Largura em 5cm, calcula Altura.",
-                    desc_height: "Fixa Altura em 4cm, calcula Largura."
+                    desc_height: "Fixa Altura em 4cm, calcula Largura.",
+                    method1_title: "Método 1: Filtro de Modelo (Apenas Word)",
+                    method1_desc: "Use este método para inserir imagens diretamente em um parágrafo usando a sintaxe Jinja2. O arquivo de imagem deve estar presente no <code>assets.zip</code> enviado.",
+                    method2_title: "Método 2: Substituição de Forma (Word e PowerPoint)",
+                    method2_desc: "Este é o <strong>melhor método para precisão de design</strong>. Crie uma forma de espaço reservado (Retângulo, Círculo ou Imagem genérica) em seu documento.",
+                    method2_step1: "Insira uma Forma ou Imagem no Word/PowerPoint.",
+                    method2_step2: "Clique com o botão direito e selecione <strong>Exibir Texto Alt</strong> (ou use o Painel de Seleção para renomeá-lo).",
+                    method2_step3: "Digite o <strong>nome exato do arquivo</strong> do seu recurso de imagem (ex: <code>foto.jpg</code> ou <code>logo.png</code>).",
+                    method2_step4: "O LogicPaper substituirá a forma pela imagem, mantendo seu tamanho e posição.",
+                    method2_tip: "<strong>Dica:</strong> Isso funciona perfeitamente para fotos de perfil circulares, fundos de slides ou layouts de grade precisos."
+                },
+                logic_adv: {
+                    title: "Lógica Condicional (Apenas Word)",
+                    desc: "Controle a visibilidade de texto, parágrafos e tabelas.",
+                    note: "Use estas tags para mostrar ou ocultar conteúdo com base em seus dados.",
+                    col_op: "Operação",
+                    col_syntax: "Sintaxe Completa (Clique para Copiar)",
+                    col_input: "Dados de Entrada",
+                    col_output: "Resultado de Saída",
+                    col_details: "Detalhes Técnicos",
+                    op_p: "Parágrafo",
+                    op_inline: "Em Linha (Inline)",
+                    op_tr: "Linha da Tabela",
+                    desc_p: "Remove o parágrafo inteiro incluindo quebras de linha.",
+                    desc_inline: "Oculta palavras específicas dentro de uma frase.",
+                    desc_tr: "Remove a linha inteira da tabela. A tag deve estar na primeira célula.",
+                    lbl_removed: "(Removido)",
+                    lbl_visible: "Active",
+                    lbl_hidden: "Oculto"
+                },
+                tables: {
+                    title: "Tabelas Dinâmicas (Apenas Word)",
+                    desc: "Gere linhas automaticamente a partir de listas do Excel.",
+                    note: "Use isso para transformar uma lista de itens (ex: Itens da Fatura, listas de produtos) em uma tabela do Word.",
+                    setup_title: "Como configurar no Word:",
+                    setup_step1: "Crie uma tabela com <strong>1 Linha de Cabeçalho</strong>, <strong>1 Linha de Início</strong>, <strong>1 Linha de Dados</strong> e <strong>1 Linha de Fim</strong>.",
+                    setup_step2: "Linha de Início: Contém <code>{%tr for item in sales_data %}</code>.",
+                    setup_step3: "Linha de Dados: Contém variáveis como <code>{{ item.product }}</code>.",
+                    setup_step4: "Linha de Fim: Contém <code>{%tr endfor %}</code>.",
+                    setup_step5: "O LogicPaper repetirá a Linha de Dados para cada item.",
+                    lbl_input: "Dados de Entrada (JSON)",
+                    lbl_output: "Resultado Final (Tabela Word)",
+                    col_product: "Produto",
+                    col_qty: "Quantidade",
+                    col_price: "Preço"
                 }
             }
         },
