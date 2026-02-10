@@ -2,7 +2,7 @@ import io
 import logging
 import re
 import zipfile
-from typing import Any, Dict, List
+from typing import Any, Dict, List, Optional
 
 import anyio
 from docx.shared import Cm
@@ -39,23 +39,56 @@ class DocumentEngine:
         self.process = process
         self.formatter = DataFormatter()
 
+    def _build_assets_map(self, assets_path: str) -> Dict[str, str]:
+        """Builds a map of asset names to absolute paths.
+
+        Maps both:
+        1. Filename with extension (lowercase) -> Full Path
+        2. Filename without extension (lowercase) -> Full Path
+
+        Args:
+            assets_path (str): Path to the assets directory.
+
+        Returns:
+            Dict[str, str]: Map of asset identifiers to file paths.
+        """
+        assets_map = {}
+        if not assets_path or not self.storage.exists(assets_path):
+            return assets_map
+
+        files = self.storage.list_dir(assets_path)
+        for f in files:
+            full_path = self.storage.join_path(assets_path, f)
+
+            # Map full filename (lowercase)
+            assets_map[f.lower()] = full_path
+
+            # Map stem (lowercase)
+            f_name, _ = self.storage.splitext(f)
+            # If multiple files have same stem, last one wins (ambiguity accepted)
+            assets_map[f_name.lower()] = full_path
+
+        return assets_map
+
     def _get_image_object(
         self,
         tpl: DocxTemplate,
         value: Any,
         args: List[str],
-        assets_path: str,
+        assets_map: Dict[str, str],
+        assets_path: Optional[str] = None,
     ) -> Any:
         """Generates an InlineImage object for insertion into a DOCX template.
 
         Parses arguments to determine dimensions and locates the image file within
-        the assets directory.
+        the assets directory using the provided map.
 
         Args:
             tpl (DocxTemplate): The active DocxTemplate instance.
             value (Any): The filename or value indicating the image.
             args (List[str]): Additional arguments (e.g., width_cm, height_cm).
-            assets_path (str): The absolute path to the assets directory.
+            assets_map (Dict[str, str]): Map of available assets.
+            assets_path (Optional[str]): Optional path for logging/fallback. Defaults to None.
 
         Returns:
             Any: An InlineImage object if successful, or an error string if failed.
@@ -67,18 +100,22 @@ class DocumentEngine:
         if not filename or filename == "None":
             return ""
 
+        # Resolve File Path using Map
+        filename_lower = filename.lower()
+        img_path = assets_map.get(filename_lower)
+
+        if not img_path:
+            if assets_path:
+                logger.warning(f"Image not found in assets: {filename}")
+            return "[IMAGE NOT FOUND]"
+
         try:
-            img_path = self.storage.join_path(assets_path, filename)
-
-            if not self.storage.is_safe_path(assets_path, img_path):
-                logger.warning(
-                    f"Security: Attempted path traversal for image: {filename}"
-                )
+            # Safety check: Verification is only possible if assets_path is provided.
+            # Note: assets_map is built from list_dir(assets_path), so entries strictly
+            # from that directory are generally safe
+            if assets_path and not self.storage.is_safe_path(assets_path, img_path):
+                logger.warning(f"Security: Path traversal detected for {filename}")
                 return "[Invalid Image Path]"
-
-            if not self.storage.exists(img_path):
-                logger.warning(f"Image not found: {img_path}")
-                return "[IMAGE NOT FOUND]"
 
             # Read image to memory to fully decouple from file path requirements of some libraries
             # InlineImage supports file path or file-like object
@@ -199,7 +236,7 @@ class DocumentEngine:
         template_path: str,
         output_path: str,
         context: Dict[str, Any],
-        assets_path: str = None,
+        assets_path: Optional[str] = None,
     ) -> bool:
         """Renders a DOCX template using Jinja2 context and Custom Filters.
 
@@ -209,7 +246,7 @@ class DocumentEngine:
             template_path (str): The absolute path to the template file.
             output_path (str): The absolute path where the rendered file will be saved.
             context (Dict[str, Any]): The data context dictionary for rendering.
-            assets_path (str, optional): The path to the assets directory. Defaults to None.
+            assets_path (Optional[str]): The path to the assets directory. Defaults to None.
 
         Returns:
             bool: True if rendering was successful, False otherwise.
@@ -229,27 +266,24 @@ class DocumentEngine:
                 filters = self.formatter.get_jinja_filters()
                 jinja_env.filters.update(filters)
 
+                # Build Assets Map
+                assets_map = {}
+                if assets_path:
+                    assets_map = self._build_assets_map(assets_path)
+
                 def format_image_wrapper(val, *args):
-                    if not assets_path:
-                        return "[NO ASSETS PATH]"
-                    return self._get_image_object(tpl, val, list(args), assets_path)
+                    if not assets_map:
+                        return "[NO ASSETS FOUND]"
+                    return self._get_image_object(
+                        tpl, val, list(args), assets_map, assets_path
+                    )
 
                 jinja_env.filters["format_image"] = format_image_wrapper
 
                 tpl.render(context, jinja_env=jinja_env)
 
-                if assets_path and self.storage.exists(assets_path):
-                    # Build Assets Map (Name -> Path) for Shape Replacement
-                    assets_map = {}
-                    files = self.storage.list_dir(assets_path)
-                    for f in files:
-                        f_name, _ = self.storage.splitext(f)
-                        assets_map[f_name.lower()] = self.storage.join_path(
-                            assets_path, f
-                        )
-
-                    if assets_map:
-                        self._replace_images_in_docx_shapes(tpl, assets_map)
+                if assets_map:
+                    self._replace_images_in_docx_shapes(tpl, assets_map)
 
                 # Save to memory
                 out_stream = io.BytesIO()
@@ -281,8 +315,8 @@ class DocumentEngine:
 
         Args:
             tpl (DocxTemplate): The active template object.
-            assets_map (Dict[str, str]): A dictionary mapping asset names (lowercase, no extension)
-                                         to their absolute file paths.
+            assets_map (Dict[str, str]): A dictionary mapping asset names (lowercase,
+                                         no extension) to their absolute file paths.
         """
         try:
             # tpl is a DocxTemplate, but we treat it as a Document for shape iteration
@@ -433,8 +467,8 @@ class DocumentEngine:
 
         Args:
             slide (Any): The PPTX slide object to process.
-            assets_map (Dict[str, str]): A dictionary mapping asset names (lowercase, no extension)
-                                         to their absolute file paths.
+            assets_map (Dict[str, str]): A dictionary mapping asset names (lowercase,
+                                         no extension) to their absolute file paths.
         """
         # Shapes to remove after replacement to avoid modifying list while iterating
         shapes_to_remove = []
@@ -536,7 +570,7 @@ class DocumentEngine:
         template_path: str,
         output_path: str,
         context: Dict[str, Any],
-        assets_path: str = None,
+        assets_path: Optional[str] = None,
     ) -> bool:
         """Renders a PPTX template using python-pptx.
 
@@ -547,7 +581,7 @@ class DocumentEngine:
             template_path (str): The absolute path to the template file.
             output_path (str): The absolute path where the rendered file will be saved.
             context (Dict[str, Any]): The data context dictionary for rendering.
-            assets_path (str, optional): The path to the assets directory. Defaults to None.
+            assets_path (Optional[str]): The path to the assets directory. Defaults to None.
 
         Returns:
             bool: True if rendering was successful, False otherwise.
@@ -564,16 +598,8 @@ class DocumentEngine:
 
                 # Build Assets Map (Name -> Path)
                 assets_map = {}
-                if assets_path and self.storage.exists(assets_path):
-                    # Use storage to list files
-                    files = self.storage.list_dir(assets_path)
-                    for f in files:
-                        f_name, f_ext = self.storage.splitext(f)
-                        # Key: lowercase filename without extension
-                        # Value: absolute path
-                        assets_map[f_name.lower()] = self.storage.join_path(
-                            assets_path, f
-                        )
+                if assets_path:
+                    assets_map = self._build_assets_map(assets_path)
 
                 for slide in prs.slides:
                     for shape in slide.shapes:
