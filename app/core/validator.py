@@ -25,13 +25,21 @@ class TemplateValidator:
         Args:
             storage (StoragePort): Port for file I/O.
         """
+        self.storage = storage
+
+        # Regex for variables: {{ variable }}
         # Regex Explanation:
         # \{\{\s* -> Match opening braces '{{' and optional whitespace
         # ([a-zA-Z0-9_]+) -> Capture Group 1: The Variable Name (alphanumeric + underscore)
         # .*?           -> Non-greedy match of any character (filters, args, spaces)
         # \}\}          -> Match closing braces '}}'
-        self.storage = storage
         self.tag_pattern = re.compile(r"\{\{\s*([a-zA-Z0-9_]+).*?\}\}")
+
+        # Regex for loops: {% for item in items %} or {%tr for item in items %}
+        # Handles optional docxtpl prefixes like 'tr', 'p', 'tc', 'r'
+        self.loop_pattern = re.compile(
+            r"\{%\s*(?:[a-zA-Z0-9]+)?\s*for\s+([a-zA-Z0-9_]+)\s+in\s+"
+        )
 
     def _extract_from_text(self, text: str) -> Set[str]:
         """Scans the provided text for Jinja2-style variables using regex.
@@ -46,10 +54,17 @@ class TemplateValidator:
             return set()
         return set(self.tag_pattern.findall(text))
 
+    def _extract_loop_vars(self, text: str) -> Set[str]:
+        """Scans text for loop declarations {% for var in list %}."""
+        if not text:
+            return set()
+        return set(self.loop_pattern.findall(text))
+
     def extract_tags_from_docx(self, file_path: str) -> Set[str]:
         """Extracts Jinja2 tags from a DOCX file via StoragePort.
 
         Scans paragraphs, tables, headers, and footers for variables.
+        Excludes variables declared in loops (e.g. 'item' in '{% for item in items %}').
 
         Args:
             file_path (str): The absolute path to the DOCX file.
@@ -58,21 +73,26 @@ class TemplateValidator:
             Set[str]: A set of unique extracted tags. Returns an empty set on failure.
         """
         tags = set()
+        loop_vars = set()
         try:
             # Read to memory
             content = self.storage.read_binary(file_path)
             doc = Document(io.BytesIO(content))
 
+            def process_text(text):
+                tags.update(self._extract_from_text(text))
+                loop_vars.update(self._extract_loop_vars(text))
+
             # Body Paragraphs
             for paragraph in doc.paragraphs:
-                tags.update(self._extract_from_text(paragraph.text))
+                process_text(paragraph.text)
 
             # Tables
             for table in doc.tables:
                 for row in table.rows:
                     for cell in row.cells:
                         for paragraph in cell.paragraphs:
-                            tags.update(self._extract_from_text(paragraph.text))
+                            process_text(paragraph.text)
 
             # Headers and Footers
             for section in doc.sections:
@@ -84,14 +104,12 @@ class TemplateValidator:
                 ]:
                     if header:
                         for paragraph in header.paragraphs:
-                            tags.update(self._extract_from_text(paragraph.text))
+                            process_text(paragraph.text)
                         for table in header.tables:
                             for row in table.rows:
                                 for cell in row.cells:
                                     for paragraph in cell.paragraphs:
-                                        tags.update(
-                                            self._extract_from_text(paragraph.text)
-                                        )
+                                        process_text(paragraph.text)
                 # Footers
                 for footer in [
                     section.footer,
@@ -100,16 +118,14 @@ class TemplateValidator:
                 ]:
                     if footer:
                         for paragraph in footer.paragraphs:
-                            tags.update(self._extract_from_text(paragraph.text))
+                            process_text(paragraph.text)
                         for table in footer.tables:
                             for row in table.rows:
                                 for cell in row.cells:
                                     for paragraph in cell.paragraphs:
-                                        tags.update(
-                                            self._extract_from_text(paragraph.text)
-                                        )
+                                        process_text(paragraph.text)
 
-            return tags
+            return tags - loop_vars
         except Exception as e:
             logger.error(f"Failed to parse DOCX {file_path}: {e}")
             return set()
@@ -125,7 +141,9 @@ class TemplateValidator:
         """
         try:
             content = self.storage.read_text(file_path)
-            return self._extract_from_text(content)
+            tags = self._extract_from_text(content)
+            loop_vars = self._extract_loop_vars(content)
+            return tags - loop_vars
         except Exception as e:
             logger.error(f"Failed to parse Text File {file_path}: {e}")
             return set()
@@ -142,6 +160,7 @@ class TemplateValidator:
             Set[str]: A set of unique extracted tags. Returns an empty set on failure.
         """
         tags = set()
+        loop_vars = set()
         try:
             content = self.storage.read_binary(file_path)
             prs = Presentation(io.BytesIO(content))
@@ -154,21 +173,24 @@ class TemplateValidator:
                             # We join runs to handle cases where formatting splits the tag
                             full_text = "".join([run.text for run in paragraph.runs])
                             tags.update(self._extract_from_text(full_text))
+                            loop_vars.update(self._extract_loop_vars(full_text))
 
                             # Fallback: Check raw paragraph text if runs failed to join correctly
                             if not tags:
-                                tags.update(self._extract_from_text(paragraph.text))
+                                text = paragraph.text
+                                tags.update(self._extract_from_text(text))
+                                loop_vars.update(self._extract_loop_vars(text))
 
                     # Tables
                     if hasattr(shape, "has_table") and shape.has_table:
                         for row in shape.table.rows:
                             for cell in row.cells:
                                 if hasattr(cell, "text_frame") and cell.text_frame:
-                                    tags.update(
-                                        self._extract_from_text(cell.text_frame.text)
-                                    )
+                                    text = cell.text_frame.text
+                                    tags.update(self._extract_from_text(text))
+                                    loop_vars.update(self._extract_loop_vars(text))
 
-            return tags
+            return tags - loop_vars
         except Exception as e:
             logger.error(f"Failed to parse PPTX {file_path}: {e}")
             return set()
