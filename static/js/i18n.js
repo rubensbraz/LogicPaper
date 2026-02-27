@@ -9,13 +9,14 @@ class I18nHandler {
          * @type {string} The current language code ('en' or 'pt').
          * @public
          */
-        this.currentLang = localStorage.getItem('logicpaper_lang') || CONFIG.settings?.defaultLocale || 'en';
+        const defaultLocale = (typeof CONFIG !== 'undefined' && CONFIG.settings?.defaultLocale) || 'en';
+        this.currentLang = localStorage.getItem('logicpaper_lang') || defaultLocale;
 
         /**
          * @type {Object} The translation dictionary.
          * @private
          */
-        this.translations = TRANSLATIONS;
+        this.translations = typeof TRANSLATIONS !== 'undefined' ? TRANSLATIONS : {};
 
         // Initialize immediately if DOM is ready, otherwise wait.
         if (document.readyState === 'loading') {

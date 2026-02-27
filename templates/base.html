@@ -27,14 +27,14 @@
             <link rel="stylesheet" href="css/style.css">
             {% block extra_css %}{% endblock %}
             {# Core JavaScript Dependencies #}
-            <script src="js/locales.js"></script>
-            <script src="js/i18n.js"></script>
-            <script src="js/config.js"></script>
-            <script src="js/utils.js"></script>
             <script>
             // Injected by build_static.py or defaults to false
             window.IS_STATIC = {{ is_static | default('false') | lower }};
             </script>
+            <script src="js/config.js"></script>
+            <script src="js/locales.js"></script>
+            <script src="js/i18n.js"></script>
+            <script src="js/utils.js"></script>
             {% block extra_head %}{% endblock %}
         </head>
         <body class="min-h-screen p-4 md:p-8 flex flex-col items-center">

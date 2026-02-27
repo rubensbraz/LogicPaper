@@ -124,11 +124,36 @@ async def load_dataframe(
             contents = await file_csv.read()
             await file_csv.seek(0)
 
+            def _parse_csv(data_bytes):
+                # Try common encodings
+                encodings = ["utf-8-sig", "latin-1", "cp1252", "utf-8"]
+                last_err = None
+
+                for enc in encodings:
+                    try:
+                        # Use sep=None and engine='python' for auto-detection
+                        # This handles comma, semicolon, tabs, etc.
+                        return pd.read_csv(
+                            io.BytesIO(data_bytes),
+                            sep=None,
+                            engine="python",
+                            encoding=enc,
+                        )
+                    except UnicodeDecodeError as e:
+                        last_err = e
+                        continue
+                    except Exception as e:
+                        # If it's a structural error, another encoding won't help,
+                        # but some structural errors are results of wrong encoding
+                        last_err = e
+                        continue
+
+                if last_err:
+                    raise last_err
+                raise ValueError("Empty or malformed CSV file")
+
             # Offload blocking pandas.read_csv
-            # default to comma separator, but pandas usually detects it well
-            return await anyio.to_thread.run_sync(
-                lambda: pd.read_csv(io.BytesIO(contents))
-            )
+            return await anyio.to_thread.run_sync(_parse_csv, contents)
         except Exception as e:
             raise ValueError(f"Failed to read CSV file: {str(e)}")
 
