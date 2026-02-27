@@ -83,15 +83,18 @@ def start_scheduler(
 
 
 async def load_dataframe(
-    file_excel: Optional[UploadFile] = None, file_json: Optional[UploadFile] = None
+    file_excel: Optional[UploadFile] = None,
+    file_json: Optional[UploadFile] = None,
+    file_csv: Optional[UploadFile] = None,
 ) -> pd.DataFrame:
-    """Loads data from either Excel or JSON into a Pandas DataFrame.
+    """Loads data from Excel, JSON, or CSV into a Pandas DataFrame.
 
     Runs blocking Pandas operations in a separate thread.
 
     Args:
         file_excel (Optional[UploadFile]): The uploaded Excel file. Defaults to None.
         file_json (Optional[UploadFile]): The uploaded JSON file. Defaults to None.
+        file_csv (Optional[UploadFile]): The uploaded CSV file. Defaults to None.
 
     Returns:
         pd.DataFrame: The loaded data as a DataFrame.
@@ -99,8 +102,8 @@ async def load_dataframe(
     Raises:
         ValueError: If no file is provided or if parsing fails.
     """
-    if not file_excel and not file_json:
-        raise ValueError("No data source provided. Please upload Excel or JSON.")
+    if not file_excel and not file_json and not file_csv:
+        raise ValueError("No data source provided. Please upload Excel, JSON, or CSV.")
 
     # Handle Excel
     if file_excel:
@@ -114,6 +117,20 @@ async def load_dataframe(
             )
         except Exception as e:
             raise ValueError(f"Failed to read Excel file: {str(e)}")
+
+    # Handle CSV
+    if file_csv:
+        try:
+            contents = await file_csv.read()
+            await file_csv.seek(0)
+
+            # Offload blocking pandas.read_csv
+            # default to comma separator, but pandas usually detects it well
+            return await anyio.to_thread.run_sync(
+                lambda: pd.read_csv(io.BytesIO(contents))
+            )
+        except Exception as e:
+            raise ValueError(f"Failed to read CSV file: {str(e)}")
 
     # Handle JSON
     if file_json:

@@ -47,7 +47,7 @@ async def stream_logs(session_id: str):
 @router.post(
     "/api/preview",
     summary="Preview Data File",
-    description="Parses an uploaded Excel or JSON file and returns the headers and the first 5 rows for UI verification.",
+    description="Parses an uploaded Excel, JSON, or CSV file and returns the headers and the first 5 rows for UI verification.",
     responses={
         200: {
             "description": "Preview data returned successfully.",
@@ -65,11 +65,13 @@ async def stream_logs(session_id: str):
     },
 )
 async def preview_data(
-    file_excel: UploadFile = File(None), file_json: UploadFile = File(None)
+    file_excel: UploadFile = File(None),
+    file_json: UploadFile = File(None),
+    file_csv: UploadFile = File(None),
 ):
-    """Parses the Excel OR JSON file and returns headers and first 5 rows."""
+    """Parses the Excel OR JSON OR CSV file and returns headers and first 5 rows."""
     try:
-        df = await load_dataframe(file_excel, file_json)
+        df = await load_dataframe(file_excel, file_json, file_csv)
         headers = df.columns.tolist()
         data_rows = df.head(5)
         preview_data = []
@@ -99,11 +101,12 @@ async def preview_data(
 async def validate_compatibility(
     file_excel: UploadFile = File(None),
     file_json: UploadFile = File(None),
+    file_csv: UploadFile = File(None),
     files_templates: List[UploadFile] = File(...),
     file_assets: UploadFile = File(None),
     storage: StoragePort = Depends(get_storage_port),
 ):
-    """Validates that template tags exist in Excel/JSON headers.
+    """Validates that template tags exist in Excel/JSON/CSV headers.
 
     If assets.zip is provided, also validates that PPTX image placeholders exist in the zip.
     """
@@ -114,7 +117,7 @@ async def validate_compatibility(
     storage.make_dir(session_path)
 
     try:
-        df = await load_dataframe(file_excel, file_json)
+        df = await load_dataframe(file_excel, file_json, file_csv)
         headers = [str(h) for h in df.columns.tolist()]
 
         templates_map = {}
@@ -178,6 +181,7 @@ async def generate_sample(
     output_pdf: bool = Form(False),
     file_excel: UploadFile = File(None),
     file_json: UploadFile = File(None),
+    file_csv: UploadFile = File(None),
     files_templates: List[UploadFile] = File(...),
     file_assets: UploadFile = File(None),
     storage: StoragePort = Depends(get_storage_port),
@@ -197,7 +201,7 @@ async def generate_sample(
         storage.make_dir(p)
 
     try:
-        df = await load_dataframe(file_excel, file_json)
+        df = await load_dataframe(file_excel, file_json, file_csv)
         input_filename = file_excel.filename if file_excel else file_json.filename
 
         # Save Templates to disk is required because Service expects paths
@@ -289,7 +293,7 @@ async def generate_sample(
     summary="Start Batch Processing",
     description="""
     Queues a full batch processing job.
-    Accepts Data (Excel/JSON), Templates, and Assets (ZIP).
+    Accepts Data (Excel/JSON/CSV), Templates, and Assets (ZIP).
     A background worker will process all rows and update the session status via Redis/SSE.
     """,
     status_code=202,
@@ -306,6 +310,7 @@ async def process_batch(
     group_by_folders: bool = Form(True),
     file_excel: UploadFile = File(None),
     file_json: UploadFile = File(None),
+    file_csv: UploadFile = File(None),
     files_templates: List[UploadFile] = File(...),
     file_assets: UploadFile = File(None),
     batch_service: BatchService = Depends(get_batch_service),
@@ -324,10 +329,16 @@ async def process_batch(
     try:
         send_log_event(session_id, "session_init")
 
-        df = await load_dataframe(file_excel, file_json)
-        input_filename = file_excel.filename if file_excel else file_json.filename
+        df = await load_dataframe(file_excel, file_json, file_csv)
+        input_filename = (
+            file_excel.filename
+            if file_excel
+            else (file_json.filename if file_json else file_csv.filename)
+        )
 
-        source_upload = file_excel if file_excel else file_json
+        source_upload = (
+            file_excel if file_excel else (file_json if file_json else file_csv)
+        )
         if source_upload:
             await source_upload.seek(0)
             source_path = storage.join_path(dir_inputs, source_upload.filename)

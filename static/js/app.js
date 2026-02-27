@@ -49,15 +49,15 @@ function resetStateOnInput(type) {
     document.getElementById('resultPanel').classList.add('hidden');
     document.getElementById('actionPanel').classList.remove('hidden');
 
-    // 2. Specific logic for Excel changes
+    // 2. Specific logic for Data Source changes
     if (type === 'data') {
         const previewEl = document.getElementById('jsonPreview');
-        previewEl.innerText = i18n.t('dashboard.config.placeholder_excel');
+        previewEl.innerText = i18n.t('dashboard.config.placeholder_data_source');
         previewEl.className = "absolute inset-0 p-4 text-xs font-mono text-green-400 overflow-auto scrollbar-thin";
 
         // Lock Config Panel until re-analysis
         document.getElementById('configPanel').classList.add('opacity-50', 'pointer-events-none');
-        document.getElementById('colSelect').innerHTML = `<option>${i18n.t('dashboard.config.placeholder_excel')}</option>`;
+        document.getElementById('colSelect').innerHTML = `<option>${i18n.t('dashboard.config.placeholder_data_source')}</option>`;
     }
 
     // 3. Add visual separator in logs to indicate new context
@@ -139,14 +139,17 @@ function updateUI(input) {
 
 /**
  * Helper to append correct data file to FormData.
- * Distinguishes between JSON and Excel files based on extension.
+ * Distinguishes between Data Source files based on extension.
  *
  * @param {FormData} formData - The FormData object to append to.
  * @param {File} file - The file object to append.
  */
 function appendDataFile(formData, file) {
-    if (file.name.toLowerCase().endsWith('.json')) {
+    const name = file.name.toLowerCase();
+    if (name.endsWith('.json')) {
         formData.append('file_json', file);
+    } else if (name.endsWith('.csv')) {
+        formData.append('file_csv', file);
     } else {
         formData.append('file_excel', file);
     }
@@ -182,7 +185,7 @@ async function performAnalysisSequence() {
     const fileTemplates = document.getElementById('fileTemplates').files;
 
     // 1. Basic Input Validation
-    if (!fileData) return Swal.fire({ icon: 'warning', title: i18n.t('alerts.missing_excel.title'), text: i18n.t('alerts.missing_excel.text'), background: '#1e293b', color: '#fff' });
+    if (!fileData) return Swal.fire({ icon: 'warning', title: i18n.t('alerts.missing_data_source.title'), text: i18n.t('alerts.missing_data_source.text'), background: '#1e293b', color: '#fff' });
     if (fileTemplates.length === 0) return Swal.fire({ icon: 'warning', title: i18n.t('alerts.missing_templates.title'), text: i18n.t('alerts.missing_templates.text'), background: '#1e293b', color: '#fff' });
 
     // 2. UI Loading State
@@ -192,7 +195,7 @@ async function performAnalysisSequence() {
     btn.disabled = true;
 
     try {
-        // 3. Preview Data (Excel/JSON Analysis)
+        // 3. Preview Data (Data Source Analysis)
         const previewSuccess = await previewData(fileData);
         if (!previewSuccess) throw new Error(i18n.t('alerts.analysis_failed'));
 
@@ -216,7 +219,7 @@ async function performAnalysisSequence() {
 }
 
 /**
- * Analyzes the Data file (Excel/JSON) and populates the JSON preview.
+ * Analyzes the Data file (Data Source) and populates the JSON preview.
  *
  * @param {File} fileData - The data file object.
  * @returns {Promise<boolean>} True if successful, false otherwise.
@@ -640,7 +643,7 @@ function validateInputs() {
         return null;
     }
     if (!colName || colName === "") {
-        Swal.fire({ icon: 'warning', title: i18n.t('alerts.missing_excel.title'), text: i18n.t('dashboard.ingestion.drop_data.sub'), background: '#1e293b', color: '#fff' });
+        Swal.fire({ icon: 'warning', title: i18n.t('alerts.missing_data_source.title'), text: i18n.t('dashboard.ingestion.drop_data.sub'), background: '#1e293b', color: '#fff' });
         return null;
     }
 

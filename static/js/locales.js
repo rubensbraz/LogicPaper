@@ -10,10 +10,10 @@ const TRANSLATIONS = {
             title_home: "LogicPaper | Document Generation Engine",
             title_help: "LogicPaper | Documentation",
             title_history: "LogicPaper | Execution History",
-            description: "LogicPaper: A powerful batch processing engine for generating DOCX, PPTX, and PDF documents from Excel/JSON data with advanced logic integration.",
+            description: "LogicPaper: A powerful batch processing engine for generating DOCX, PPTX, and PDF documents from Excel/JSON/CSV data with advanced logic integration.",
             description_help: "Complete documentation for LogicPaper. Master Jinja2 templating strategies, format data and apply conditional logic.",
             description_history: "View your LogicPaper job execution history, check status, and re-download completed files.",
-            keywords: "batch processing, document generation, excel to pdf, excel to word, json to docx, automation, logicpaper"
+            keywords: "batch processing, document generation, excel to pdf, excel to word, json to docx, csv to word, automation, logicpaper"
         },
         navbar: {
             title_main: "Logic",
@@ -34,7 +34,7 @@ const TRANSLATIONS = {
                 subtitle: "Drag & Drop Enabled",
                 drop_data: {
                     main: "Data Source",
-                    sub: "Required (.xlsx or .json)"
+                    sub: "Required (.xlsx, .json or .csv)"
                 },
                 drop_templates: {
                     main: "Templates",
@@ -50,7 +50,7 @@ const TRANSLATIONS = {
             config: {
                 title: "2. Configuration",
                 lbl_filename: "FILENAME IDENTIFIER",
-                placeholder_excel: "Awaiting Excel or JSON file...",
+                placeholder_data_source: "Awaiting Excel, JSON or CSV file...",
                 opt_select_col: "-- Select Identifier Column --",
                 lbl_pdf: "Convert Output to PDF",
                 lbl_folders: "Group Files in Folders",
@@ -70,7 +70,7 @@ const TRANSLATIONS = {
             preview: {
                 title: "Data Source Preview",
                 badge: "Read-Only",
-                waiting: "Awaiting Excel or JSON file...",
+                waiting: "Awaiting Excel, JSON or CSV file...",
                 step1: "Step 1: Reading Data Structure...",
                 error: "Error: "
             },
@@ -103,7 +103,7 @@ const TRANSLATIONS = {
             toast: "Code copied to clipboard!",
             header: {
                 title: "Template Engine Reference",
-                desc: "Comprehensive documentation for the LogicPaper formatting engine. Learn how to transform raw Excel data using <strong>Jinja2 Pipes</strong> directly inside your Word, PowerPoint, Markdown or Plain Text templates.",
+                desc: "Comprehensive documentation for the LogicPaper formatting engine. Learn how to transform Excel/JSON/CSV data using <strong>Jinja2 Pipes</strong> directly inside your Word, PowerPoint, Markdown or Plain Text templates.",
                 btn_back: "Back to Dashboard"
             },
             nav: {
@@ -318,9 +318,9 @@ const TRANSLATIONS = {
                 title: "Static Demo Mode",
                 html: "<p class='mb-2'>Backend processing is <strong>unavailable</strong> in this live preview.</p>"
             },
-            missing_excel: {
+            missing_data_source: {
                 title: "Missing Input",
-                text: "Please upload an Excel or JSON file."
+                text: "Please upload an Excel, JSON or CSV file."
             },
             missing_templates: {
                 title: "Missing Input",
@@ -391,10 +391,10 @@ const TRANSLATIONS = {
             title_home: "LogicPaper | Motor de Geração de Documentos",
             title_help: "LogicPaper | Documentação",
             title_history: "LogicPaper | Histórico de Execuções",
-            description: "LogicPaper: Um poderoso motor de processamento em lote para gerar documentos DOCX, PPTX e PDF a partir de dados Excel/JSON com integração de lógica avançada.",
+            description: "LogicPaper: Um poderoso motor de processamento em lote para gerar documentos DOCX, PPTX e PDF a partir de dados Excel/JSON/CSV com integração de lógica avançada.",
             description_help: "Documentação completa do LogicPaper. Domine estratégias de template Jinja2, formate dados e aplique lógica condicional.",
             description_history: "Visualize o histórico de execuções do LogicPaper, verifique o status e baixe novamente arquivos concluídos.",
-            keywords: "processamento em lote, geração de documentos, excel para pdf, excel para word, json para docx, automação, logicpaper"
+            keywords: "processamento em lote, geração de documentos, excel para pdf, excel para word, json para docx, csv para word, automação, logicpaper"
         },
         navbar: {
             title_main: "Logic",
@@ -415,7 +415,7 @@ const TRANSLATIONS = {
                 subtitle: "Arrastar e Soltar Ativado",
                 drop_data: {
                     main: "Fonte de Dados",
-                    sub: "Obrigatório (.xlsx or .json)"
+                    sub: "Obrigatório (.xlsx, .json ou .csv)"
                 },
                 drop_templates: {
                     main: "Modelos (Templates)",
@@ -431,7 +431,7 @@ const TRANSLATIONS = {
             config: {
                 title: "2. Configuração",
                 lbl_filename: "IDENTIFICADOR DO ARQUIVO",
-                placeholder_excel: "Aguardando arquivo Excel ou JSON...",
+                placeholder_data_source: "Aguardando arquivo Excel, JSON ou CSV...",
                 opt_select_col: "-- Selecione a Coluna Identificadora --",
                 lbl_pdf: "Converter Saída para PDF",
                 lbl_folders: "Agrupar Arquivos em Pastas",
@@ -451,7 +451,7 @@ const TRANSLATIONS = {
             preview: {
                 title: "Prévia dos Dados",
                 badge: "Somente Leitura",
-                waiting: "Aguardando arquivo Excel ou JSON...",
+                waiting: "Aguardando arquivo Excel, JSON ou CSV...",
                 step1: "Passo 1: Lendo Estrutura dos Dados...",
                 error: "Erro: "
             },
@@ -484,7 +484,7 @@ const TRANSLATIONS = {
             toast: "Código copiado para a área de transferência!",
             header: {
                 title: "Referência do Motor de Modelos",
-                desc: "Documentação completa para o motor de formatação LogicPaper. Aprenda como transformar dados brutos do Excel usando <strong>Jinja2 Pipes</strong> diretamente dentro dos seus modelos Word, PowerPoint, Markdown ou Plain Text (.txt).",
+                desc: "Documentação completa para o motor de formatação LogicPaper. Aprenda como transformar dados do Excel/JSON/CSV usando <strong>Jinja2 Pipes</strong> diretamente dentro dos seus modelos Word, PowerPoint, Markdown ou Plain Text (.txt).",
                 btn_back: "Voltar para Dashboard"
             },
             nav: {
@@ -699,9 +699,9 @@ const TRANSLATIONS = {
                 title: "Modo de Demonstração Estático",
                 html: "<p class='mb-2'>O processamento de back-end está <strong>indisponível</strong> nesta pré-visualização ao vivo.</p>"
             },
-            missing_excel: {
+            missing_data_source: {
                 title: "Entrada Ausente",
-                text: "Por favor, carregue um arquivo Excel ou um JSON."
+                text: "Por favor, carregue um arquivo Excel, JSON ou CSV."
             },
             missing_templates: {
                 title: "Entrada Ausente",

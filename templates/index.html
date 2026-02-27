@@ -1,7 +1,7 @@
 {% extends "base.html" %}
 {% block title %}LogicPaper | Document Generation Engine{% endblock %}
 {% block meta_description %}
-    LogicPaper: A powerful batch processing engine for generating DOCX, PPTX, and PDF documents from Excel/JSON data with advanced logic integration.
+    LogicPaper: A powerful batch processing engine for generating DOCX, PPTX, and PDF documents from Excel/JSON/CSV data with advanced logic integration.
 {% endblock %}
 {% block meta_description_attr %}data-i18n-attr="content:meta.description"{% endblock %}
 {% block meta_keywords %}
@@ -24,7 +24,7 @@
                         <input type="file"
                                id="fileData"
                                class="hidden"
-                               accept=".xlsx,.json"
+                               accept=".xlsx,.json,.csv"
                                onchange="updateUI(this)">
                         <div class="flex items-center gap-3">
                             <div class="p-2 bg-green-500/20 text-green-400 rounded-lg">📊</div>
@@ -94,7 +94,7 @@
                                data-i18n="dashboard.config.lbl_filename">FILENAME IDENTIFIER</label>
                         <select id="colSelect"
                                 class="w-full bg-black/40 border border-gray-600 rounded-lg p-3 text-sm text-white focus:border-blue-500 outline-none transition appearance-none cursor-pointer hover:bg-black/60">
-                            <option data-i18n="dashboard.config.placeholder_excel">Awaiting Excel file...</option>
+                            <option data-i18n="dashboard.config.placeholder_data_source">Awaiting Excel file...</option>
                         </select>
                     </div>
                     <div class="flex items-center justify-between bg-black/20 p-3 rounded-lg border border-white/5">
