@@ -1,0 +1,767 @@
+/**
+ * @fileoverview Main Application Logic.
+ * Handles state management, file uploading, and Server-Sent Events (SSE) communication.
+ * Implements the core workflow for the LogicPaper dashboard.
+ */
+
+// --- Global State ---
+
+/**
+ * Unique identifier for the current user session.
+ * resets on page load or after a batch completes.
+ * @type {string}
+ */
+let sessionId = crypto.randomUUID();
+
+/**
+ * Flag indicating if a batch process is currently active.
+ * Prevents re-submission or state changes during processing.
+ * @type {boolean}
+ */
+let isProcessing = false;
+
+// --- Initialization ---
+
+document.addEventListener('DOMContentLoaded', () => {
+    initializeDragDrop(['dropData', 'dropTemplates', 'dropAssets']);
+});
+
+// --- State Management ---
+
+/**
+ * Completely resets the application state by reloading the page.
+ * This ensures a truly clean slate (memory, file inputs, global variables).
+ */
+function performFullReset() {
+    window.location.reload();
+}
+
+/**
+ * Resets the UI state when inputs change.
+ * Allows the user to start a fresh batch without page reload.
+ *
+ * @param {string} type - The type of input changed ('data', 'template', 'asset').
+ */
+function resetStateOnInput(type) {
+    if (isProcessing) return;
+
+    // 1. Hide Result Panel, Show Action Panel
+    document.getElementById('resultPanel').classList.add('hidden');
+    document.getElementById('actionPanel').classList.remove('hidden');
+
+    // 2. Specific logic for Data Source changes
+    if (type === 'data') {
+        const previewEl = document.getElementById('jsonPreview');
+        previewEl.innerText = i18n.t('dashboard.config.placeholder_data_source');
+        previewEl.className = "absolute inset-0 p-4 text-xs font-mono text-green-400 overflow-auto scrollbar-thin";
+
+        // Lock Config Panel until re-analysis
+        document.getElementById('configPanel').classList.add('opacity-50', 'pointer-events-none');
+        document.getElementById('colSelect').innerHTML = `<option>${i18n.t('dashboard.config.placeholder_data_source')}</option>`;
+    }
+
+    // 3. Add visual separator in logs to indicate new context
+    const term = document.getElementById('terminal');
+    if (term.innerText.trim() !== i18n.t('dashboard.logs.ready')) {
+        logToTerminal(i18n.t('logs.inputs_changed'), 'info');
+    }
+}
+
+// --- Drag & Drop Logic ---
+
+/**
+ * Initializes drag and drop listeners for a list of element IDs.
+ * Binds events for visual feedback and file handling.
+ *
+ * @param {string[]} ids - Array of DOM IDs to initialize.
+ */
+function initializeDragDrop(ids) {
+    ids.forEach(id => {
+        const dropZone = document.getElementById(id);
+        const input = dropZone.querySelector('input');
+
+        // Prevent default browser behavior
+        ['dragenter', 'dragover', 'dragleave', 'drop'].forEach(eventName => {
+            dropZone.addEventListener(eventName, (e) => {
+                e.preventDefault();
+                e.stopPropagation();
+            }, false);
+        });
+
+        // Visual Feedback
+        ['dragenter', 'dragover'].forEach(evt => {
+            dropZone.addEventListener(evt, () => dropZone.classList.add('drag-over'), false);
+        });
+
+        ['dragleave', 'drop'].forEach(evt => {
+            dropZone.addEventListener(evt, () => dropZone.classList.remove('drag-over'), false);
+        });
+
+        // Handle Drop
+        dropZone.addEventListener('drop', (e) => {
+            const files = e.dataTransfer.files;
+            if (files.length > 0) {
+                input.files = files;
+                updateUI(input);
+            }
+        }, false);
+    });
+}
+
+/**
+ * Updates the UI labels when files are selected.
+ * Triggers state reset but DOES NOT auto-analyze.
+ *
+ * @param {HTMLInputElement} input - The file input element.
+ */
+function updateUI(input) {
+    const labelId = input.id.replace('file', 'lbl').replace('Excel', 'Data');
+    const label = document.getElementById(input.id === 'fileData' ? 'lblData' : labelId);
+
+    if (input.files && input.files.length > 0) {
+        if (input.files.length === 1) {
+            label.innerText = input.files[0].name;
+        } else {
+            label.innerText = i18n.t('alerts.files_selected_plural', { count: input.files.length });
+        }
+
+        // Visual confirmation style
+        label.classList.add('text-blue-400', 'font-bold');
+        label.classList.remove('text-gray-500');
+
+        // Reset state (hide results, lock config) to force re-analysis
+        const type = input.id === 'fileData' ? 'data' : 'other';
+        resetStateOnInput(type);
+    }
+}
+
+// --- API Helpers ---
+
+/**
+ * Helper to append correct data file to FormData.
+ * Distinguishes between Data Source files based on extension.
+ *
+ * @param {FormData} formData - The FormData object to append to.
+ * @param {File} file - The file object to append.
+ */
+function appendDataFile(formData, file) {
+    const name = file.name.toLowerCase();
+    if (name.endsWith('.json')) {
+        formData.append('file_json', file);
+    } else if (name.endsWith('.csv')) {
+        formData.append('file_csv', file);
+    } else {
+        formData.append('file_excel', file);
+    }
+}
+
+// --- API Actions ---
+
+/**
+ * Orchestrates the Analysis and Validation workflow.
+ * 1. Checks inputs.
+ * 2. Runs Data Preview (Backend Analysis).
+ * 3. Runs Template Validation (Backend Comparison).
+ * 4. Unlocks Configuration if successful.
+ *
+ * @returns {Promise<void>}
+ */
+async function performAnalysisSequence() {
+    // Environment Guard: Check for Static Demo (GitHub Pages)
+    if (CONFIG.env.isGithubPages) {
+        Swal.fire({
+            icon: 'info',
+            title: i18n.t('alerts.static_mode.title'),
+            html: i18n.t('alerts.static_mode.html'),
+            background: '#1e293b',
+            color: '#fff',
+            confirmButtonColor: '#3b82f6',
+            confirmButtonText: i18n.t('alerts.btn_understood')
+        });
+        return;
+    }
+
+    const fileData = document.getElementById('fileData').files[0];
+    const fileTemplates = document.getElementById('fileTemplates').files;
+
+    // 1. Basic Input Validation
+    if (!fileData) return Swal.fire({ icon: 'warning', title: i18n.t('alerts.missing_data_source.title'), text: i18n.t('alerts.missing_data_source.text'), background: '#1e293b', color: '#fff' });
+    if (fileTemplates.length === 0) return Swal.fire({ icon: 'warning', title: i18n.t('alerts.missing_templates.title'), text: i18n.t('alerts.missing_templates.text'), background: '#1e293b', color: '#fff' });
+
+    // 2. UI Loading State
+    const btn = document.getElementById('btnValidate');
+    const originalText = btn.innerHTML;
+    btn.innerHTML = `<span class="animate-pulse">${i18n.t('dashboard.ingestion.btn_validating')}</span>`;
+    btn.disabled = true;
+
+    try {
+        // 3. Preview Data (Data Source Analysis)
+        const previewSuccess = await previewData(fileData);
+        if (!previewSuccess) throw new Error(i18n.t('alerts.analysis_failed'));
+
+        // 4. Validate Templates (Compatibility Check)
+        const fileAssets = document.getElementById('fileAssets').files[0];
+        const validationSuccess = await validateTemplates(fileData, fileTemplates, fileAssets);
+
+        // 5. Unlock Configuration Panel only if everything passed
+        if (validationSuccess) {
+            document.getElementById('configPanel').classList.remove('opacity-50', 'pointer-events-none');
+            logToTerminal(i18n.t('logs.validation_success'), "success");
+        }
+
+    } catch (e) {
+        // Silent catch (errors handled in sub-functions), but ensure button resets
+        console.error(e);
+    } finally {
+        btn.innerHTML = originalText;
+        btn.disabled = false;
+    }
+}
+
+/**
+ * Analyzes the Data file (Data Source) and populates the JSON preview.
+ *
+ * @param {File} fileData - The data file object.
+ * @returns {Promise<boolean>} True if successful, false otherwise.
+ */
+async function previewData(fileData) {
+    const formData = new FormData();
+    appendDataFile(formData, fileData);
+
+    const prevEl = document.getElementById(CONFIG.dom.jsonPreview);
+    prevEl.innerText = i18n.t('dashboard.preview.step1');
+    prevEl.className = "absolute inset-0 p-4 text-xs font-mono text-blue-400 overflow-auto scrollbar-thin animate-pulse";
+
+    try {
+        const res = await fetch(CONFIG.endpoints.preview, { method: 'POST', body: formData });
+        const data = await res.json();
+
+        if (data.status === 'success') {
+            // Render JSON
+            prevEl.className = "absolute inset-0 p-4 text-xs font-mono text-green-400 overflow-auto scrollbar-thin";
+            prevEl.innerText = JSON.stringify(data.preview, null, 2);
+
+            // Populate Dropdown
+            const sel = document.getElementById('colSelect');
+            sel.innerHTML = `<option value="">${i18n.t('dashboard.config.opt_select_col')}</option>`;
+            data.headers.forEach(h => {
+                let opt = document.createElement('option');
+                opt.value = h;
+                opt.innerText = h;
+                sel.appendChild(opt);
+            });
+            return true;
+        } else {
+            throw new Error(data.message);
+        }
+    } catch (e) {
+        Swal.fire({ icon: 'error', title: i18n.t('alerts.analysis_failed'), text: e.message, background: '#1e293b', color: '#fff' });
+        prevEl.innerText = i18n.t('dashboard.preview.error') + e.message;
+        prevEl.className = "absolute inset-0 p-4 text-xs font-mono text-red-400 overflow-auto scrollbar-thin";
+        return false;
+    }
+}
+
+/**
+ * Validates that template placeholders match data headers.
+ *
+ * @param {File} fileData - The data file.
+ * @param {FileList} fileTemplates - The list of templates.
+ * @param {File} [fileAssets] - The assets zip file (optional).
+ * @returns {Promise<boolean>} True if valid (or warning shown/accepted).
+ */
+async function validateTemplates(fileData, fileTemplates, fileAssets) {
+    const formData = new FormData();
+    appendDataFile(formData, fileData);
+    for (let i = 0; i < fileTemplates.length; i++) {
+        formData.append('files_templates', fileTemplates[i]);
+    }
+    if (fileAssets) {
+        formData.append('file_assets', fileAssets);
+    }
+
+    try {
+        const res = await fetch(CONFIG.endpoints.validate, { method: 'POST', body: formData });
+        const data = await res.json();
+
+        if (data.status === 'success') {
+            renderValidationReport(data.report);
+            return true;
+        } else {
+            throw new Error(data.message);
+        }
+    } catch (e) {
+        Swal.fire({ icon: 'error', title: i18n.t('alerts.validation_failed_title'), text: e.message, background: '#1e293b', color: '#fff' });
+        return false;
+    }
+}
+
+/**
+ * Renders the validation results modal using SweetAlert2.
+ *
+ * @param {Object} report - The validation report object from the backend.
+ */
+function renderValidationReport(report) {
+    // Determine Status
+    // Priority: ERROR > WARNING > OK
+    const status = report.overall_status;
+    const isValid = status === 'OK' || status === 'WARNING';
+
+    let titleText, descText, colorClass, iconMain;
+
+    if (status === 'OK') {
+        titleText = i18n.t('alerts.validation_modal.title_ok');
+        descText = i18n.t('alerts.validation_modal.desc_ok');
+        colorClass = 'green';
+        iconMain = '✔';
+    } else if (status === 'WARNING') {
+        titleText = i18n.t('alerts.validation_modal.title_warn');
+        descText = i18n.t('alerts.validation_modal.desc_warn');
+        colorClass = 'yellow';
+        iconMain = '⚠️';
+    } else {
+        titleText = i18n.t('alerts.validation_modal.title_fail');
+        descText = i18n.t('alerts.validation_modal.desc_fail');
+        colorClass = 'red';
+        iconMain = '✖';
+    }
+
+    // 1. Build Header
+    let html = `
+    <div class="flex flex-col gap-6 text-left">
+        <div class="p-4 rounded-xl border bg-${colorClass}-500/10 border-${colorClass}-500/50 flex items-center gap-4">
+            <div class="w-12 h-12 flex items-center justify-center rounded-full shrink-0 bg-${colorClass}-500/20 text-${colorClass}-400">
+                <span class="text-2xl leading-none">${iconMain}</span>
+            </div>
+            <div>
+                <h3 class="text-lg font-bold text-white">${titleText}</h3>
+                <p class="text-sm text-${colorClass}-300">
+                    ${descText}
+                </p>
+            </div>
+        </div>
+
+        <div class="max-h-[400px] overflow-y-auto pr-2 space-y-3 custom-scrollbar">
+    `;
+
+    // 2. Build Cards
+    report.details.forEach(item => {
+        let isOk = item.status === 'OK';
+        let isWarning = item.status.includes('Warning');
+
+        let borderColor = 'border-l-green-500';
+        let icon = '📄';
+        let statusKey = 'status_ok';
+        let badgeColor = 'bg-green-500/20 text-green-400';
+
+        if (!isOk && !isWarning) {
+            // Error (Missing Data)
+            borderColor = 'border-l-red-500';
+            icon = '📑';
+            statusKey = 'status_missing';
+            badgeColor = 'bg-red-500/20 text-red-400';
+        } else if (isWarning) {
+            // Warning (Missing Images)
+            borderColor = 'border-l-yellow-500';
+            icon = '⚠️';
+            statusKey = 'status_warning';
+            badgeColor = 'bg-yellow-500/20 text-yellow-400';
+        }
+
+        const statusLabel = i18n.t(`alerts.validation_modal.${statusKey}`);
+
+        html += `
+            <div class="bg-black/40 rounded-lg border border-white/5 border-l-4 ${borderColor} p-4 transition hover:bg-black/60">
+                <div class="flex justify-between items-start mb-2">
+                    <div class="flex items-center gap-2">
+                        <span class="text-xl">${icon}</span>
+                        <span class="font-semibold text-gray-200 text-sm">${item.template}</span>
+                    </div>
+                    <span class="px-2 py-1 rounded text-[10px] font-bold uppercase tracking-wider ${badgeColor}">
+                        ${statusLabel}
+                    </span>
+                </div>
+            `;
+
+        // 3. Render Missing Variables
+        if (item.missing_vars.length > 0) {
+            html += `
+            <div class="mt-3 bg-red-900/10 rounded p-3 border border-red-500/10">
+                <p class="text-sm text-red-300 mb-2 font-semibold flex items-center gap-1">
+                    <span>❌</span> ${i18n.t('alerts.validation_modal.missing_vars')}
+                </p>
+                <div class="flex flex-wrap gap-2">`;
+
+            item.missing_vars.forEach(v => {
+                html += `<span class="font-mono text-sm bg-red-500/20 text-red-200 px-2 py-1 rounded border border-red-500/30">{{ ${v} }}</span>`;
+            });
+
+            html += `</div></div>`;
+        }
+
+        // 4. Render Missing Assets (Warning)
+        if (item.potential_missing_assets && item.potential_missing_assets.length > 0) {
+            let msg = i18n.t('alerts.validation_modal.missing_assets');
+            let colorClass = 'yellow';
+
+            if (item.assets_error) {
+                msg = "❌ " + item.assets_error;
+                colorClass = 'red';
+            } else if (!item.assets_provided) {
+                msg = "❓ " + i18n.t('alerts.validation_modal.no_assets_provided');
+                colorClass = 'orange';
+            }
+
+            html += `
+            <div class="mt-3 bg-${colorClass}-900/10 rounded p-3 border border-${colorClass}-500/10">
+                <p class="text-sm text-${colorClass}-300 mb-2 font-semibold flex items-center gap-1">
+                    ${msg}
+                </p>
+                <div class="flex flex-wrap gap-2">`;
+
+            item.potential_missing_assets.forEach(a => {
+                html += `<span class="font-mono text-sm bg-${colorClass}-500/20 text-${colorClass}-200 px-2 py-1 rounded border border-${colorClass}-500/30">${a}</span>`;
+            });
+
+            html += `</div></div>`;
+        }
+
+        // 5. Render Success Stats
+        html += `<div class="mt-2 text-xs text-gray-500 space-y-1">`;
+
+        if (item.matched_vars.length > 0) {
+            html += `
+             <div class="flex items-center gap-1">
+                <span class="text-green-500">●</span> ${item.matched_vars.length} ${i18n.t('alerts.validation_modal.matched')}
+             </div>`;
+        }
+
+        if (item.matched_assets && item.matched_assets.length > 0) {
+            html += `
+             <div class="flex items-center gap-1">
+                <span class="text-green-500">●</span> ${item.matched_assets.length} ${i18n.t('alerts.validation_modal.matched_assets')}
+             </div>`;
+        }
+
+        html += `</div></div>`;
+    });
+
+    html += `</div></div>`;
+
+    // 4. Launch Modal
+    Swal.fire({
+        title: `<span class="text-xl font-bold text-gray-100">${i18n.t('alerts.validation_modal.title')}</span>`,
+        html: html,
+        background: '#0f172a',
+        color: '#e2e8f0',
+        showCloseButton: true,
+        focusConfirm: false,
+        confirmButtonText: isValid ? i18n.t('alerts.validation_modal.btn_proceed') : i18n.t('alerts.validation_modal.btn_close'),
+        confirmButtonColor: isValid ? '#10b981' : '#3b82f6',
+        customClass: {
+            popup: 'glass-panel border border-white/10 shadow-2xl',
+            title: 'text-left border-b border-white/10 pb-4',
+            htmlContainer: '!m-0 !pt-4 !text-left',
+            confirmButton: 'px-6 py-3 rounded-xl text-sm font-bold shadow-lg w-full mt-4'
+        },
+        width: '650px',
+        padding: '2rem'
+    });
+}
+
+/**
+ * Generates a single sample row for testing.
+ * Blocks the Batch Process button while generating.
+ *
+ * @returns {Promise<void>}
+ */
+async function generateSample() {
+    const params = validateInputs();
+    if (!params) return;
+
+    // UI Locking
+    toggleLoadingState(true, 'btnSample');
+    const btnProcess = document.getElementById('btnProcess');
+    btnProcess.disabled = true;
+    btnProcess.classList.add('opacity-50', 'cursor-not-allowed');
+
+    logToTerminal(i18n.t('logs.sample_start'), 'info');
+
+    try {
+        const formData = buildFormData(params);
+        const response = await fetch(CONFIG.endpoints.sample, { method: 'POST', body: formData });
+
+        if (response.ok) {
+            downloadBlob(await response.blob(), "LogicPaper_Sample.zip");
+            logToTerminal(i18n.t('logs.sample_success'), 'success');
+            Swal.fire({
+                icon: 'success',
+                title: i18n.t('alerts.sample_ready_title'),
+                text: i18n.t('alerts.sample_ready_text'),
+                background: '#1e293b',
+                color: '#fff',
+                timer: 2000,
+                showConfirmButton: false
+            });
+        } else {
+            const err = await response.json();
+            throw new Error(err.message || i18n.t('alerts.server_error'));
+        }
+    } catch (e) {
+        logToTerminal(i18n.t('logs.sample_error', { error: e.message }), 'error');
+        Swal.fire({ icon: 'error', title: i18n.t('alerts.sample_failed_title'), text: e.message, background: '#1e293b', color: '#fff' });
+    } finally {
+        // UI Unlocking
+        toggleLoadingState(false, 'btnSample');
+        btnProcess.disabled = false;
+        btnProcess.classList.remove('opacity-50', 'cursor-not-allowed');
+    }
+}
+
+/**
+ * Starts the production batch process.
+ * Permanently locks the Sample button during execution.
+ * Configures Server-Sent Events (SSE) for real-time updates.
+ */
+function startProcessing() {
+    const params = validateInputs();
+    if (!params) return;
+
+    // Reset Terminal visually
+    document.getElementById(CONFIG.dom.terminal).innerHTML = '';
+    logToTerminal(i18n.t('logs.batch_init'), 'info');
+
+    // UI Locking
+    toggleLoadingState(true, 'btnProcess');
+    const btnSample = document.getElementById('btnSample');
+    btnSample.disabled = true;
+    btnSample.classList.add('opacity-50', 'cursor-not-allowed');
+
+    isProcessing = true;
+
+    // Connect to SSE
+    const evtSource = new EventSource(`/stream-logs/${sessionId}`);
+
+    evtSource.onopen = () => {
+        logToTerminal(i18n.t('logs.connection_established'), 'info');
+
+        const formData = buildFormData(params);
+        fetch(CONFIG.endpoints.process, { method: 'POST', body: formData })
+            .then(res => res.json())
+            .then(data => {
+                if (data.status === 'processing' || data.status === 'success') {
+                    logToTerminal(i18n.t('logs.job_accepted'), 'info');
+                    // Pre-configure the download button logic
+                    document.getElementById('mainDownloadBtn').href = `/api/download/${sessionId}`;
+                } else {
+                    throw new Error(data.message || i18n.t('alerts.server_error'));
+                }
+            })
+            .catch(e => {
+                logToTerminal(i18n.t('logs.request_error', { error: e.message }), 'error');
+                finishBatch(false);
+                evtSource.close();
+            });
+    };
+
+    evtSource.onmessage = (event) => {
+        handleSSEMessage(event, evtSource);
+    };
+
+    evtSource.onerror = () => {
+        evtSource.close();
+        logToTerminal(i18n.t('logs.connection_lost'), 'error');
+        finishBatch(false);
+    };
+}
+
+/**
+ * Handles incoming SSE messages.
+ * Parses JSON logs, updates the UI, and detects completion signals.
+ *
+ * @param {MessageEvent} event - The SSE event.
+ * @param {EventSource} evtSource - The EventSource instance.
+ */
+function handleSSEMessage(event, evtSource) {
+    let message = event.data;
+    let isComplete = false;
+
+    try {
+        const logData = JSON.parse(event.data);
+        if (logData.code) {
+            // Sanitize parameters to prevent XSS
+            const safeParams = logData.params || {};
+            Object.keys(safeParams).forEach(k => {
+                if (typeof safeParams[k] === 'string') safeParams[k] = escapeHtml(safeParams[k]);
+            });
+
+            message = i18n.t(`logs.${logData.code}`, safeParams);
+
+            if (logData.code === 'process_complete') isComplete = true;
+            if (!message) message = event.data;
+        } else if (logData.message) {
+            message = logData.message;
+        }
+    } catch (e) {
+        // Not JSON, treat as raw string
+        message = event.data;
+    }
+
+    if (message.includes("PROCESS_COMPLETE") || isComplete) {
+        evtSource.close();
+        if (!isComplete) logToTerminal(i18n.t('logs.process_complete'), 'success');
+        else logToTerminal(message, 'success');
+
+        finishBatch(true);
+    } else if (message.includes("PROCESS_ERROR")) {
+        evtSource.close();
+        logToTerminal(message, 'error');
+        finishBatch(false);
+    } else {
+        logToTerminal(message);
+    }
+}
+
+// --- Helpers ---
+
+/**
+ * Validates form inputs before submission.
+ * Checks for missing files or required configurations.
+ *
+ * @returns {Object|null} Parameters object containing all inputs, or null if invalid.
+ */
+function validateInputs() {
+    const fileData = document.getElementById('fileData').files[0];
+    const fileTemplates = document.getElementById('fileTemplates').files;
+    const fileAssets = document.getElementById('fileAssets').files[0];
+    const colName = document.getElementById('colSelect').value;
+    const toPdf = document.getElementById('checkPDF').checked;
+    const groupFolders = document.getElementById('checkFolders').checked;
+
+    if (fileTemplates.length === 0) {
+        Swal.fire({ icon: 'warning', title: i18n.t('alerts.missing_templates.title'), text: i18n.t('alerts.missing_templates.text'), background: '#1e293b', color: '#fff' });
+        return null;
+    }
+    if (!colName || colName === "") {
+        Swal.fire({ icon: 'warning', title: i18n.t('alerts.missing_data_source.title'), text: i18n.t('dashboard.ingestion.drop_data.sub'), background: '#1e293b', color: '#fff' });
+        return null;
+    }
+
+    return { fileData, fileTemplates, fileAssets, colName, toPdf, groupFolders };
+}
+
+/**
+ * Builds the FormData object for the API request.
+ *
+ * @param {Object} p - The parameters object from validateInputs().
+ * @returns {FormData} The constructed FormData.
+ */
+function buildFormData(p) {
+    const fd = new FormData();
+    fd.append('session_id', sessionId);
+    fd.append('filename_col', p.colName);
+    fd.append('output_pdf', p.toPdf);
+    fd.append('group_by_folders', p.groupFolders);
+    appendDataFile(fd, p.fileData);
+
+    for (let i = 0; i < p.fileTemplates.length; i++) fd.append('files_templates', p.fileTemplates[i]);
+    if (p.fileAssets) fd.append('file_assets', p.fileAssets);
+    return fd;
+}
+
+/**
+ * Toggles the loading state of a button and disables inputs.
+ *
+ * @param {boolean} isLoading - Whether to show loading state.
+ * @param {string} btnId - The ID of the button to toggle.
+ */
+function toggleLoadingState(isLoading, btnId) {
+    const btn = document.getElementById(btnId);
+    if (isLoading) {
+        btn.dataset.originalText = btn.innerHTML;
+        btn.innerHTML = `<span class="animate-pulse">${i18n.t('dashboard.config.btn_processing')}</span>`;
+        btn.disabled = true;
+        document.querySelectorAll('input, select').forEach(i => i.disabled = true);
+        document.querySelectorAll('.drop-zone').forEach(d => d.classList.add('disabled-zone'));
+    } else {
+        if (btn.dataset.originalText) btn.innerHTML = btn.dataset.originalText;
+        btn.disabled = false;
+        document.querySelectorAll('input, select').forEach(i => i.disabled = false);
+        document.querySelectorAll('.drop-zone').forEach(d => d.classList.remove('disabled-zone'));
+    }
+}
+
+/**
+ * Appends a log message to the terminal UI.
+ *
+ * @param {string} msg - The raw message to display.
+ * @param {string} [type='normal'] - The log type ('info', 'error', 'success').
+ */
+function logToTerminal(msg, type = 'normal') {
+    const term = document.getElementById('terminal');
+    const p = document.createElement('div');
+    p.className = "mb-1 border-l-2 border-transparent pl-2 text-xs font-mono break-all log-entry";
+
+    // Clean message
+    const cleanMsg = msg.replace('data:', '').trim();
+
+    // Default base style
+    p.classList.add('text-gray-300');
+
+    if (type === 'error') {
+        p.classList.add('text-red-400', 'bg-red-900/10');
+    } else if (type === 'success') {
+        p.classList.add('text-green-400');
+    } else if (type === 'info') {
+        p.classList.add('text-blue-300');
+    }
+
+    p.innerHTML = cleanMsg;
+    term.appendChild(p);
+    term.scrollTop = term.scrollHeight;
+}
+
+/**
+ * Handles batch completion UI logic.
+ *
+ * @param {boolean} success - Whether the batch finished successfully.
+ */
+function finishBatch(success) {
+    isProcessing = false;
+    toggleLoadingState(false, 'btnProcess');
+
+    if (success) {
+        document.getElementById('actionPanel').classList.add('hidden');
+        const resultPanel = document.getElementById('resultPanel');
+        resultPanel.classList.remove('hidden');
+
+        resultPanel.classList.add('animate-pulse');
+        setTimeout(() => resultPanel.classList.remove('animate-pulse'), 500);
+    } else {
+        // On failure, re-enable the sample button so user can fix and retry
+        const btnSample = document.getElementById('btnSample');
+        btnSample.disabled = false;
+        btnSample.classList.remove('opacity-50', 'cursor-not-allowed');
+
+        Swal.fire({ icon: 'error', title: i18n.t('alerts.batch_fail_title'), text: i18n.t('alerts.batch_fail_text'), background: '#1e293b', color: '#fff' });
+    }
+
+    // New session ID for the next run
+    sessionId = crypto.randomUUID();
+}
+
+/**
+ * Triggers a browser download from a Blob.
+ *
+ * @param {Blob} blob - The file blob.
+ * @param {string} filename - The target filename.
+ */
+function downloadBlob(blob, filename) {
+    const url = window.URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = filename;
+    document.body.appendChild(a);
+    a.click();
+    a.remove();
+}
