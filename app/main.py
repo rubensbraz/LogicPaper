@@ -110,8 +110,8 @@ app.include_router(
                     "example": {
                         "status": "healthy",
                         "timestamp": "2026-01-01T12:00:00",
-                        "version": "1.4.0",
-                        "engine": "LogicPaper v1.4.0",
+                        "version": "1.4.1",
+                        "engine": "LogicPaper v1.4.1",
                         "redis": "connected",
                     }
                 }
